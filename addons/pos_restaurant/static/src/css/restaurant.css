@@ -48,6 +48,7 @@
     background: #D8D7D7;
     background-repeat: no-repeat;
     overflow: hidden;
+    background-size: cover;
 }
 
 @media screen and (min-width: 1024px) {
@@ -240,4 +241,13 @@
 }
 
 
+/* ------ ORDER NOTES ------- */
+
+.pos .order .orderline-note {
+    margin: 8px;
+}
+.orderline-note .fa {
+    opacity: 0.5;
+    margin-right: 4px;
+}
 

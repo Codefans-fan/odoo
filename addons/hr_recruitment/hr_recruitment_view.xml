@@ -102,6 +102,13 @@
                         type="object">
                         <field name="attachment_number" widget="statinfo" string="Documents"/>
                     </button>
+                    <button name="action_get_created_employee"
+                        class="oe_stat_button"
+                        icon="fa-user"
+                        type="object"
+                        attrs="{'invisible': [('emp_id', '=', False)]}">
+                        <field name="employee_name" widget="statinfo" string="Employee"/>
+                    </button>
                 </div>
                 <div class="oe_title">
                     <label for="name" class="oe_edit_only"/>
@@ -159,7 +166,7 @@
                             <span class="oe_inline" attrs="{'invisible':[('salary_proposed_extra','=',False)]}"> + </span>
                             <field name="salary_proposed_extra" class="oe_inline" placeholder="Extra advantages..."/>
                         </div>
-                        <field name="emp_id" readonly="1"/>
+                        <field name="emp_id" invisible="1"/>
                     </group>
                 </group>
                 <group>
@@ -176,13 +183,25 @@
         </field>
     </record>
 
+    <record model="ir.ui.view" id="crm_case_pivot_view_job">
+        <field name="name">Jobs - Recruitment</field>
+        <field name="model">hr.applicant</field>
+        <field name="arch" type="xml">
+              <pivot string="Cases By Stage and Estimates">
+                <field name="job_id" type="row"/>
+                <field name="stage_id" type="col"/>
+                <field name="salary_expected" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
     <record model="ir.ui.view" id="crm_case_graph_view_job">
         <field name="name">Jobs - Recruitment Graph</field>
         <field name="model">hr.applicant</field>
         <field name="arch" type="xml">
-              <graph string="Cases By Stage and Estimates" type="bar" orientation="vertical" stacked="True">
-                <field name="job_id" type="row"/>
-                <field name="stage_id" type="col"/>
+              <graph string="Cases By Stage and Estimates">
+                <field name="job_id"/>
+                <field name="stage_id"/>
                 <field name="salary_expected" type="measure"/>
             </graph>
         </field>
