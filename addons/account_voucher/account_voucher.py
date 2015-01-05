@@ -328,7 +328,7 @@ class account_voucher(osv.osv):
                         \n* The \'Cancelled\' status is used when user cancel voucher.'),
         'amount': fields.float('Total', digits_compute=dp.get_precision('Account'), required=True, readonly=True, states={'draft':[('readonly',False)]}),
         'tax_amount':fields.float('Tax Amount', digits_compute=dp.get_precision('Account'), readonly=True),
-        'reference': fields.char('Ref #', readonly=True, states={'draft':[('readonly',False)]},
+        'reference': fields.char('Reference', readonly=True, states={'draft':[('readonly',False)]},
                                  help="Transaction reference number.", copy=False),
         'number': fields.char('Number', readonly=True, copy=False),
         'move_id':fields.many2one('account.move', 'Account Entry', copy=False),
@@ -1568,5 +1568,3 @@ class account_voucher_line(osv.osv):
             'type':ttype
         })
         return values
-
-# vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:

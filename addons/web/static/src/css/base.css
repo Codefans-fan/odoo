@@ -1847,9 +1847,6 @@
   margin-left: 10px;
   font-weight: bold;
 }
-.openerp .oe_form_field_progressbar.ui-progressbar .ui-widget-header {
-  background: #cccccc url(/web/static/lib/jquery.ui/css/smoothness/images/ui-bg_highlight-soft_75_cccccc_1x100.png) 50% 50% repeat-x;
-}
 .openerp .oe_form .oe_form_field_text {
   width: 100%;
 }
@@ -2420,6 +2417,10 @@
 .openerp .oe_list.oe_list_editable.oe_editing .oe_form_field.oe_form_field_datetime input.oe_datepicker_master, .openerp .oe_list.oe_list_editable.oe_editing .oe_form_field.oe_form_field_date input.oe_datepicker_master {
   width: 100% !important;
 }
+.openerp .oe_list.oe_list_editable.oe_editing .oe_form_field.oe_form_field_datetime .oe_datepicker_main, .openerp .oe_list.oe_list_editable.oe_editing .oe_form_field.oe_form_field_date .oe_datepicker_main {
+  width: -webkit-calc(100% - 20px);
+  width: calc(100% - 20px);
+}
 .openerp .oe_list.oe_list_editable.oe_editing .oe_form_field.oe_form_field_reference {
   display: table;
 }
@@ -2828,6 +2829,7 @@ div.ui-widget-overlay {
   font-family: "Lucida Grande", Helvetica, Verdana, Arial, sans-serif;
   color: #4c4c4c;
   font-size: 13px;
+  z-index: 1051;
 }
 
 .ui-menu {
