@@ -24,6 +24,7 @@ from openerp.osv import fields, osv
 from openerp.tools import DEFAULT_SERVER_DATE_FORMAT as DF
 from openerp.tools.safe_eval import safe_eval
 from openerp.tools.translate import _
+from openerp.exceptions import UserError
 
 import logging
 import time
@@ -145,7 +146,7 @@ class gamification_goal_definition(osv.Model):
                 obj.search(cr, uid, domain, context=context, count=True)
             except (ValueError, SyntaxError), e:
                 msg = e.message or (e.msg + '\n' + e.text)
-                raise osv.except_osv(_('Error!'),_("The domain for the definition %s seems incorrect, please check it.\n\n%s" % (definition.name, msg)))
+                raise UserError(_("The domain for the definition %s seems incorrect, please check it.\n\n%s" % (definition.name, msg)))
         return True
 
     def create(self, cr, uid, vals, context=None):
@@ -261,7 +262,7 @@ class gamification_goal(osv.Model):
             last_update = datetime.strptime(goal.last_update, DF).date()
             if date.today() - last_update > delta_max:
                 # generate a remind report
-                temp_obj = self.pool.get('email.template')
+                temp_obj = self.pool.get('mail.template')
                 template_id = self.pool['ir.model.data'].get_object(cr, uid, 'gamification', 'email_template_goal_reminder', context)
                 body_html = temp_obj.render_template(cr, uid, template_id.body_html, 'gamification.goal', goal.id, context=context)
                 self.pool['mail.thread'].message_post(cr, uid, 0, body=body_html, partner_ids=[goal.user_id.partner_id.id], context=context, subtype='mail.mt_comment')
@@ -450,7 +451,7 @@ class gamification_goal(osv.Model):
         for goal in self.browse(cr, uid, ids, context=context):
             if goal.state != "draft" and ('definition_id' in vals or 'user_id' in vals):
                 # avoid drag&drop in kanban view
-                raise osv.except_osv(_('Error!'), _('Can not modify the configuration of a started goal'))
+                raise UserError(_('Can not modify the configuration of a started goal'))
 
             if vals.get('current'):
                 if 'no_remind_goal' in context:

@@ -189,7 +189,7 @@
                             <group string="Categorization" groups="base.group_multi_company,base.group_no_one" name="categorization">
                                 <field name="company_id"
                                     groups="base.group_multi_company"
-                                    widget="selection"/>
+                                    options="{'no_create': True}"/>
                             </group>
                             <group string="Mailings">
                                 <field name="opt_out"/>
@@ -290,7 +290,7 @@
                     <field name="stage_id" options='{"group_by_tooltip": {"requirements": "Description", "legend_priority": "Use of stars"}}'/>
                     <field name="color"/>
                     <field name="priority"/>
-                    <field name="planned_revenue" sum="Expected Revenues"/>
+                    <field name="planned_revenue"/>
                     <field name="user_email"/>
                     <field name="user_id"/>
                     <field name="partner_address_email"/>
@@ -468,6 +468,7 @@
                             <group>
                                 <field name="tag_ids" widget="many2many_tags"/>
                                 <field name="lost_reason"/>
+                                <field name="date_conversion" invisible="1"/>
                             </group>
                         </group>
 
@@ -632,7 +633,7 @@
 
         <!--Update of email_template defined in crm_lead_data, to add ref_ir_act_window
             allowing to have a well formed email template (context action considered as set). -->
-        <record id="email_template_opportunity_mail" model="email.template">
+        <record id="email_template_opportunity_mail" model="mail.template">
             <field name="ref_ir_act_window" ref="crm.action_lead_mass_mail"/>
         </record>
 

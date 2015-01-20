@@ -1,4 +1,4 @@
-@charset "UTF-8";
+@charset "utf-8";
 @font-face {
   font-family: "mnmliconsRegular";
   src: url("/web/static/src/font/mnmliconsv21-webfont.eot") format("eot");
@@ -30,7 +30,7 @@
 }
 #oe_main_menu_navbar .oe_topbar_avatar {
   max-height: 18px;
-  width: auto;
+  width: 18px;
 }
 
 #oe_main_menu_navbar.navbar {
@@ -39,6 +39,10 @@
 
 .oe_systray {
   margin-right: 0px !important;
+}
+
+.apps-client {
+  border: 0;
 }
 
 .oe_notification {
@@ -64,10 +68,10 @@
 .navbar .oe_topbar_name {
   max-width: 150px;
   display: inline-block;
-  height: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
+  vertical-align: middle;
 }
 
 .openerp {
@@ -436,6 +440,13 @@
 }
 .openerp .oe_button_box .oe_stat_button {
   display: inline-table;
+}
+.openerp button.oe_toggle_button {
+  box-shadow: none;
+  white-space: nowrap;
+  background: transparent;
+  outline: none;
+  border: none;
 }
 .openerp .oe_avatar > img {
   max-height: 90px;
@@ -2846,6 +2857,7 @@ div.ui-widget-overlay {
 }
 .ui-menu .ui-menu-item a {
   padding: 1px 16px;
+  color: #404040;
 }
 .ui-menu .ui-menu-item a.ui-corner-all {
   -moz-border-radius: 0;
@@ -3033,11 +3045,23 @@ body.oe_single_form .oe_single_form_container {
 }
 
 @media print {
+  body {
+    height: auto !important;
+  }
+
+  .openerp#announcement_bar_table {
+    display: none;
+  }
+
   .openerp {
     text-shadow: none;
   }
+  .openerp .oe_application, .openerp .oe_view_manager_wrapper {
+    height: auto !important;
+  }
   .openerp .oe_application > div > .oe_view_manager > .oe_view_manager_wrapper > div > .oe_view_manager_body {
     overflow: visible;
+    position: relative !important;
   }
   .openerp .oe_header_row, .openerp ul.oe_header, .openerp div.oe_mail_thread_action, .openerp .oe_mail_recthread_actions, .openerp .oe_button_box, .openerp .oe_form button, .openerp button.oe_invite, .openerp .oe_form header, .openerp .openerp .oe_notebook > li.ui-state-default, .openerp .oe_topbar, .openerp .oe_leftbar, .openerp .oe_loading {
     display: none !important;

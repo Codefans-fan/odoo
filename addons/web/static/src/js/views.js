@@ -590,7 +590,7 @@ instance.web.ViewManager =  instance.web.Widget.extend({
             self.view_order.push(view_descr);
             self.views[view_type] = view_descr;
         });
-        this.multiple_views = (self.view_order.length - ('form' in this.views ? 1 : 0)) > 1;
+        this.multiple_views = (self.view_order.length > 1);
     },
     /**
      * @returns {jQuery.Deferred} initial view loading promise
@@ -613,7 +613,12 @@ instance.web.ViewManager =  instance.web.Widget.extend({
         this.$header_col = this.$header.find('.oe-header-title');
         this.$search_col = this.$header.find('.oe-view-manager-search-view');
         this.$switch_buttons.click(function (event) {
-            self.switch_mode($(this).data('view-type'));
+            var view_type = $(this).data('view-type');
+            if ((view_type === 'form') && (self.active_view.type === 'form')) {
+                self._display_view(view_type);
+            } else {
+                self.switch_mode(view_type);
+            }
         });
         var views_ids = {};
         _.each(this.views, function (view) {
@@ -625,9 +630,7 @@ instance.web.ViewManager =  instance.web.Widget.extend({
                 action : self.action,
                 action_views_ids : views_ids,
             }, self.flags, self.flags[view.type], view.options);
-            if (view.type !== 'form') {
-                self.$('.oe-vm-switch-' + view.type).tooltip();
-            }
+            self.$('.oe-vm-switch-' + view.type).tooltip();
         });
         this.$('.oe_debug_view').click(this.on_debug_changed);
         this.$el.addClass("oe_view_manager_" + ((this.action && this.action.target) || 'current'));
@@ -641,7 +644,6 @@ instance.web.ViewManager =  instance.web.Widget.extend({
     switch_mode: function(view_type, no_store, view_options) {
         var self = this,
             view = this.views[view_type];
-
         if (!view) {
             return $.Deferred().reject();
         }
@@ -718,14 +720,16 @@ instance.web.ViewManager =  instance.web.Widget.extend({
             .empty()
             .append($breadcrumbs);
 
-        function make_breadcrumb (bc, is_active) {
-            var handler = function () {
-                self.action_manager.select_widget(bc.widget, bc.index);
-            };
-            return $('<li>')
-                    .append(is_active ? bc.title : $('<a>').text(bc.title))
-                    .toggleClass('active', is_active)
-                    .click(handler);
+        function make_breadcrumb (bc, is_last) {
+            var $bc = $('<li>')
+                    .append(is_last ? bc.title : $('<a>').text(bc.title))
+                    .toggleClass('active', is_last);
+            if (!is_last) {
+                $bc.click(function () {
+                    self.action_manager.select_widget(bc.widget, bc.index);
+                });
+            }
+            return $bc;
         }
     },
     create_view: function(view) {
@@ -1571,5 +1575,3 @@ instance.web.xml_to_str = function(node) {
 instance.web.views = new instance.web.Registry();
 
 })();
-
-// vim:et fdc=0 fdl=0 foldnestmax=3 fdm=syntax:

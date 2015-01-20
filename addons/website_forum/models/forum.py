@@ -13,7 +13,7 @@ from openerp import modules
 from openerp import tools
 from openerp import SUPERUSER_ID
 from openerp.addons.website.models.website import slug
-from openerp.exceptions import Warning
+from openerp.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -48,6 +48,7 @@ class Forum(models.Model):
     faq = fields.Html('Guidelines', default=_get_default_faq, translate=True)
     description = fields.Html(
         'Description',
+        translate=True,
         default='<p> This community is for professionals and enthusiasts of our products and services.'
                 'Share and discuss the best content and new marketing ideas,'
                 'build your professional profile and become a better marketer together.</p>')
@@ -264,6 +265,15 @@ class Post(models.Model):
     def _get_post_karma_rights(self):
         user = self.env.user
 
+    def name_get(self, cr, uid, ids, context=None):
+        result = []
+        for post in self.browse(cr, uid, ids, context=context):
+            if post.parent_id and not post.name:
+                result.append((post.id, '%s (%s)' % (post.parent_id.name, post.id)))
+            else:
+                result.append((post.id, '%s' % (post.name)))
+        return result
+
         self.karma_accept = self.parent_id and self.parent_id.create_uid.id == self._uid and self.forum_id.karma_answer_accept_own or self.forum_id.karma_answer_accept_all
         self.karma_edit = self.create_uid.id == self._uid and self.forum_id.karma_edit_own or self.forum_id.karma_edit_all
         self.karma_close = self.create_uid.id == self._uid and self.forum_id.karma_close_own or self.forum_id.karma_close_all
@@ -297,7 +307,7 @@ class Post(models.Model):
         post = super(Post, self.with_context(mail_create_nolog=True)).create(vals)
         # deleted or closed questions
         if post.parent_id and (post.parent_id.state == 'close' or post.parent_id.active is False):
-            raise Warning(_('Posting answer on a [Deleted] or [Closed] question is not possible'))
+            raise UserError(_('Posting answer on a [Deleted] or [Closed] question is not possible'))
         # karma-based access
         if not post.parent_id and not post.can_ask:
             raise KarmaError('Not enough karma to create a new question')
@@ -319,6 +329,17 @@ class Post(models.Model):
             post.message_post(subject=post.name, body=body, subtype='website_forum.mt_question_new')
             self.env.user.sudo().add_karma(post.forum_id.karma_gen_question_new)
         return post
+
+    @api.multi
+    @api.depends('name', 'post_type')
+    def name_get(self):
+        result = []
+        for post in self:
+            if post.post_type == 'discussion' and post.parent_id and not post.name:
+                result.append((post.id, '%s (%s)' % (post.parent_id.name, post.id)))
+            else:
+                result.append((post.id, '%s' % (post.name)))
+        return result
 
     @api.multi
     def write(self, vals):
@@ -444,7 +465,7 @@ class Post(models.Model):
             'subtype': 'mail.mt_comment',
             'date': self.create_date,
         }
-        new_message = self.browse(question.id).with_context(mail_create_nosubcribe=True).message_post(**values)
+        new_message = self.browse(question.id).with_context(mail_create_nosubscribe=True).message_post(**values)
 
         # unlink the original answer, using SUPERUSER_ID to avoid karma issues
         self.sudo().unlink()
@@ -563,7 +584,7 @@ class Vote(models.Model):
 
         # own post check
         if vote.user_id.id == vote.post_id.create_uid.id:
-            raise Warning('Not allowed to vote for its own post')
+            raise UserError(_('Not allowed to vote for its own post'))
         # karma check
         if vote.vote == '1' and not vote.post_id.can_upvote:
             raise KarmaError('Not enough karma to upvote.')
@@ -583,7 +604,7 @@ class Vote(models.Model):
             for vote in self:
                 # own post check
                 if vote.user_id.id == vote.post_id.create_uid.id:
-                    raise Warning('Not allowed to vote for its own post')
+                    raise UserError(_('Not allowed to vote for its own post'))
                 # karma check
                 if (values['vote'] == '1' or vote.vote == '-1' and values['vote'] == '0') and not vote.post_id.can_upvote:
                     raise KarmaError('Not enough karma to upvote.')

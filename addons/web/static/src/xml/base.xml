@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- vim:fdl=1:
--->
 <templates id="template" xml:space="preserve">
 <t t-name="EmptyComponent">
     <div></div>
@@ -31,7 +29,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-                    <h3 class="modal-title"><t t-raw="title"/></h3>
+                    <h3 class="modal-title"><t t-raw="title"/><span class="text-muted"><t t-esc="subtitle"/></span></h3>
                 </div>
                 <div class="modal-body">
                 </div>
@@ -84,7 +82,7 @@
                 </p>
                 <p class="oe_grey" style="margin: 10px">
                     By default, the master password is 'admin'. This password
-                    is required to created, delete dump or restore databases.
+                    is required to create, delete, dump or restore databases.
                 </p>
                 <table class="db_option_table" style="margin: 10px">
                     <tr>
@@ -215,6 +213,15 @@
                                 </t>
                             </select>
                             <input t-if="!widget.db_list" name="backup_db" class="required" type="text" autofocus="autofocus"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><label for="backup_format">Backup format:</label></td>
+                        <td class="oe_form_field oe_form_field_selection">
+                            <select name="backup_format">
+                                <option value="zip">zip (includes filestore)</option>
+                                <option value="dump">pg_dump custom format (without filestore)</option>
+                            </select>
                         </td>
                     </tr>
                     <tr>
@@ -497,7 +504,7 @@
                     <t t-if="widget.multiple_views">
                         <div class="oe-view-manager-switch btn-group btn-group-sm">
                             <t t-foreach="widget.view_order" t-as="view">
-                                <button type="button" t-attf-class="btn btn-default fa oe-vm-switch-#{view.type}" t-att-data-view-type="view.type" t-att-title="view.label" t-if="view.type!=='form'">
+                                <button type="button" t-attf-class="btn btn-default fa oe-vm-switch-#{view.type}" t-att-data-view-type="view.type" t-att-title="view.label">
                                 </button>
                             </t>
                         </div>
@@ -2021,6 +2028,10 @@
     style="box-shadow: none; white-space:nowrap;">
     <img t-attf-src="#{prefix}/web/static/src/img/icons/#{widget.icon}.png"
     t-att-alt="widget.string"/>
+</button>
+<button t-name="FieldToggleBoolean" type="button"
+    t-att-title="widget.string" class="oe_toggle_button">
+    <img t-attf-src="#{_s}/web/static/src/img/icons/#{widget.icon}" t-att-alt="widget.string"/>
 </button>
 
 </templates>
