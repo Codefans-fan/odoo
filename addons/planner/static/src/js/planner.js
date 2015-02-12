@@ -102,7 +102,7 @@
             this.planner_launcher = parent;
             this.planner = planner;
             this.cookie_name = this.planner['planner_application'] + '_last_page';
-            this.set('progress', 0);
+            this.set('progress', 5);
         },
         start: function() {
             var self = this;
@@ -186,8 +186,8 @@
         _switch_page: function(page_id) {
             this.$(".oe_planner li a[href^='#planner_page']").parent().removeClass('active');
             this.$(".oe_planner li a[href=#"+page_id+"]").parent().addClass('active');
-            this.$(".oe_planner div[id^='planner_page']").removeClass('visible');
-            this.$(".oe_planner div[id="+page_id+"]").addClass('visible');
+            this.$(".oe_planner div[id^='planner_page']").removeClass('show');
+            this.$(".oe_planner div[id="+page_id+"]").addClass('show');
             this.planner.data['last_open_page'] = page_id;
             openerp.session.set_cookie(this.cookie_name, page_id, 8*60*60); // create cookie for 8h
         },
@@ -252,7 +252,7 @@
             // re compute the progress percentage
             var mark_btn = this.$(".oe_planner button[id^='mark_button']");
             var marked_btn = this.$(".oe_planner button[id^='mark_button'].fa-check-square-o");
-            var percent = parseInt((marked_btn.length / mark_btn.length * 100));
+            var percent = parseInt((marked_btn.length+1) / (mark_btn.length+1) * 100);
             this.set('progress', percent);
             this.planner.progress = percent;
             // save data and progress in database

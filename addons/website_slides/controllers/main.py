@@ -260,7 +260,7 @@ class website_slides(http.Controller):
             return {
                 'img_src': '/website/image/slide.slide/%s/image_thumb' % (slide.id),
                 'caption': slide.name,
-                'url': slide.share_url
+                'url': slide.website_url
             }
         vals = map(slide_mapped_dict, slide.get_related_slides(slides_to_suggest))
         add_more_slide = slides_to_suggest - len(vals)
@@ -313,7 +313,9 @@ class website_slides(http.Controller):
         # otherwise client slide create dialog box continue processing even server fail to create a slide.
         try:
             slide_id = request.env['slide.slide'].create(values)
-        # TDE TODO: probably improve this behavior by differentiating exceptions
+        except AccessError as e:
+            _logger.error(e)
+            return {'error': e.name}
         except Exception as e:
             _logger.error(e)
             return {'error': _('Internal server error, please try again later or contact administrator.\nHere is the error message: %s' % e.message)}

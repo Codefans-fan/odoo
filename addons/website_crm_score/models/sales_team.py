@@ -20,8 +20,7 @@ try:
         return bool(address.validate_address(mail))
 
 except ImportError:
-    _logger.warning('Flanker library not found, Flanker features (check email on lead) disabled. \
-                     If you plan to use it, please install the Flanker library from http://pypi.python.org/pypi/flanker')
+    _logger.warning('flanker not found, email validation disabled.')
 
     def checkmail(mail):
         return True
@@ -69,7 +68,8 @@ class team_user(models.Model):
 
     @api.one
     def toggle_active(self):
-        self.running = not self.running
+        if isinstance(self.id, int):  # if already saved
+            self.running = not self.running
 
 
 class crm_team(osv.osv):
@@ -117,7 +117,6 @@ class crm_team(osv.osv):
     unassigned_leads = fields.Integer(compute='_unassigned_leads')
     capacity = fields.Integer(compute='_capacity')
     team_user_ids = fields.One2many('team.user', 'team_id', string='Salesman')
-    user_ids = fields.Many2many('res.users', 'team_user', 'team_id', 'user_id', readonly=True)  # Use for display in Kanban
     min_for_assign = fields.Integer("Minimum score", help="Minimum score to be automatically assign (>=)", default=0, required=True)
 
     @api.model
@@ -150,7 +149,7 @@ class crm_team(osv.osv):
                 if dry:
                     for lead in leads:
                         values = {'lead_id': lead.id, 'team_id': salesteam['id']}
-                        self.env['leads.dry.run'].create(values)
+                        self.env['crm.leads.dry.run'].create(values)
                 else:
                     leads.write({'team_id': salesteam['id']})
 
@@ -188,7 +187,7 @@ class crm_team(osv.osv):
             limit = int(math.ceil(su.maximum_user_leads / 15.0))
 
             if dry:
-                dry_leads = self.env["leads.dry.run"].search([('team_id', '=', su.team_id.id)])
+                dry_leads = self.env["crm.leads.dry.run"].search([('team_id', '=', su.team_id.id)])
                 domain.append(['id', 'in', dry_leads.mapped('lead_id.id')])
             else:
                 domain.append(('team_id', '=', su.team_id.id))
@@ -219,12 +218,12 @@ class crm_team(osv.osv):
                 del users[i]
                 continue
 
-            #lead convert for this user
+            # lead convert for this user
             lead = user['leads'][0]
             assigned.add(lead)
             if dry:
                 values = {'lead_id': lead.id, 'team_id': user['su'].team_id.id, 'user_id': user['su'].user_id.id}
-                self.env['leads.dry.run'].create(values)
+                self.env['crm.leads.dry.run'].create(values)
             else:
                 # Assign date will be setted by write function
                 data = {'user_id': user['su'].user_id.id}
@@ -241,7 +240,7 @@ class crm_team(osv.osv):
     def _assign_leads(self, dry=False):
         # Emptying the table
         self._cr.execute("""
-                TRUNCATE TABLE leads_dry_run;
+                TRUNCATE TABLE crm_leads_dry_run;
             """)
 
         all_salesteams = self.search_read(fields=['score_team_domain'], domain=[('score_team_domain', '!=', False)])

@@ -7,7 +7,7 @@
                 <form class="navbar-form text-muted">
                     <button type="button" data-action="save"
                             class="btn btn-primary btn-xs">Save</button>
-                    or
+                    <span>or</span>
                     <a href="#" data-action="cancel" class="btn btn-link btn-xs">Discard</a>
                 </form>
             </div>
@@ -24,7 +24,8 @@
                     </div>
                     <div class="modal-body"><t t-raw="0"/></div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-primary save">Save</button>
+                        <button type="button" class="btn btn-primary save" t-if="!button">Save</button>
+                        <button type="button" class="btn btn-primary save" t-if="button"><t t-raw="button"/></button>
                         <button type="button" class="btn hidden wait" disabled="disabled"/>
                         or
                         <a href="#" data-dismiss="modal" aria-hidden="true">Discard</a>
@@ -362,9 +363,6 @@
                 <t t-call="website.editor.dialog.font-icons.icons">
                     <t t-set="iconsParser" t-value="widget.iconsParser"/>
                 </t>
-            </div>
-            <div class="form-group mt32" id="fa-preview">
-
             </div>
         </form>
     </t>

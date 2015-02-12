@@ -196,7 +196,7 @@ class account_account_type(osv.osv):
     _columns = {
         'name': fields.char('Account Type', required=True, translate=True),
         'code': fields.char('Code', size=32, required=True, select=True),
-        'close_method': fields.selection([('none', 'None'), ('balance', 'Balance'), ('detail', 'Detail'), ('unreconciled', 'Unreconciled')], 'Deferral Method', required=True, help="""Set here the method that will be used to generate the end of year journal entries for all the accounts of this type.
+        'close_method': fields.selection([('none', 'None'), ('balance', 'Balance'), ('detail', 'Detail'), ('unreconciled', 'Unreconciled')], 'Carry Forward Method', required=True, help="""Set here the method that will be used to generate the end of year journal entries for all the accounts of this type.
 
  'None' means that nothing will be done.
  'Balance' will generally be used for cash accounts.
@@ -566,7 +566,7 @@ class account_account(osv.osv):
     _constraints = [
         (_check_recursion, 'Error!\nYou cannot create recursive accounts.', ['parent_id']),
         (_check_type, 'Configuration Error!\nYou cannot define children to an account with internal type different of "View".', ['type']),
-        (_check_account_type, 'Configuration Error!\nYou cannot select an account type with a deferral method different of "Unreconciled" for accounts with internal type "Payable/Receivable".', ['user_type','type']),
+        (_check_account_type, 'Configuration Error!\nYou cannot select an account type with a `carry forward` method different of "Unreconciled" for accounts with internal type "Payable/Receivable".', ['user_type','type']),
         (_check_company_account, 'Error!\nYou cannot create an account which has parent account of different company.', ['parent_id']),
     ]
     _sql_constraints = [
@@ -1320,7 +1320,7 @@ class account_move(osv.osv):
                     new_name = invoice.internal_number
                 else:
                     if journal.sequence_id:
-                        c = {'fiscalyear_id': move.period_id.fiscalyear_id.id}
+                        c = {'ir_sequence_date': move.period_id.date_start}
                         new_name = obj_sequence.next_by_id(cr, uid, journal.sequence_id.id, c)
                     else:
                         raise UserError(_('Please define a sequence on the journal.'))
@@ -1370,9 +1370,6 @@ class account_move(osv.osv):
         self.validate(cr, uid, ids, context=context)
         return result
 
-    #
-    # TODO: Check if period is closed !
-    #
     def create(self, cr, uid, vals, context=None):
         context = dict(context or {})
         if vals.get('line_id'):
@@ -1534,6 +1531,8 @@ class account_move(osv.osv):
             line_ids = []
             line_draft_ids = []
             company_id = None
+            # makes sure we don't use outdated period
+            obj_move_line._update_journal_check(cr, uid, journal.id, move.period_id.id, context=context)
             for line in move.line_id:
                 amount += line.debit - line.credit
                 line_ids.append(line.id)

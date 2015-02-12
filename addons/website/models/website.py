@@ -6,7 +6,6 @@ import hashlib
 import inspect
 import logging
 import math
-import mimetypes
 import unicodedata
 import os
 import re
@@ -24,6 +23,7 @@ except ImportError:
     slugify_lib = None
 
 import openerp
+from openerp.tools.translate import _
 from openerp.osv import orm, osv, fields
 from openerp.tools import html_escape as escape, ustr, image_resize_and_sharpen, image_save_for_web
 from openerp.tools.safe_eval import safe_eval
@@ -222,6 +222,77 @@ class website(osv.osv):
             'page': ispage,
         })
         return page_xmlid
+
+    def delete_page(self, cr, uid, view_id, context=None):
+        if context is None:
+            context = {}
+        View = self.pool.get('ir.ui.view')
+        view_find = View.search(cr, uid, [
+            ('id', '=', view_id),
+            "|", ('website_id', '=', context.get('website_id')), ('website_id', '=', False),
+            ('page', '=', True),
+            ('type', '=', 'qweb')
+        ], context=context)
+        if view_find:
+            View.unlink(cr, uid, view_find, context=context)
+
+    def page_search_dependencies(self, cr, uid, view_id=False, context=None):
+        dep = {}
+        if not view_id:
+            return dep
+
+        # search dependencies just for information.
+        # It will not catch 100% of dependencies and False positive is more than possible
+        # Each module could add dependences in this dict
+        if context is None:
+            context = {}
+        View = self.pool.get('ir.ui.view')
+        Menu = self.pool.get('website.menu')
+
+        view = View.browse(cr, uid, view_id, context=context)
+        website_id = context.get('website_id')
+        name = view.key.replace("website.", "")
+        fullname = "website.%s" % name
+
+        if view.page:
+            # search for page with link
+            page_search_dom = [
+                '|', ('website_id', '=', website_id), ('website_id', '=', False),
+                '|', ('arch_db', 'ilike', '/page/%s' % name), ('arch_db', 'ilike', '/page/%s' % fullname)
+            ]
+            pages = View.search(cr, uid, page_search_dom, context=context)
+            if pages:
+                page_key = _('Page')
+                dep[page_key] = []
+            for page in View.browse(cr, uid, pages, context=context):
+                if page.page:
+                    dep[page_key].append({
+                        'text': _('Page <b>%s</b> probably has a link to this page !' % page.key),
+                        'link': '/page/%s' % page.key
+                    })
+                else:
+                    dep[page_key].append({
+                        'text': _('Template <b>%s (id:%s)</b> probably has a link to this page !' % (page.key, page.id)),
+                        'link': '#'
+                    })
+
+            # search for menu with link
+            menu_search_dom = [
+                '|', ('website_id', '=', website_id), ('website_id', '=', False),
+                '|', ('url', 'ilike', '/page/%s' % name), ('url', 'ilike', '/page/%s' % fullname)
+            ]
+
+            menus = Menu.search(cr, uid, menu_search_dom, context=context)
+            if menus:
+                menu_key = _('Menu')
+                dep[menu_key] = []
+            for menu in Menu.browse(cr, uid, menus, context=context):
+                dep[menu_key].append({
+                    'text': _('Menu <b>%s</b> probably has a link to this page !' % menu.name),
+                    'link': '#'
+                })
+
+        return dep
 
     def page_for_name(self, cr, uid, ids, name, module='website', context=None):
         # whatever
@@ -681,7 +752,7 @@ class website_menu(osv.osv):
     _order = "sequence"
 
     # would be better to take a menu_id as argument
-    def get_tree(self, cr, uid, website_id, context=None):
+    def get_tree(self, cr, uid, website_id, menu_id=None, context=None):
         def make_tree(node):
             menu_node = dict(
                 id=node.id,
@@ -695,7 +766,10 @@ class website_menu(osv.osv):
             for child in node.child_id:
                 menu_node['children'].append(make_tree(child))
             return menu_node
-        menu = self.pool.get('website').browse(cr, uid, website_id, context=context).menu_id
+        if menu_id:
+            menu = self.browse(cr, uid, menu_id, context=context)
+        else:
+            menu = self.pool.get('website').browse(cr, uid, website_id, context=context).menu_id
         return make_tree(menu)
 
     def save(self, cr, uid, website_id, data, context=None):
@@ -853,3 +927,25 @@ class website_seo_metadata(osv.Model):
         'website_meta_description': fields.text("Website meta description", translate=True),
         'website_meta_keywords': fields.char("Website meta keywords", translate=True),
     }
+
+
+class website_published_mixin(osv.AbstractModel):
+    _name = "website.published.mixin"
+
+    _website_url_proxy = lambda self, *a, **kw: self._website_url(*a, **kw)
+
+    _columns = {
+        'website_published': fields.boolean('Visible in Website', copy=False),
+        'website_url': fields.function(_website_url_proxy, type='char', string='Website URL',
+                                       help='The full URL to access the document through the website.'),
+    }
+
+    def _website_url(self, cr, uid, ids, field_name, arg, context=None):
+        return dict.fromkeys(ids, '#')
+
+    def open_website_url(self, cr, uid, ids, context=None):
+        return {
+            'type': 'ir.actions.act_url',
+            'url': self.browse(cr, uid, ids[0]).website_url,
+            'target': 'self',
+        }

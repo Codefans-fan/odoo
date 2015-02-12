@@ -171,8 +171,11 @@ class view(osv.osv):
                 if context and key in context:
                     imd = context[key]
                     if self._model._name == imd['model'] and (not view.xml_id or view.xml_id == imd['xml_id']):
-                        # we store the relative path to the resource instead of the absolute path
-                        data['arch_fs'] = '/'.join(get_resource_from_path(imd['xml_file'])[0:2])
+                        # we store the relative path to the resource instead of the absolute path, if found
+                        # (it will be missing e.g. when importing data-only modules using base_import_module)
+                        path_info = get_resource_from_path(imd['xml_file'])
+                        if path_info:
+                            data['arch_fs'] = '/'.join(path_info)[0:2]
                 self.write(cr, uid, ids, data, context=context)
 
         return True
@@ -194,7 +197,7 @@ class view(osv.osv):
             ('search','Search'),
             ('qweb', 'QWeb')], string='View Type'),
         'arch': fields.function(_arch_get, fnct_inv=_arch_set, string='View Architecture', type="text", nodrop=True),
-        'arch_db': fields.text('Arch Blob'),
+        'arch_db': fields.text('Arch Blob', oldname='arch'),
         'arch_fs': fields.char('Arch Filename'),
         'inherit_id': fields.many2one('ir.ui.view', 'Inherited View', ondelete='restrict', select=True),
         'inherit_children_ids': fields.one2many('ir.ui.view','inherit_id', 'Inherit Views'),
@@ -1065,6 +1068,7 @@ class view(osv.osv):
         if values is None:
             values = dict()
         qcontext = dict(
+            env=api.Environment(cr, uid, context),
             keep_query=keep_query,
             request=request, # might be unbound if we're not in an httprequest context
             debug=request.debug if request else False,

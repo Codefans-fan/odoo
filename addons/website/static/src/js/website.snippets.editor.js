@@ -24,8 +24,7 @@
             this.on('rte:ready', this, function () {
                 var $editable = $(".o_editable");
                 window.snippets = this.snippets = new website.snippet.BuildingBlock(this, $editable);
-                this.snippets.appendTo(this.$el);
-                self.snippets.$button.removeClass("hidden");
+                this.snippets.insertAfter(this.$el);
                 website.snippet.start_animation(true);
                 $editable.find("*").off('mousedown mouseup click');
             });
@@ -100,18 +99,11 @@
         },
         start: function() {
             var self = this;
-
-            this.$button = $(openerp.qweb.render('website.snippets_button'))
-                .prependTo(this.parent.$(".js_editor_placeholder"))
-                .find("button");
-
-            this.$button.click(_.bind(this.show_blocks, this));
-
             this.$snippet = $("#oe_snippets");
 
-            $('body').on('click', '.o_editable', function () {
-                self.$el.addClass("hidden");
-            });
+            this.$el
+                .on("mouseenter", function () { self.show(); })
+                .on("mouseleave", function (event) { if (event.clientX>0 && event.clientY>0) self.hide(); });
 
             $(window).resize(function () {
                 setTimeout('$(document).click()',0);
@@ -119,67 +111,45 @@
 
             this.fetch_snippet_templates();
             this.bind_snippet_click_editor();
-            this.$el.addClass("hidden");
 
             $(document).on('click', '.dropdown-submenu a[tabindex]', function (e) {
                 e.preventDefault();
             });
 
-            this.getParent().on('change:height', this, function (editor) {
-                self.$el.css('top', editor.get('height'));
-            });
-            this.$el.css('top', this.parent.get('height'));
-
             var _isNotBreakable = $.summernote.core.dom.isNotBreakable;
             $.summernote.core.dom.isNotBreakable = function (node, sc, so, ec, eo) {
                 return _isNotBreakable(node, sc, so, ec, eo) || $(node).is('div') || website.snippet.globalSelector.is($(node));
             };
-        },
 
-        show_blocks: function () {
-            var self = this;
-            this.make_active(false);
-            this.$el.toggleClass("hidden");
-            if (this.$el.hasClass("hidden")) {
-                return;
-            }
+            $(window).on('resize', function () {
+                if (self.$active_snipped_id) {
+                    self.cover_target(self.$active_snipped_id.data("snippet-editor").$overlay, self.$active_snipped_id);
+                }
+                var $scroll = self.$snippet.find('.scroll:first').css("overflow", "");
+                if ($scroll.children().last().height() + $scroll.children().first().height() + 34 > document.body.clientHeight) {
+                    $scroll.css("overflow", "auto").css("width", "216px");
+                } else {
+                    $scroll.css("width", "");
+                }
+            });
 
-            var cache = {};
-            this.$snippet.find(".tab-pane").each(function () {
-                var catcheck = false;
-                var $category = $(this);
-                $category.find(".oe_snippet_body").each(function () {
-                    var $snippet = $(this);
-
-                    var check = false;
-
-                    for (var k in website.snippet.templateOptions) {
-                        var option = website.snippet.templateOptions[k];
-                        if ($snippet.is(option.base_selector)) {
-
-                            cache[k] = cache[k] || {
-                                'drop-near': option['drop-near'] ? option['drop-near'].all() : [],
-                                'drop-in': option['drop-in'] ? option['drop-in'].all() : []
-                            };
-
-                            if (cache[k]['drop-near'].length || cache[k]['drop-in'].length) {
-                                catcheck = true;
-                                check = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (check) {
-                        $snippet.closest(".oe_snippet").removeClass("disable");
-                    } else {
-                        $snippet.closest(".oe_snippet").addClass("disable");
-                    }
-                });
-
-                $('#oe_snippets .scroll a[data-toggle="tab"][href="#' + $category.attr("id") + '"]').toggle(catcheck);
+            $(document).on('mousemove', function () {
+                if (self.$active_snipped_id && self.$active_snipped_id.data("snippet-editor")) {
+                    self.$active_snipped_id.data("snippet-editor").$overlay.removeClass('o_keypress');
+                }
+            });
+            $(document).on('keydown', function (event) {
+                if (self.$active_snipped_id && self.$active_snipped_id.data("snippet-editor")) {
+                    self.$active_snipped_id.data("snippet-editor").$overlay.addClass('o_keypress');
+                }
+                if ((event.metaKey || (event.ctrlKey && !event.altKey)) && event.shiftKey && event.keyCode >= 48 && event.keyCode <= 57) {
+                    self.$snippet.find('.scroll:first > ul li:eq('+(event.keyCode-49)+') a').trigger("click");
+                    self.show();
+                    event.preventDefault();
+                }
             });
         },
+
         _get_snippet_url: function () {
             return '/website/snippets';
         },
@@ -229,6 +199,16 @@
             openerp.jsonRpc(this._get_snippet_url(), 'call', {})
                 .then(function (html) {
                     var $html = $(html);
+
+                    $html.siblings(".scroll").find('> ul li').tooltip({
+                            delay: { "show": 500, "hide": 100 },
+                            container: 'body',
+                            title: function () {
+                                return (navigator.appVersion.indexOf('Mac') > -1 ? 'CMD' : 'CTRL')+'+SHIFT+'+($(this).index()+1);
+                            },
+                            trigger: 'hover',
+                            placement: 'right'
+                        }).on('click', function () {$(this).tooltip('hide');});
 
                     // t-snippet
                     $html.find('> .tab-content > div > [data-oe-type="snippet"]').each(function () {
@@ -310,6 +290,21 @@
                             $("> *:not(.oe_snippet_thumbnail)", this).addClass('oe_snippet_body');
                         });
 
+                    // select all default text to edit (if snippet default text)
+                    self.$snippets.find('.oe_snippet_body, .oe_snippet_body *')
+                        .contents()
+                        .filter(function() {
+                            return this.nodeType === 3 && this.textContent.match(/\S/);
+                        }).parent().addClass("o_default_snippet_text");
+                    $(document).on("mouseup", ".o_default_snippet_text", function (event) {
+                        $(event.target).selectContent();
+                    });
+                    $(document).on("keyup", function (event) {
+                        var r = $.summernote.core.range.create();
+                        $(r && r.sc).closest(".o_default_snippet_text").removeClass("o_default_snippet_text");
+                    });
+                    // end
+
                     // clean t-oe
                     $html.find('[data-oe-model]').each(function () {
                         for (var k=0; k<this.attributes.length; k++) {
@@ -322,6 +317,8 @@
                     // end
 
                     self.$el.append($html);
+
+                    $(window).trigger('resize');
 
                     self.make_snippet_draggable(self.$snippets);
                 });
@@ -350,18 +347,59 @@
             $el.find(".oe_handle.size").css({'top': $target.outerHeight() + mt});
             $el.find(".oe_handle.s,.oe_handle.n").css({'width': width-2});
         },
+
+        show_blocks: function () {
+            var cache = {};
+            this.$snippet.find(".tab-pane").each(function () {
+                var catcheck = false;
+                var $category = $(this);
+                $category.find(".oe_snippet_body").each(function () {
+                    var $snippet = $(this);
+
+                    var check = false;
+
+                    for (var k in website.snippet.templateOptions) {
+                        var option = website.snippet.templateOptions[k];
+                        if ($snippet.is(option.base_selector)) {
+
+                            cache[k] = cache[k] || {
+                                'drop-near': option['drop-near'] ? option['drop-near'].all() : [],
+                                'drop-in': option['drop-in'] ? option['drop-in'].all() : []
+                            };
+
+                            if (cache[k]['drop-near'].length || cache[k]['drop-in'].length) {
+                                catcheck = true;
+                                check = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (check) {
+                        $snippet.closest(".oe_snippet").removeClass("disable");
+                    } else {
+                        $snippet.closest(".oe_snippet").addClass("disable");
+                    }
+                });
+
+                $('#oe_snippets .scroll a[data-toggle="tab"][href="#' + $category.attr("id") + '"]').toggle(catcheck);
+            });
+        },
         show: function () {
-            this.$el.removeClass("hidden");
+            var self = this;
+            this.make_active(false);
+            this.$el.addClass("o_open");
+            this.show_blocks();
         },
         hide: function () {
-            this.$el.addClass("hidden");
+            this.$el.removeClass("o_open");
         },
         bind_snippet_click_editor: function () {
             var self = this;
             var snipped_event_flag;
             $(document).on('click', '*', function (event) {
-                var srcElement = event.srcElement || (event.originalEvent && (event.originalEvent.originalTarget || event.originalEvent.target));
-                if (snipped_event_flag===srcElement || !srcElement) {
+                var srcElement = event.srcElement || (event.originalEvent && (event.originalEvent.originalTarget || event.originalEvent.target) || event.target);
+                if (self.editor_busy || snipped_event_flag===srcElement || !srcElement) {
                     return;
                 }
                 snipped_event_flag = srcElement;
@@ -1379,7 +1417,9 @@
                     $body.unbind('mousemove', body_mousemove);
                     $body.unbind('mouseup', body_mouseup);
                     $body.removeClass(cursor);
-                    self.BuildingBlock.editor_busy = false;
+                    setTimeout(function () {
+                        self.BuildingBlock.editor_busy = false;
+                    },0);
                     self.$target.removeClass("resize_editor_busy");
                 };
                 $body.mousemove(body_mousemove);
@@ -1760,11 +1800,13 @@
             if (!this.$target.hasClass('o_ul_folded')) {
                 this.$target.find(".o_close").removeClass("o_close");
             }
+            this.$target.find("li:not(:has(>ul))").css('list-style', '');
         },
         toggle_class: function (type, value, $li) {
             this._super(type, value, $li);
             this.$target.data("snippet-view").stop();
             this.reset_ul();
+            this.$target.find("li:not(:has(>ul))").css('list-style', '');
             this.$target.data("snippet-view", new website.snippet.animationRegistry.ul(this.$target, true));
         }
     });

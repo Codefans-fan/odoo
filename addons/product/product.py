@@ -122,7 +122,7 @@ class product_uom(osv.osv):
     _order = "name"
     _columns = {
         'name': fields.char('Unit of Measure', required=True, translate=True),
-        'category_id': fields.many2one('product.uom.categ', 'Product Category', required=True, ondelete='cascade',
+        'category_id': fields.many2one('product.uom.categ', 'Unit of Measure Category', required=True, ondelete='cascade',
             help="Conversion between Units of Measure can only occur if they belong to the same category. The conversion will be made based on the ratios."),
         'factor': fields.float('Ratio', required=True, digits=0, # force NUMERIC with unlimited precision
             help='How much bigger or smaller this unit is compared to the reference Unit of Measure for this category:\n'\
@@ -403,7 +403,7 @@ class product_attribute_line(osv.osv):
     _columns = {
         'product_tmpl_id': fields.many2one('product.template', 'Product Template', required=True, ondelete='cascade'),
         'attribute_id': fields.many2one('product.attribute', 'Attribute', required=True, ondelete='restrict'),
-        'value_ids': fields.many2many('product.attribute.value', id1='line_id', id2='val_id', string='Product Attribute Value'),
+        'value_ids': fields.many2many('product.attribute.value', id1='line_id', id2='val_id', string='Product Attribute Value(s)'),
     }
 
 
@@ -455,6 +455,17 @@ class product_template(osv.osv):
             res.setdefault(id, 0.0)
         return res
 
+    def _set_product_template_price(self, cr, uid, id, name, value, args, context=None):
+        product_uom_obj = self.pool.get('product.uom')
+
+        product = self.browse(cr, uid, id, context=context)
+        if 'uom' in context:
+            uom = product.uos_id or product.uom_id
+            value = product_uom_obj._compute_price(cr, uid,
+                    context['uom'], value, uom.id)
+
+        return product.write({'list_price': value})
+
     def get_history_price(self, cr, uid, product_tmpl, company_id, date=None, context=None):
         if context is None:
             context = {}
@@ -481,7 +492,7 @@ class product_template(osv.osv):
 
     def _get_product_variant_count(self, cr, uid, ids, name, arg, context=None):
         res = {}
-        for product in self.browse(cr, uid, ids):
+        for product in self.browse(cr, uid, ids, context=context):
             res[product.id] = len(product.product_variant_ids)
         return res
 
@@ -500,7 +511,7 @@ class product_template(osv.osv):
         'type': fields.selection([('consu', 'Consumable'),('service','Service')], 'Product Type', required=True, help="Consumable are product where you don't manage stock, a service is a non-material product provided by a company or an individual."),        
         'rental': fields.boolean('Can be Rent'),
         'categ_id': fields.many2one('product.category','Internal Category', required=True, change_default=True, domain="[('type','=','normal')]" ,help="Select category for the current product"),
-        'price': fields.function(_product_template_price, type='float', string='Price', digits_compute=dp.get_precision('Product Price')),
+        'price': fields.function(_product_template_price, fnct_inv=_set_product_template_price, type='float', string='Price', digits_compute=dp.get_precision('Product Price')),
         'list_price': fields.float('Sale Price', digits_compute=dp.get_precision('Product Price'), help="Base price to compute the customer price. Sometimes called the catalog price."),
         'lst_price' : fields.related('list_price', type="float", string='Public Price', digits_compute=dp.get_precision('Product Price')),
         'standard_price': fields.property(type = 'float', digits_compute=dp.get_precision('Product Price'), 
@@ -925,7 +936,7 @@ class product_product(osv.osv):
         return result
 
     _columns = {
-        'price': fields.function(_product_price, type='float', string='Price', digits_compute=dp.get_precision('Product Price')),
+        'price': fields.function(_product_price, fnct_inv=_set_product_lst_price, type='float', string='Price', digits_compute=dp.get_precision('Product Price')),
         'price_extra': fields.function(_get_price_extra, type='float', string='Variant Extra Price', help="This is the sum of the extra price of all attributes", digits_compute=dp.get_precision('Product Price')),
         'lst_price': fields.function(_product_lst_price, fnct_inv=_set_product_lst_price, type='float', string='Public Price', digits_compute=dp.get_precision('Product Price')),
         'code': fields.function(_product_code, type='char', string='Internal Reference'),

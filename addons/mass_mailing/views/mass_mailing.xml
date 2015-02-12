@@ -166,9 +166,8 @@
                     <field name="list_id"/>
                     <field name="message_bounce"/>
                     <field name="create_date"/>
-                    <field name="unsubscription_date"/>
+                    <field name="unsubscription_date" readonly="1"/>
                     <field name="opt_out" on_change="on_change_opt_out(opt_out)"/>
-                    <field name="unsubscription_date" invisible="1"/>
                 </tree>
             </field>
         </record>
@@ -396,7 +395,8 @@
 
                                 <field name="mailing_domain" widget="char_domain"
                                     placeholder="Select recipients"
-                                    options="{'model_field': 'mailing_model', 'model_domain': 'mailing_domain'}"/>
+                                    options="{'model_field': 'mailing_model', 'model_domain': 'mailing_domain'}"
+                                    context="{'search_default_not_opt_out':1}"/>
 
                                 <div attrs="{'invisible': [('mailing_model', '&lt;&gt;', 'mail.mass_mailing.contact')]}">
                                     <label for="contact_list_ids" string="Select mailing lists:" class="oe_edit_only"/>
@@ -469,7 +469,7 @@
                         <t t-name="kanban-box">
                             <div t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click oe_kanban_mass_mailing">
                                 <div class="oe_dropdown_toggle oe_dropdown_kanban">
-                                    <span class="oe_e">i</span>
+                                    <i class="fa fa-bars fa-lg"/>
                                     <ul class="oe_dropdown_menu">
                                         <t t-if="widget.view.is_action_enabled('delete')">
                                             <li><a type="delete">Delete</a></li>
@@ -746,7 +746,7 @@
                         <t t-name="kanban-box">
                             <div t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click oe_kanban_mass_mailing_campaign">
                                 <div class="oe_dropdown_toggle oe_dropdown_kanban">
-                                    <span class="oe_e">i</span>
+                                    <i class="fa fa-bars fa-lg"/>
                                     <ul class="oe_dropdown_menu">
                                         <t t-if="widget.view.is_action_enabled('edit')">
                                             <li><a type="edit">Settings</a></li>

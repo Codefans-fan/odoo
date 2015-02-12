@@ -305,7 +305,7 @@ instance.web.CrashManager = instance.web.Class.extend({
             }
 
             this.show_warning(error);
-        //InternalError    
+        //InternalError
 
         } else {
             this.show_error(error);
@@ -600,12 +600,9 @@ instance.web.DatabaseManager = instance.web.Widget.extend({
                 self.do_notify(_t("Backed"), _t("Database backed up successfully"));
             },
             error: function(error){
-               if(error){
-                  self.display_error({
-                        title: _t("Backup Database"),
-                        error: 'AccessDenied'
-                  });
-               }
+                if (error && error[1]) {
+                    self.display_error(error[1][0]);
+                }
             },
             complete: function() {
                 self.unblockUI();
@@ -749,9 +746,9 @@ instance.web.client_actions.add("reload_context", "instance.web.ReloadContext");
  * If can't go back in history stack, will go back to home.
  */
 instance.web.HistoryBack = function(parent) {
-    if (!parent.history_back()) {
+    parent.history_back().fail(function() {
         instance.web.Home(parent);
-    }
+    });
 };
 instance.web.client_actions.add("history_back", "instance.web.HistoryBack");
 
@@ -808,7 +805,6 @@ instance.web.SystrayMenu = instance.web.Widget.extend({
     init: function(parent) {
         this._super(parent);
         this.items = [];
-        this.widgets = [];
         this.load = $.Deferred();
     },
     start: function() {
@@ -823,19 +819,9 @@ instance.web.SystrayMenu = instance.web.Widget.extend({
         var self = this;
         _.each(instance.web.SystrayItems, function(widgetCls) {
             var cur_systray_item = new widgetCls(self);
-            self.widgets.push(cur_systray_item);
             self.items.push(cur_systray_item.appendTo(self.$el));
         });
     },
-    get_widget: function(searched_class){
-        for (i = 0; i < this.widgets.length; i++) {
-            var current = this.widgets[i];
-            if(current instanceof searched_class){
-                return current;
-            }
-        }
-        return undefined;
-    }
 });
 
 instance.web.Menu =  instance.web.Widget.extend({
@@ -1313,7 +1299,7 @@ instance.web.WebClient = instance.web.Client.extend({
         $("body").css("background-image", "url(" + instance.session.origin + "/web/static/src/img/back-enable.jpg" + ")");
         if ($.blockUI) {
             var imgkit = Math.floor(Math.random() * 2 + 1);
-            $.blockUI.defaults.message = '<img src="http://www.amigrave.com/loading-kitten/' + imgkit + '.gif" class="loading-kitten">';
+            $.blockUI.defaults.message = '<img src="/web/static/src/img/k-waiting' + imgkit + '.gif" class="loading-kitten">';
         }
     },
     /**

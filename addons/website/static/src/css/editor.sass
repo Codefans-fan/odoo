@@ -64,10 +64,11 @@
 
 .o_editable
     &:not(:empty),&[data-oe-type]
-        &:not(:focus):hover
-            -moz-box-shadow: rgba(94, 255, 0, 0.8) 0 0 5px 2px inset
-            -webkit-box-shadow: rgba(94, 255, 0, 0.8) 0 0 5px 2px inset
-            box-shadow: rgba(94, 255, 0, 0.8) 0 0 5px 2px inset
+        &:not([data-oe-model="ir.ui.view"]):not([data-oe-type="html"]):hover
+            /* to do change into primary color in less */
+            -moz-box-shadow: #3071a9 0 0 5px 2px inset
+            -webkit-box-shadow: #3071a9 0 0 5px 2px inset
+            box-shadow: #3071a9 0 0 5px 2px inset
     &:focus,&[data-oe-type]
         min-height: 0.8em
         min-width: 8px
@@ -139,7 +140,7 @@
 .css_editable_hidden
     display: none !important
 
-.o_editable .css_editable_mode_hidden
+.editor_enable .css_editable_mode_hidden
     display: none
 
 .editor_enable .css_non_editable_mode_hidden
@@ -311,14 +312,8 @@ ul.oe_menu_editor
     #icon-search
         padding-left: 2.5em
 
-    #fa-preview
-        text-align: center
-
-        span
-            cursor: pointer
-            padding: 0 15px
-        .font-icons-selected
-            background-color: #ddd
+    .font-icons-selected
+        background-color: #ddd
 
 $attachment-border-color: #848490
 .existing-attachments

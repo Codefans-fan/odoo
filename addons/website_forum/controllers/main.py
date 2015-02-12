@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from datetime import datetime
 import werkzeug.urls
 import werkzeug.wrappers
 import simplejson
@@ -194,6 +195,7 @@ class WebsiteForum(http.Controller):
         values.update({
             'main_object': question,
             'question': question,
+            'can_bump': (question.forum_id.allow_bump and not question.child_ids and (datetime.today() - datetime.strptime(question.write_date, tools.DEFAULT_SERVER_DATETIME_FORMAT)).days > 9),
             'header': {'question_data': True},
             'filters': filters,
             'reversed': reversed,
@@ -344,6 +346,9 @@ class WebsiteForum(http.Controller):
         question = post.parent_id if post.parent_id else post
         return werkzeug.utils.redirect("/forum/%s/question/%s" % (slug(forum), slug(question)))
 
+    #  JSON utilities
+    # --------------------------------------------------
+
     @http.route('/forum/<model("forum.forum"):forum>/post/<model("forum.post"):post>/upvote', type='json', auth="public", website=True)
     def post_upvote(self, forum, post, **kwargs):
         if not request.session.uid:
@@ -362,6 +367,13 @@ class WebsiteForum(http.Controller):
         upvote = True if post.user_vote < 0 else False
         return post.vote(upvote=upvote)
 
+    @http.route('/forum/post/bump', type='json', auth="public", website=True)
+    def post_bump(self, post_id, **kwarg):
+        post = request.env['forum.post'].browse(int(post_id))
+        if not post.exists() or post.parent_id:
+            return False
+        return post.bump()
+
     # User
     # --------------------------------------------------
 
@@ -371,7 +383,7 @@ class WebsiteForum(http.Controller):
     def users(self, forum, page=1, **searches):
         User = request.env['res.users']
         step = 30
-        tag_count = len(User.search([('karma', '>', 1), ('website_published', '=', True)]))
+        tag_count = User.search_count([('karma', '>', 1), ('website_published', '=', True)])
         pager = request.website.pager(url="/forum/%s/users" % slug(forum), total=tag_count, page=page, step=step, scope=30)
         user_obj = User.sudo().search([('karma', '>', 1), ('website_published', '=', True)], limit=step, offset=pager['offset'], order='karma DESC')
         # put the users in block of 3 to display them as a table
