@@ -37,13 +37,6 @@ class hr_timesheet_sheet(osv.osv):
     _order = "id desc"
     _description = "Timesheet"
 
-    _track = {
-        'state': {
-            'hr_timesheet_sheet.mt_timesheet_confirmed': lambda self, cr, uid, obj, ctx=None: obj.state == 'confirm',
-            'hr_timesheet_sheet.mt_timesheet_approved': lambda self, cr, uid, obj, ctx=None: obj.state == 'done',
-        },
-    }
-
     def _total(self, cr, uid, ids, name, args, context=None):
         """ Compute the attendances, analytic lines timesheets and differences between them
             for all the days of a timesheet and the current day
@@ -265,6 +258,14 @@ class hr_timesheet_sheet(osv.osv):
                 raise UserError(_('You cannot delete a timesheet which is already confirmed.'))
             elif sheet['total_attendance'] <> 0.00:
                 raise UserError(_('You cannot delete a timesheet which have attendance entries.'))
+
+        toremove = []
+        analytic_timesheet = self.pool.get('hr.analytic.timesheet')
+        for sheet in self.browse(cr, uid, ids, context=context):
+            for timesheet in sheet.timesheet_ids:
+                toremove.append(timesheet.id)
+        analytic_timesheet.unlink(cr, uid, toremove, context=context)
+
         return super(hr_timesheet_sheet, self).unlink(cr, uid, ids, context=context)
 
     def onchange_employee_id(self, cr, uid, ids, employee_id, context=None):
@@ -279,6 +280,14 @@ class hr_timesheet_sheet(osv.osv):
     # ------------------------------------------------
     # OpenChatter methods and notifications
     # ------------------------------------------------
+
+    def _track_subtype(self, cr, uid, ids, init_values, context=None):
+        record = self.browse(cr, uid, ids[0], context=context)
+        if 'state' in init_values and record.state == 'confirm':
+            return 'hr_timesheet_sheet.mt_timesheet_confirmed'
+        elif 'state' in init_values and record.state == 'done':
+            return 'hr_timesheet_sheet.mt_timesheet_approved'
+        return super(hr_timesheet_sheet, self)._track_subtype(cr, uid, ids, init_values, context=context)
 
     def _needaction_domain_get(self, cr, uid, context=None):
         emp_obj = self.pool.get('hr.employee')

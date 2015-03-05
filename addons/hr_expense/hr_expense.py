@@ -57,13 +57,6 @@ class hr_expense_expense(osv.osv):
     _inherit = ['mail.thread', 'ir.needaction_mixin']
     _description = "Expense"
     _order = "id desc"
-    _track = {
-        'state': {
-            'hr_expense.mt_expense_approved': lambda self, cr, uid, obj, ctx=None: obj.state == 'accepted',
-            'hr_expense.mt_expense_refused': lambda self, cr, uid, obj, ctx=None: obj.state == 'cancelled',
-            'hr_expense.mt_expense_confirmed': lambda self, cr, uid, obj, ctx=None: obj.state == 'confirm',
-        },
-    }
 
     _columns = {
         'name': fields.char('Description', required=True, readonly=True, states={'draft':[('readonly',False)], 'confirm':[('readonly',False)]}),
@@ -151,6 +144,16 @@ class hr_expense_expense(osv.osv):
 
     def expense_canceled(self, cr, uid, ids, context=None):
         return self.write(cr, uid, ids, {'state': 'cancelled'}, context=context)
+
+    def _track_subtype(self, cr, uid, ids, init_values, context=None):
+        record = self.browse(cr, uid, ids[0], context=context)
+        if 'state' in init_values and record.state == 'accepted':
+            return 'hr_expense.mt_expense_approved'
+        elif 'state' in init_values and record.state == 'confirm':
+            return 'hr_expense.mt_expense_confirmed'
+        elif 'state' in init_values and record.state == 'cancelled':
+            return 'hr_expense.mt_expense_refused'
+        return super(hr_expense_expense, self)._track_subtype(cr, uid, ids, init_values, context=context)
 
     def account_move_get(self, cr, uid, expense_id, context=None):
         '''
@@ -318,7 +321,7 @@ class hr_expense_expense(osv.osv):
                 is_price_include = tax_obj.read(cr,uid,tax['id'],['price_include'],context)['price_include']
                 if is_price_include:
                     ## We need to deduce the price for the tax
-                    res[-1]['price'] = res[-1]['price']  - (tax['amount'] * tax['base_sign'] or 0.0)
+                    res[-1]['price'] = res[-1]['price'] - tax['amount']
                     # tax amount countains base amount without the tax
                     base_tax_amount = (base_tax_amount - tax['amount']) * tax['base_sign']
                 else:
@@ -329,7 +332,7 @@ class hr_expense_expense(osv.osv):
                              'name':tax['name'],
                              'price_unit': tax['price_unit'],
                              'quantity': 1,
-                             'price':  tax['amount'] * tax['base_sign'] or 0.0,
+                             'price': tax['amount'] or 0.0,
                              'account_id': tax['account_collected_id'] or mres['account_id'],
                              'tax_code_id': tax['tax_code_id'],
                              'tax_amount': tax['amount'] * tax['base_sign'],

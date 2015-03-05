@@ -197,13 +197,13 @@ class purchase_order(osv.osv):
         ('done', 'Done'),
         ('cancel', 'Cancelled')
     ]
-    _track = {
-        'state': {
-            'purchase.mt_rfq_confirmed': lambda self, cr, uid, obj, ctx=None: obj.state == 'confirmed',
-            'purchase.mt_rfq_approved': lambda self, cr, uid, obj, ctx=None: obj.state == 'approved',
-            'purchase.mt_rfq_done': lambda self, cr, uid, obj, ctx=None: obj.state == 'done',
-        },
+
+    READONLY_STATES = {
+        'confirmed': [('readonly', True)],
+        'approved': [('readonly', True)],
+        'done': [('readonly', True)]
     }
+
     _columns = {
         'name': fields.char('Order Reference', required=True, select=True, copy=False,
                             help="Unique number of the purchase order, "
@@ -225,16 +225,16 @@ class purchase_order(osv.osv):
                                  copy=False),
         'date_approve':fields.date('Date Approved', readonly=1, select=True, copy=False,
                                    help="Date on which purchase order has been approved"),
-        'partner_id':fields.many2one('res.partner', 'Supplier', required=True, states={'confirmed':[('readonly',True)], 'approved':[('readonly',True)],'done':[('readonly',True)]},
+        'partner_id':fields.many2one('res.partner', 'Supplier', required=True, states=READONLY_STATES,
             change_default=True, track_visibility='always'),
         'dest_address_id':fields.many2one('res.partner', 'Customer Address (Direct Delivery)',
-            states={'confirmed':[('readonly',True)], 'approved':[('readonly',True)],'done':[('readonly',True)]},
+            states=READONLY_STATES,
             help="Put an address if you want to deliver directly from the supplier to the customer. " \
                 "Otherwise, keep empty to deliver to your own company."
         ),
-        'location_id': fields.many2one('stock.location', 'Destination', required=True, domain=[('usage','<>','view')], states={'confirmed':[('readonly',True)], 'approved':[('readonly',True)],'done':[('readonly',True)]} ),
-        'pricelist_id':fields.many2one('product.pricelist', 'Pricelist', required=True, states={'confirmed':[('readonly',True)], 'approved':[('readonly',True)],'done':[('readonly',True)]}, help="The pricelist sets the currency used for this purchase order. It also computes the supplier price for the selected products/quantities."),
-        'currency_id': fields.many2one('res.currency','Currency', readonly=True, required=True,states={'draft': [('readonly', False)],'sent': [('readonly', False)]}),
+        'location_id': fields.many2one('stock.location', 'Destination', required=True, domain=[('usage','<>','view')], states=READONLY_STATES),
+        'pricelist_id':fields.many2one('product.pricelist', 'Pricelist', required=True, states=READONLY_STATES, help="The pricelist sets the currency used for this purchase order. It also computes the supplier price for the selected products/quantities."),
+        'currency_id': fields.many2one('res.currency','Currency', required=True, states=READONLY_STATES),
         'state': fields.selection(STATE_SELECTION, 'Status', readonly=True,
                                   help="The status of the purchase order or the quotation request. "
                                        "A request for quotation is a purchase order in a 'Draft' status. "
@@ -343,6 +343,16 @@ class purchase_order(osv.osv):
         self.signal_workflow(cr, uid, unlink_ids, 'purchase_cancel')
 
         return super(purchase_order, self).unlink(cr, uid, unlink_ids, context=context)
+
+    def _track_subtype(self, cr, uid, ids, init_values, context=None):
+        record = self.browse(cr, uid, ids[0], context=context)
+        if 'state' in init_values and record.state == 'approved':
+            return 'purchase.mt_rfq_approved'
+        elif 'state' in init_values and record.state == 'confirmed':
+            return 'purchase.mt_rfq_confirmed'
+        elif 'state' in init_values and record.state == 'done':
+            return 'purchase.mt_rfq_done'
+        return super(purchase_order, self)._track_subtype(cr, uid, ids, init_values, context=context)
 
     def set_order_line_status(self, cr, uid, ids, status, context=None):
         line = self.pool.get('purchase.order.line')
@@ -1297,6 +1307,11 @@ class procurement_order(osv.osv):
 
     def _get_product_supplier(self, cr, uid, procurement, context=None):
         ''' returns the main supplier of the procurement's product given as argument'''
+        supplierinfo = self.pool['product.supplierinfo']
+        company_supplier = supplierinfo.search(cr, uid,
+            [('product_tmpl_id', '=', procurement.product_id.product_tmpl_id.id), ('company_id', '=', procurement.company_id.id)], limit=1, context=context)
+        if company_supplier:
+            return supplierinfo.browse(cr, uid, company_supplier[0], context=context).name
         return procurement.product_id.seller_id
 
     def _get_po_line_values_from_procs(self, cr, uid, procurements, partner, schedule_date, context=None):
@@ -1424,8 +1439,8 @@ class procurement_order(osv.osv):
             po_line_ids = po_line_obj.search(cr, uid, [('order_id', '=', add_purchase), ('product_id', 'in', [x.product_id.id for x in procurements])], context=context)
             po_lines = po_line_obj.browse(cr, uid, po_line_ids, context=context)
             po_prod_dict = {}
-            for po in po_lines:
-                po_prod_dict[po.product_id.id] = po
+            for pol in po_lines:
+                po_prod_dict[pol.product_id.id] = pol
             procs_to_create = []
             #Check which procurements need a new line and which need to be added to an existing one
             for proc in procurements:

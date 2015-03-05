@@ -49,7 +49,7 @@ import pytz
 import re
 import time
 from collections import defaultdict, MutableMapping
-from inspect import getmembers
+from inspect import getmembers, currentframe
 
 import babel.dates
 import dateutil.relativedelta
@@ -64,8 +64,9 @@ from .api import Environment
 from .exceptions import AccessError, MissingError, ValidationError, UserError
 from .osv import fields
 from .osv.query import Query
-from .tools import lazy_property, ormcache
+from .tools import frozendict, lazy_property, ormcache
 from .tools.config import config
+from .tools.func import frame_codeinfo
 from .tools.misc import CountingStream, DEFAULT_SERVER_DATETIME_FORMAT, DEFAULT_SERVER_DATE_FORMAT
 from .tools.safe_eval import safe_eval as eval
 from .tools.translate import _
@@ -631,8 +632,9 @@ class BaseModel(object):
         attrs = {
             '_name': name,
             '_register': False,
-            '_columns': {},             # filled by _setup_fields()
-            '_defaults': {},            # filled by Field._determine_default()
+            '_columns': None,           # recomputed in _setup_fields()
+            '_defaults': None,          # recomputed in _setup_base()
+            '_fields': frozendict(),    # idem
             '_inherits': dict(cls._inherits),
             '_depends': dict(cls._depends),
             '_constraints': list(cls._constraints),
@@ -739,15 +741,40 @@ class BaseModel(object):
         for (key, _, msg) in cls._sql_constraints:
             cls.pool._sql_error[cls._table + '_' + key] = msg
 
-        # collect constraint and onchange methods
-        cls._constraint_methods = []
-        cls._onchange_methods = defaultdict(list)
-        for attr, func in getmembers(cls, callable):
-            if hasattr(func, '_constrains'):
-                cls._constraint_methods.append(func)
-            if hasattr(func, '_onchange'):
-                for name in func._onchange:
-                    cls._onchange_methods[name].append(func)
+    @property
+    def _constraint_methods(self):
+        """ Return a list of methods implementing Python constraints. """
+        def is_constraint(func):
+            return callable(func) and hasattr(func, '_constrains')
+
+        cls = type(self)
+        methods = []
+        for attr, func in getmembers(cls, is_constraint):
+            if not all(name in cls._fields for name in func._constrains):
+                _logger.warning("@constrains%r parameters must be field names", func._constrains)
+            methods.append(func)
+
+        # optimization: memoize result on cls, it will not be recomputed
+        cls._constraint_methods = methods
+        return methods
+
+    @property
+    def _onchange_methods(self):
+        """ Return a dictionary mapping field names to onchange methods. """
+        def is_onchange(func):
+            return callable(func) and hasattr(func, '_onchange')
+
+        cls = type(self)
+        methods = defaultdict(list)
+        for attr, func in getmembers(cls, is_onchange):
+            for name in func._onchange:
+                if name not in cls._fields:
+                    _logger.warning("@onchange%r parameters must be field names", func._onchange)
+                methods[name].append(func)
+
+        # optimization: memoize result on cls, it will not be recomputed
+        cls._onchange_methods = methods
+        return methods
 
     def __new__(cls):
         # In the past, this method was registering the model class in the server.
@@ -793,19 +820,6 @@ class BaseModel(object):
             assert cls._log_access, \
                 "TransientModels must have log_access turned on, " \
                 "in order to implement their access rights policy"
-
-        # retrieve new-style fields (from above registry class) and duplicate
-        # them (to avoid clashes with inheritance between different models)
-        cls._fields = {}
-        above = cls.__bases__[0]
-        for attr, field in getmembers(above, Field.__instancecheck__):
-            cls._add_field(attr, field.new())
-
-        # introduce magic fields
-        cls._add_magic_fields()
-
-        # register constraints and onchange methods
-        cls._init_constraints_onchanges()
 
         # prepare ormcache, which must be shared by all instances of the model
         cls._ormcache = {}
@@ -2522,10 +2536,15 @@ class BaseModel(object):
                                 if (f_pg_type==c[0]) and (f._type==c[1]):
                                     if f_pg_type != f_obj_type:
                                         ok = True
-                                        cr.execute('ALTER TABLE "%s" RENAME COLUMN "%s" TO __temp_type_cast' % (self._table, k))
-                                        cr.execute('ALTER TABLE "%s" ADD COLUMN "%s" %s' % (self._table, k, c[2]))
-                                        cr.execute(('UPDATE "%s" SET "%s"= __temp_type_cast'+c[3]) % (self._table, k))
-                                        cr.execute('ALTER TABLE "%s" DROP COLUMN  __temp_type_cast CASCADE' % (self._table,))
+                                        try:
+                                            with cr.savepoint():
+                                                cr.execute('ALTER TABLE "%s" ALTER COLUMN "%s" TYPE %s' % (self._table, k, c[2]), log_exceptions=False)
+                                        except psycopg2.NotSupportedError:
+                                            # can't do inplace change -> use a casted temp column
+                                            cr.execute('ALTER TABLE "%s" RENAME COLUMN "%s" TO __temp_type_cast' % (self._table, k))
+                                            cr.execute('ALTER TABLE "%s" ADD COLUMN "%s" %s' % (self._table, k, c[2]))
+                                            cr.execute('UPDATE "%s" SET "%s"= __temp_type_cast%s' % (self._table, k, c[3]))
+                                            cr.execute('ALTER TABLE "%s" DROP COLUMN  __temp_type_cast CASCADE' % (self._table,))
                                         cr.commit()
                                         _schema.debug("Table '%s': column '%s' changed type from %s to %s",
                                             self._table, k, c[0], c[1])
@@ -2889,6 +2908,7 @@ class BaseModel(object):
         cls._inherit_fields = struct = {}
         for parent_model, parent_field in cls._inherits.iteritems():
             parent = cls.pool[parent_model]
+            parent._inherits_reload()
             for name, column in parent._columns.iteritems():
                 struct[name] = (parent_model, parent_field, column, parent_model)
             for name, source in parent._inherit_fields.iteritems():
@@ -2946,25 +2966,27 @@ class BaseModel(object):
         if cls._setup_done:
             return
 
-        # first make sure that parent models determine all their fields
+        # 1. determine the proper fields of the model; duplicate them on cls to
+        # avoid clashes with inheritance between different models
+        for name in getattr(cls, '_fields', {}):
+            delattr(cls, name)
+
+        # retrieve fields from parent classes
+        cls._fields = {}
+        cls._defaults = {}
+        for attr, field in getmembers(cls, Field.__instancecheck__):
+            cls._add_field(attr, field.new())
+
+        # add magic and custom fields
+        cls._add_magic_fields()
+        cls._init_manual_fields(self._cr, partial)
+
+        # 2. make sure that parent models determine their own fields, then add
+        # inherited fields to cls
         cls._inherits_check()
         for parent in cls._inherits:
             self.env[parent]._setup_base(partial)
-
-        # remove inherited fields from cls._fields
-        for name, field in cls._fields.items():
-            if field.inherited:
-                del cls._fields[name]
-
-        # retrieve custom fields
-        cls._init_manual_fields(self._cr, partial)
-
-        # retrieve inherited fields
         cls._init_inherited_fields()
-
-        # prepare the setup of fields
-        for field in cls._fields.itervalues():
-            field.reset()
 
         cls._setup_done = True
 
@@ -2973,11 +2995,13 @@ class BaseModel(object):
         """ Setup the fields, except for recomputation triggers. """
         cls = type(self)
 
-        # set up fields, and update their corresponding columns
+        # set up fields, and determine their corresponding column
+        cls._columns = {}
         for name, field in cls._fields.iteritems():
             field.setup(self.env)
-            if field.store or field.column:
-                cls._columns[name] = field.to_column()
+            column = field.to_column()
+            if column:
+                cls._columns[name] = column
 
         # group fields by compute to determine field.computed_fields
         fields_by_compute = defaultdict(list)
@@ -3012,14 +3036,8 @@ class BaseModel(object):
         # register stuff about low-level function fields
         cls._init_function_fields(cls.pool, self._cr)
 
-        # check constraints
-        for func in cls._constraint_methods:
-            if not all(name in cls._fields for name in func._constrains):
-                _logger.warning("@constrains%r parameters must be field names", func._constrains)
-        for name in cls._onchange_methods:
-            if name not in cls._fields:
-                func = cls._onchange_methods[name]
-                _logger.warning("@onchange%r parameters must be field names", func._onchange)
+        # register constraints and onchange methods
+        cls._init_constraints_onchanges()
 
         # check defaults
         for name in cls._defaults:
@@ -3974,7 +3992,7 @@ class BaseModel(object):
             self.pool[model_name]._store_set_values(cr, user, todo, fields_to_recompute, context)
 
         # recompute new-style fields
-        if context.get('recompute', True):
+        if recs.env.recompute and context.get('recompute', True):
             recs.recompute()
 
         self.step_workflow(cr, user, ids, context=context)
@@ -4221,7 +4239,7 @@ class BaseModel(object):
         # check Python constraints
         recs._validate_fields(vals)
 
-        if context.get('recompute', True):
+        if recs.env.recompute and context.get('recompute', True):
             result += self._store_get_values(cr, user, [id_new],
                 list(set(vals.keys() + self._inherits.values())),
                 context)
@@ -4234,7 +4252,7 @@ class BaseModel(object):
             # recompute new-style fields
             recs.recompute()
 
-        if self._log_create and context.get('recompute', True):
+        if self._log_create and recs.env.recompute and context.get('recompute', True):
             message = self._description + \
                 " '" + \
                 self.name_get(cr, user, [id_new], context=context)[0][1] + \
@@ -5463,7 +5481,9 @@ class BaseModel(object):
         """ Test whether two recordsets are equivalent (up to reordering). """
         if not isinstance(other, BaseModel):
             if other:
-                _logger.warning("Comparing apples and oranges: %s == %s", self, other)
+                filename, lineno = frame_codeinfo(currentframe(), 1)
+                _logger.warning("Comparing apples and oranges: %r == %r (%s:%s)",
+                                self, other, filename, lineno)
             return False
         return self._name == other._name and set(self._ids) == set(other._ids)
 
@@ -5630,12 +5650,13 @@ class BaseModel(object):
             field, recs = self.env.get_todo()
             # evaluate the fields to recompute, and save them to database
             names = [f.name for f in field.computed_fields if f.store]
-            for rec, rec1 in zip(recs, recs.with_context(recompute=False)):
+            for rec in recs:
                 try:
                     values = rec._convert_to_write({
                         name: rec[name] for name in names
                     })
-                    rec1._write(values)
+                    with rec.env.norecompute():
+                        rec._write(values)
                 except MissingError:
                     pass
             # mark the computed fields as done
@@ -5776,6 +5797,11 @@ class BaseModel(object):
             values = dict(record._cache)
             # attach `self` with a different context (for cache consistency)
             record._origin = self.with_context(__onchange=True)
+
+        # load fields on secondary records, to avoid false changes
+        with env.do_in_onchange():
+            for field_seq in secondary:
+                record.mapped(field_seq)
 
         # determine which field(s) should be triggered an onchange
         todo = list(names) or list(values)

@@ -783,7 +783,7 @@ class account_move_line(osv.osv):
             ret_line = {
                 'id': line.id,
                 'name': line.name != '/' and line.move_id.name + ': ' + line.name or line.move_id.name,
-                'ref': line.move_id.ref,
+                'ref': line.move_id.ref or '',
                 # For reconciliation between statement transactions and already registered payments (eg. checks)
                 'already_paid': line.account_id.type == 'liquidity',
                 'account_code': line.account_id.code,
@@ -1155,9 +1155,10 @@ class account_move_line(osv.osv):
         move_ids = set()
         for line in self.browse(cr, uid, ids, context=context):
             move_ids.add(line.move_id.id)
-            context['journal_id'] = line.journal_id.id
-            context['period_id'] = line.period_id.id
-            result = super(account_move_line, self).unlink(cr, uid, [line.id], context=context)
+            localcontext = dict(context)
+            localcontext['journal_id'] = line.journal_id.id
+            localcontext['period_id'] = line.period_id.id
+            result = super(account_move_line, self).unlink(cr, uid, [line.id], context=localcontext)
         move_ids = list(move_ids)
         if check and move_ids:
             move_obj.validate(cr, uid, move_ids, context=context)
@@ -1175,9 +1176,11 @@ class account_move_line(osv.osv):
             raise UserError(_('You cannot change the tax, you should remove and recreate lines.'))
         if ('account_id' in vals) and not account_obj.read(cr, uid, vals['account_id'], ['active'])['active']:
             raise UserError(_('You cannot use an inactive account.'))
-        if update_check:
-            if ('account_id' in vals) or ('journal_id' in vals) or ('period_id' in vals) or ('move_id' in vals) or ('debit' in vals) or ('credit' in vals) or ('date' in vals):
-                self._update_check(cr, uid, ids, context)
+
+        affects_move = any(f in vals for f in ('account_id', 'journal_id', 'period_id', 'move_id', 'debit', 'credit', 'date'))
+
+        if update_check and affects_move:
+            self._update_check(cr, uid, ids, context)
 
         todo_date = None
         if vals.get('date', False):
@@ -1201,7 +1204,8 @@ class account_move_line(osv.osv):
             if journal.centralisation:
                 self._check_moves(cr, uid, context=ctx)
         result = super(account_move_line, self).write(cr, uid, ids, vals, context)
-        if check and not context.get('novalidate'):
+
+        if affects_move and check and not context.get('novalidate'):
             done = []
             for line in self.browse(cr, uid, ids):
                 if line.move_id.id not in done:
@@ -1377,6 +1381,8 @@ class account_move_line(osv.osv):
                     }
                     self.create(cr, uid, data, context)
                 #create the Tax movement
+                if not tax['amount'] and not tax[tax_code]:
+                    continue
                 data = {
                     'move_id': vals['move_id'],
                     'name': tools.ustr(vals['name'] or '') + ' ' + tools.ustr(tax['name'] or ''),
@@ -1394,7 +1400,8 @@ class account_move_line(osv.osv):
                 self.create(cr, uid, data, context)
             del vals['account_tax_id']
 
-        if check and not context.get('novalidate') and (context.get('recompute', True) or journal.entry_posted):
+        recompute = journal.env.recompute and context.get('recompute', True)
+        if check and not context.get('novalidate') and (recompute or journal.entry_posted):
             tmp = move_obj.validate(cr, uid, [vals['move_id']], context)
             if journal.entry_posted and tmp:
                 move_obj.button_validate(cr,uid, [vals['move_id']], context)
