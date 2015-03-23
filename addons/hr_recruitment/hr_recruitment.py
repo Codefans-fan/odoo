@@ -81,7 +81,7 @@ class hr_recruitment_source(osv.osv):
 
     _columns = {
         'source_id': fields.many2one('utm.source', 'Source', ondelete='cascade', required=True),
-        'url': fields.function(_get_url, string='Url', type='char', store={
+        'url': fields.function(_get_url, string='Url Parameters', type='char', store={
             'hr.recruitment.source': (lambda self, cr, uid, ids, ctx: ids, ['source_id'], 20),
             'utm.source': (_get_source, ['name'], 20),
         }),
@@ -600,11 +600,14 @@ class hr_job(osv.osv):
     _name = "hr.job"
     _inherits = {'mail.alias': 'alias_id'}
 
-    _track = {
-        'state': {
-            'hr_recruitment.mt_job_new': lambda self, cr, uid, obj, ctx=None: obj.state == 'open'
-        },
-    }
+
+
+    def _track_subtype(self, cr, uid, ids, init_values, context=None):
+        record = self.browse(cr, uid, ids[0], context=context)
+        if 'state' in init_values and record.state == 'open':
+            return 'hr_recruitment.mt_job_new'
+        return super(hr_job, self)._track_subtype(cr, uid, ids, init_values, context=context)
+
 
     def _get_attached_docs(self, cr, uid, ids, field_name, arg, context=None):
         res = {}
