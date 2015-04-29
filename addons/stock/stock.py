@@ -725,6 +725,7 @@ class stock_picking(osv.osv):
             default.setdefault('backorder_id', False)
         if 'invoice_state' not in default and picking_obj.invoice_state == 'invoiced':
             default['invoice_state'] = '2binvoiced'
+        default.setdefault('date_done', False)
         res = super(stock_picking, self).copy(cr, uid, id, default, context)
         return res
 
@@ -884,7 +885,13 @@ class stock_picking(osv.osv):
         This method is called at the end of the workflow by the activity "done".
         @return: True
         """
-        self.write(cr, uid, ids, {'state': 'done', 'date_done': time.strftime('%Y-%m-%d %H:%M:%S')})
+        for picking in self.browse(cr, uid, ids, context=context):
+            values = {
+                'state': 'done'
+            }
+            if not picking.date_done:
+                values['date_done'] = time.strftime(DEFAULT_SERVER_DATETIME_FORMAT)
+            picking.write(values)
         return True
 
     def action_move(self, cr, uid, ids, context=None):
@@ -2054,17 +2061,20 @@ class stock_move(osv.osv):
             for todo in moves_by_type.values():
                 ptype = todo[0][1][5] and todo[0][1][5] or location_obj.picking_type_get(cr, uid, todo[0][0].location_dest_id, todo[0][1][0])
                 if picking:
+                    # Need to check name of old picking because it always considers picking as "OUT" when created from Sales Order
+                    old_ptype = location_obj.picking_type_get(cr, uid, picking.move_lines[0].location_id, picking.move_lines[0].location_dest_id)
+                    if old_ptype != picking.type:
+                        if old_ptype == 'internal':
+                            old_pick_name = seq_obj.get(cr, uid, 'stock.picking')
+                        else:
+                            old_pick_name = seq_obj.get(cr, uid, 'stock.picking.' + old_ptype)
+                        self.pool.get('stock.picking').write(cr, uid, [picking.id], {'name': old_pick_name, 'type': old_ptype}, context=context)
                     # name of new picking according to its type
                     if ptype == 'internal':
                         new_pick_name = seq_obj.get(cr, uid,'stock.picking')
                     else :
                         new_pick_name = seq_obj.get(cr, uid, 'stock.picking.' + ptype)
                     pickid = self._create_chained_picking(cr, uid, new_pick_name, picking, ptype, todo, context=context)
-                    # Need to check name of old picking because it always considers picking as "OUT" when created from Sales Order
-                    old_ptype = location_obj.picking_type_get(cr, uid, picking.move_lines[0].location_id, picking.move_lines[0].location_dest_id)
-                    if old_ptype != picking.type:
-                        old_pick_name = seq_obj.get(cr, uid, 'stock.picking.' + old_ptype)
-                        self.pool.get('stock.picking').write(cr, uid, [picking.id], {'name': old_pick_name, 'type': old_ptype}, context=context)
                 else:
                     pickid = False
                 for move, (loc, dummy, delay, dummy, company_id, ptype, invoice_state) in todo:
@@ -2714,9 +2724,11 @@ class stock_move(osv.osv):
                 continue
             partial_data = partial_datas.get('move%s'%(move.id), False)
             assert partial_data, _('Missing partial picking data for move #%s.') % (move.id)
-            product_qty = partial_data.get('product_qty',0.0)
+            product_uom = partial_data.get('product_uom', False)
+            product_qty = partial_data.get('product_qty', 0.0)
+            product_qty = self.pool['product.uom']._compute_qty(cr, uid, product_uom, product_qty, move.product_uom.id)
             move_product_qty[move.id] = product_qty
-            product_uom = partial_data.get('product_uom',False)
+
             product_price = partial_data.get('product_price',0.0)
             product_currency = partial_data.get('product_currency',False)
             prodlot_ids[move.id] = partial_data.get('prodlot_id')
@@ -3056,6 +3068,10 @@ class stock_picking_in(osv.osv):
         defaults.update(in_defaults)
         return defaults
 
+    def copy(self, cr, uid, id, default=None, context=None):
+        return self.pool['stock.picking'].copy(cr, uid, id, default=default, context=context)
+
+
     _columns = {
         'backorder_id': fields.many2one('stock.picking.in', 'Back Order of', states={'done':[('readonly', True)], 'cancel':[('readonly',True)]}, help="If this shipment was split, then this field links to the shipment which contains the already processed part.", select=True),
         'state': fields.selection(
@@ -3128,6 +3144,10 @@ class stock_picking_out(osv.osv):
         out_defaults = super(stock_picking_out, self).default_get(cr, uid, fields_list, context=context)
         defaults.update(out_defaults)
         return defaults
+
+    def copy(self, cr, uid, id, default=None, context=None):
+        return self.pool['stock.picking'].copy(cr, uid, id, default=default, context=context)
+
 
     _columns = {
         'backorder_id': fields.many2one('stock.picking.out', 'Back Order of', states={'done':[('readonly', True)], 'cancel':[('readonly',True)]}, help="If this shipment was split, then this field links to the shipment which contains the already processed part.", select=True),
