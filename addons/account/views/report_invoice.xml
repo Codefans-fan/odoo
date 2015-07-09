@@ -8,7 +8,7 @@
                 <div class="col-xs-5 col-xs-offset-7">
                     <address t-field="o.partner_id"
                         t-field-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": true}' />
-                    <span t-if="o.partner_id.vat">VAT: <span t-field="o.partner_id.vat"/></span>
+                    <span t-if="o.partner_id.vat">TIN: <span t-field="o.partner_id.vat"/></span>
                 </div>
             </div>
 
@@ -154,6 +154,23 @@
     <t t-call="report.html_container">
         <t t-foreach="doc_ids" t-as="doc_id">
             <t t-raw="translate_doc(doc_id, doc_model, 'partner_id.lang', 'account.report_invoice_document')"/>
+        </t>
+    </t>
+</template>
+
+<template id="account_invoice_report_duplicate" inherit_id="account.report_invoice_document" primary="True">
+    <xpath expr="//h2" position="replace">
+        <h2>
+            <span>Duplicate</span>
+            <span t-field="o.number"/>
+        </h2>
+    </xpath>
+</template>
+
+<template id="account_invoice_report_duplicate_main">
+    <t t-call="report.html_container">
+        <t t-foreach="doc_ids" t-as="doc_id">
+            <t t-raw="translate_doc(doc_id, doc_model, 'partner_id.lang', 'account.account_invoice_report_duplicate')"/>
         </t>
     </t>
 </template>

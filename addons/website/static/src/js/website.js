@@ -170,6 +170,16 @@ function prompt(options, qweb) {
     return def;
 }
 
+function error(data, url) {
+    var $error = $(core.qweb.render('website.error_dialog', {
+        'title': data.data ? data.data.arguments[0] : "",
+        'message': data.data ? data.data.arguments[1] : data.statusText,
+        'backend_url': url
+    }));
+    $error.appendTo("body");
+    $error.modal('show');
+}
+
 function form(url, method, params) {
     var htmlform = document.createElement('form');
     htmlform.setAttribute('action', url);
@@ -261,11 +271,21 @@ function add_template_file(template) {
     return def;
 }
 
+add_template_file('/website/static/src/xml/website.xml');
+
 var dom_ready = $.Deferred();
 $(document).ready(function () {
     dom_ready.resolve();
     // fix for ie
     if($.fn.placeholder) $('input, textarea').placeholder();
+    $(".oe_search_box").on('input', function() {
+        $(this).next('span').toggle(!!$(this).val());
+    });
+    $(".oe_search_clear").on('click', function() {
+        $(this).prev('input').val('').focus();
+        $(".oe_search_button").trigger("click");
+    });
+    $(".oe_search_clear").toggle(!!$('.oe_search_box').val());
 });
 
 /**
@@ -380,6 +400,13 @@ dom_ready.then(function () {
         init_kanban(this);
     });
 
+    $('.js_website_submit_form').on('submit', function() {
+        var $buttons = $(this).find('button[type="submit"], a.a-submit');
+        _.each($buttons, function(btn) {
+            $(btn).attr('data-loading-text', '<i class="fa fa-spinner fa-spin"></i> ' + $(btn).text()).button('loading');
+        });
+    });
+
     setTimeout(function () {
         if (window.location.hash.indexOf("scrollTop=") > -1) {
             window.document.body.scrollTop = +location.hash.match(/scrollTop=([0-9]+)/)[1];
@@ -408,6 +435,7 @@ return {
     parseHash: parseHash,
     reload: reload,
     prompt: prompt,
+    error: error,
     form: form,
     init_kanban: init_kanban,
     add_template_file: add_template_file,

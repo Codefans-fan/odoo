@@ -18,7 +18,7 @@
 @odoo-main-color-muted: #a8a8a8;
 @odoo-main-text-color: #666666;
 @odoo-webclient-background-color: @odoo-brand-secondary;
-@odoo-view-background-color: red;
+@odoo-view-background-color: white;
 @odoo-shadow-color: #303030;
 @brand-primary: @odoo-brand-primary;
 
@@ -79,7 +79,16 @@
     margin-right: 15px;
 }
 
-.oe_form_field_one2many {
+// Pager input (to edit pager values)
+.o_pager_value > input {
+    width: 60px;
+    text-align: right;
+    &:focus {
+        outline: none;
+    }
+}
+
+.oe_form_field_one2many, .oe_form_field_many2many {
     .oe-view-manager {
         background-color: white;
 
@@ -129,14 +138,13 @@
     vertical-align: top; // To update display context changed by overflow:hidden
 }
 
-.oe-o2m-control-panel {
+.oe-x2m-control-panel {
     background-color: white;
 }
 
-.oe_formview {
+.openerp .oe_formview {
    .oe_button_box {
         .oe_stat_button {
-
             .stat_button_icon {
                 display: inline-block;
             }
@@ -183,13 +191,104 @@
                 }
             }
 
-
             // Some buttons only display text and directly use the WidgetButton template instead of StatInfo
             > span {
                 .o_stat_info; // layout
                 font-size: small;
                 white-space: normal; // text on several lines if needed
             }
+        }
+
+        + .oe_title {
+            width: 400px;
+        }
+
+        + .oe_avatar {
+            > img {
+                max-width: 90px;
+                max-height: 90px;
+            }
+
+            + .oe_title {
+                width: 400px;
+                padding-left: 95px;
+            }
+        }
+    }
+
+    .o_row > * {
+        width: auto!important; // oe_inline
+
+        &.oe_form_field_many2one, &.o_form_field_many2manytags {
+            width: 100%!important;
+        }
+    }
+
+    .o_form_field_many2manytags {
+        .o-flex-display();
+        .o-flex-flow(row, wrap);
+        .o-align-items(flex-start);
+
+        .badge {
+            .o-flex(0, 0, auto);
+            margin: 0 3px 3px 0;
+            .o_delete {
+                cursor: pointer;
+            }
+        }
+
+        padding: 0;
+        > .oe_form_field_many2one {
+            padding: 0;
+        }
+    }
+
+    &.oe_form_editable .o_form_field_many2manytags {
+        border: 1px solid #CCC;
+        border-radius: 3px;
+
+        &.o_form_field_empty {
+            display: none;
+        }
+
+        > .oe_form_field {
+            .o-flex(1, 0, 100px);
+
+            input {
+                border: none;
+            }
+        }
+    }
+
+    .o_address_format {
+        width: 100%;
+
+        > .oe_form_field {
+            width: auto;
+            display: block;
+        }
+
+        > .o_address_street, > .o_address_country {
+            clear: left;
+            width: 100%;
+        }
+        > .o_address_city, > .o_address_state, > .o_address_zip {
+            float: left;
+            margin-right: 2%;
+        }
+        > .o_address_zip {
+            margin-right: 0;
+        }
+    }
+    &.oe_form_editable .o_address_format {
+        > .o_address_city {
+            width: 38%;
+        }
+        > .o_address_state {
+            width: 33%;
+        }
+        > .o_address_zip {
+            width: 25%;
         }
     }
 }

@@ -30,7 +30,7 @@ Tour.register({
         {
             title:      "create new message a",
             waitFor:    '.oe_form_required input:propValue(test)',
-            element:    '.oe_form_field_one2many_list_row_add a'
+            element:    '.oe_form_field_x2many_list_row_add:first a'
         },
         {
             title:      "insert body a",
@@ -40,7 +40,7 @@ Tour.register({
         {
             title:      "save new message a",
             waitFor:    '.modal textarea.field_text:propValue(a)',
-            element:    '.oe_abstractformpopup-form-save'
+            element:    '.o_formdialog_save'
         },
 
         // add message b
@@ -49,7 +49,7 @@ Tour.register({
             title:      "create new message b",
             waitNot:    '.modal',
             waitFor:    '.oe_application:has(.oe_list_field_cell):has(textarea[name="message_concat"]:propValue([test] Administrator:a))',
-            element:    '.oe_form_field_one2many_list_row_add a'
+            element:    '.oe_form_field_x2many_list_row_add:first a'
         },
         {
             title:      "insert body b",
@@ -59,7 +59,7 @@ Tour.register({
         {
             title:      "save new message b",
             waitFor:    '.modal textarea.field_text:propValue(b)',
-            element:    '.oe_abstractformpopup-form-save'
+            element:    '.o_formdialog_save'
         },
 
         // change title to trigger on change
@@ -97,7 +97,7 @@ Tour.register({
         {
             title:      "save changes",
             waitFor:    '.modal textarea.field_text:propValue(bbb)',
-            element:    '.oe_abstractformpopup-form-save'
+            element:    '.o_formdialog_save'
         },
 
         // add message c
@@ -106,7 +106,7 @@ Tour.register({
             title:      "create new message c",
             waitNot:    '.modal',
             waitFor:    'textarea[name="message_concat"]:propValue([test_trigger] Administrator:a\n[test_trigger] Administrator:bbb)',
-            element:    '.oe_form_field_one2many_list_row_add a'
+            element:    '.oe_form_field_x2many_list_row_add:first a'
         },
         {
             title:      "insert body",
@@ -116,7 +116,7 @@ Tour.register({
         {
             title:      "save new message c",
             waitFor:    '.modal textarea.field_text:propValue(c)',
-            element:    '.oe_abstractformpopup-form-save'
+            element:    '.o_formdialog_save'
         },
 
         // add participants
@@ -129,7 +129,7 @@ Tour.register({
         },
         {
             title:      "click to add participants",
-            element:    '.tab-pane:eq(1).active .oe_form_field_many2many_list_row_add a'
+            element:    '.tab-pane:eq(1).active .oe_form_field_x2many_list_row_add a'
         },
         {
             title:      "select participant 1",
@@ -143,7 +143,7 @@ Tour.register({
         {
             title:      "save selected participants",
             waitFor:    '.modal .oe_list_record_selector input[type="checkbox"]:eq(1):propChecked',
-            element:    '.oe_selectcreatepopup-search-select'
+            element:    '.o_selectcreatepopup_search_select'
         },
 
         // save
@@ -189,7 +189,7 @@ Tour.register({
         {
             title:      "create new message d",
             waitFor:    'li.active a[data-toggle="tab"]:contains(Messages)',
-            element:    '.oe_form_field_one2many_list_row_add a'
+            element:    '.oe_form_field_x2many_list_row_add:first a'
         },
         {
             title:      "insert body",
@@ -199,7 +199,7 @@ Tour.register({
         {
             title:      "save new message d",
             waitFor:    '.modal textarea.field_text:propValue(d)',
-            element:    '.oe_abstractformpopup-form-save'
+            element:    '.o_formdialog_save'
         },
 
         // add message e
@@ -208,7 +208,7 @@ Tour.register({
             title:      "create new message e",
             waitNot:    '.modal',
             waitFor:    '.oe_list_field_cell:containsExact(d)',
-            element:    '.oe_form_field_one2many_list_row_add a'
+            element:    '.oe_form_field_x2many_list_row_add:first a'
         },
         {
             title:      "insert body",
@@ -218,7 +218,7 @@ Tour.register({
         {
             title:      "save new message e",
             waitFor:    '.modal textarea.field_text:propValue(e)',
-            element:    '.oe_abstractformpopup-form-save'
+            element:    '.o_formdialog_save'
         },
 
         // change message a
@@ -237,7 +237,7 @@ Tour.register({
         {
             title:      "save changes",
             waitFor:    '.modal textarea.field_text:propValue(aaa)',
-            element:    '.oe_abstractformpopup-form-save'
+            element:    '.o_formdialog_save'
         },
 
         // remove
@@ -246,12 +246,12 @@ Tour.register({
             title:      "remove b",
             waitNot:    '.modal',
             waitFor:    '.oe_list_field_text:contains(aaa)',
-            element:    'tr:has(.oe_list_field_cell:containsExact(bbb)) .oe_list_record_delete button'
+            element:    'tr:has(.oe_list_field_cell:containsExact(bbb)) .oe_list_record_delete'
         },
         {
             title:      "remove e",
             waitNot:    'tr:has(.oe_list_field_cell:containsExact(bbb))',
-            element:    'tr:has(.oe_list_field_cell:containsExact(e)) .oe_list_record_delete button'
+            element:    'tr:has(.oe_list_field_cell:containsExact(e)) .oe_list_record_delete'
         },
 
         // save
@@ -295,7 +295,7 @@ Tour.register({
             title:      "create new message ddd",
             waitNot:    '.modal',
             waitFor:    '.oe_list_field_cell:containsExact(d)',
-            element:    '.oe_form_field_one2many_list_row_add a'
+            element:    '.oe_form_field_x2many_list_row_add:first a'
         },
         {
             title:      "select an other user",
@@ -317,7 +317,7 @@ Tour.register({
         {
             title:      "save new message ddd",
             waitFor:    '.modal textarea.field_text:propValue(ddd)',
-            element:    '.oe_abstractformpopup-form-save'
+            element:    '.o_formdialog_save'
         },
 
         // trigger onchange
@@ -362,12 +362,8 @@ Tour.register({
         },
 
         {
-            title:      "switch to list view",
-            waitFor:    ".oe_list_editable",
-            element:    '.oe-cp-switch-list',
-        },
-        {
             title:      "select previous created record",
+            waitFor:    '.breadcrumb li:containsExact(Discussions 2)',
             element:    'td[data-field="name"]:contains(test_trigger):last',
         },
         {
@@ -399,7 +395,7 @@ Tour.register({
 
         {
             title:      "open the many2one to select an other user",
-            element:    '.oe_m2o_drop_down_button',
+            element:    '.oe_list .oe_m2o_drop_down_button',
         },
         {
             title:      "select an other user",
@@ -433,23 +429,18 @@ Tour.register({
 
         {
             title:      "click outside to trigger one2many onchange",
-            element:    '.oe_tags .text-arrow',
+            element:    '.o_form_field_many2manytags .oe_m2o_drop_down_button',
         },
         {
-            title:      "click outside to trigger one2many onchange",
-            element:    '.text-label:first',
-        },
-
-        {
-            title:      "click outside to trigger one2many onchange",
-            element:    '.text-label:first',
+            title:      "add a tag",
+            element:    '.ui-autocomplete a:first',
         },
 
         // remove record
 
         {
             title:      "delete the last item in the editable list",
-            element:    '.oe_list_record_delete button:visible:last',
+            element:    '.oe_list_record_delete:visible:last',
         },
         {
             title:      "test one2many onchange after delete",
@@ -488,7 +479,7 @@ Tour.register({
         {
             title:      "create new message eee",
             waitFor:    'li.active a[data-toggle="tab"]:contains(Messages)',
-            element:    '.oe_form_field_one2many_list_row_add a'
+            element:    '.oe_form_field_x2many_list_row_add:first a'
         },
         {
             title:      "change text value",

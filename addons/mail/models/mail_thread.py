@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import base64
-from collections import OrderedDict
 import datetime
 import dateutil
 import email
@@ -20,7 +19,7 @@ from email.message import Message
 from email.utils import formataddr
 from urllib import urlencode
 
-from openerp import _, api, fields, models, SUPERUSER_ID
+from openerp import _, api, fields, models
 from openerp import exceptions
 from openerp import tools
 from openerp.addons.mail.models.mail_message import decode
@@ -80,11 +79,9 @@ class MailThread(models.AbstractModel):
     message_unread = fields.Boolean(
         'Unread Messages', compute='_get_message_unread', search='_search_message_unread',
         help="If checked new messages require your attention.")
-    message_summary = fields.Text(
-        'Summary', compute='_get_message_unread',
-        help="Holds the Chatter summary (number of messages, ...). "\
-             "This summary is directly in html format in order to "\
-             "be inserted in kanban views.")
+    message_unread_counter = fields.Integer(
+        'Unread Messages', compute='_get_message_unread',
+        help="Number of unread messages")
 
     @api.multi
     def _get_followers(self):
@@ -153,8 +150,6 @@ class MailThread(models.AbstractModel):
 
     @api.multi
     def _get_message_unread(self):
-        """ Compute the existence of unread message (message_unread) + the kanban
-        summary for unread messages (message_summary) """
         res = dict((res_id, 0) for res_id in self.ids)
 
         # search for unread messages, directly in SQL to improve performances
@@ -167,13 +162,8 @@ class MailThread(models.AbstractModel):
             res[result[0]] += 1
 
         for record in self:
-            record.message_unread = res.get(record.id, 0) >= 1
-            if record.message_unread:
-                record.message_summary = "<span class='oe_kanban_mail_new' title='%(title)s'><i class='fa fa-comments'/> %(count)d</span>" % {
-                    'title': '%d%s' % (res[record.id], _('unread messages')),
-                    'count': res[record.id]}
-            else:
-                record.message_summary = ''
+            record.message_unread_counter = res.get(record.id, 0)
+            record.message_unread = bool(record.message_unread_counter)
 
     @api.model
     def _search_message_unread(self, operator, operand):
@@ -205,13 +195,6 @@ class MailThread(models.AbstractModel):
             doc_name = self.env['ir.model'].search([('model', '=', self._name)]).read(['name'])[0]['name']
             thread.message_post(body=_('%s created') % doc_name)
 
-        # auto_subscribe: take values and defaults into account
-        create_values = dict(values)
-        for key, val in self._context.iteritems():
-            if key.startswith('default_') and key[8:] not in create_values:
-                create_values[key[8:]] = val
-        thread.message_auto_subscribe(create_values.keys(), values=create_values)
-
         # track values
         if not self._context.get('mail_notrack'):
             if 'lang' not in self._context:
@@ -222,6 +205,14 @@ class MailThread(models.AbstractModel):
             if tracked_fields:
                 initial_values = {thread.id: dict.fromkeys(tracked_fields, False)}
                 track_thread.message_track(tracked_fields, initial_values)
+
+        # auto_subscribe: take values and defaults into account
+        create_values = dict(values)
+        for key, val in self._context.iteritems():
+            if key.startswith('default_') and key[8:] not in create_values:
+                create_values[key[8:]] = val
+        thread.message_auto_subscribe(create_values.keys(), values=create_values)
+
         return thread
 
     @api.multi
@@ -242,13 +233,15 @@ class MailThread(models.AbstractModel):
             initial_values = dict((record.id, dict((key, getattr(record, key)) for key in tracked_fields))
                                   for record in track_self)
 
-        # Perform write, update followers
+        # Perform write
         result = super(MailThread, self).write(values)
-        self.message_auto_subscribe(values.keys(), values=values)
 
         # Perform the tracking
         if tracked_fields:
             track_self.message_track(tracked_fields, initial_values)
+
+        # update followers
+        self.message_auto_subscribe(values.keys(), values=values)
 
         return result
 
@@ -327,67 +320,25 @@ class MailThread(models.AbstractModel):
 
         return help
 
-    def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):
-        res = super(MailThread, self).fields_view_get(cr, uid, view_id=view_id, view_type=view_type, context=context, toolbar=toolbar, submenu=submenu)
+    @api.model
+    def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+        res = super(MailThread, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu)
         if view_type == 'form':
             doc = etree.XML(res['arch'])
             for node in doc.xpath("//field[@name='message_ids']"):
+                # the 'Log a note' button is employee only
                 options = json.loads(node.get('options', '{}'))
-                user = self.pool['res.users'].browse(cr, SUPERUSER_ID, uid, context=context)
-                options['display_log_button'] = user.has_group('base.group_user')
+                is_employee = self.env.user.has_group('base.group_user')
+                options['display_log_button'] = is_employee
+                if is_employee:
+                    Subtype = self.env['mail.message.subtype'].sudo()
+                    # fetch internal subtypes
+                    internal_subtypes = Subtype.search_read([
+                        ('res_model', 'in', [False, self._name]),
+                        ('internal', '=', True)], ['name', 'description', 'sequence'])
+                    options['internal_subtypes'] = internal_subtypes
                 node.set('options', json.dumps(options))
             res['arch'] = etree.tostring(doc)
-        return res
-
-    @api.model
-    def read_followers_data(self, follower_ids):
-        # TDE NOTE: move as controller ? (used in mail_followers.js)$
-        # TDE NOTE2: usefull anyway ?
-        result = []
-        is_editable = self.env.user.has_group('base.group_no_one')
-        for follower in self.env['res.partner'].browse(follower_ids):
-            is_uid = self.env.user.partner_id.id in follower.ids
-            data = (follower.id,
-                    follower.name,
-                    {'is_editable': is_editable, 'is_uid': is_uid},
-                    )
-            result.append(data)
-        return result
-
-    @api.multi
-    def _get_subscription_data(self, user_pid=None):
-        # TDE NOTE: move as controller ? (used in mail_followers.js)
-        """ Computes:
-            - message_subtype_data: data about document subtypes: which are
-                available, which are followed if any """
-        res = dict((id, dict(message_subtype_data='')) for id in self.ids)
-        if user_pid is None:
-            user_pid = self.env.user.partner_id.id
-
-        # find current model subtypes, add them to a dictionary
-        subtypes = self.env['mail.message.subtype'].search(['&', ('hidden', '=', False), '|', ('res_model', '=', self._name), ('res_model', '=', False)])
-        subtype_dict = OrderedDict(
-            (subtype.name, {
-                'default': subtype.default,
-                'followed': False,
-                'parent_model': subtype.parent_id and subtype.parent_id.res_model or self._name,
-                'id': subtype.id
-            }) for subtype in subtypes)
-        for res_id in self.ids:
-            res[res_id]['message_subtype_data'] = subtype_dict.copy()
-
-        # find the document followers, update the data
-        followers = self.env['mail.followers'].search([
-            ('partner_id', '=', user_pid),
-            ('res_id', 'in', self.ids),
-            ('res_model', '=', self._name),
-        ])
-        for fol in followers:
-            thread_subtype_dict = res[fol.res_id]['message_subtype_data']
-            for subtype in [st for st in fol.subtype_ids if st.name in thread_subtype_dict]:
-                thread_subtype_dict[subtype.name]['followed'] = True
-            res[fol.res_id]['message_subtype_data'] = thread_subtype_dict
-
         return res
 
     # ------------------------------------------------------
@@ -537,7 +488,7 @@ class MailThread(models.AbstractModel):
         """ When redirecting towards the Inbox, choose which action xml_id has
             to be fetched. This method is meant to be inherited, at least in portal
             because portal users have a different Inbox action than classic users. """
-        return 'mail.action_mail_inbox_feeds'
+        return 'mail.mail_message_action_inbox'
 
     @api.model
     def message_redirect_action(self):
@@ -867,7 +818,7 @@ class MailThread(models.AbstractModel):
         email_from = decode_header(message, 'From')
         email_to = decode_header(message, 'To')
         references = decode_header(message, 'References')
-        in_reply_to = decode_header(message, 'In-Reply-To')
+        in_reply_to = decode_header(message, 'In-Reply-To').strip()
         thread_references = references or in_reply_to
 
         # 0. First check if this is a bounce message or not.
@@ -1549,8 +1500,9 @@ class MailThread(models.AbstractModel):
             attachments, kwargs.pop('attachment_ids', []), model, self.ids and self.ids[0] or None)
 
         # 4: mail.message.subtype
-        subtype_id = False
-        if subtype:
+        subtype_id = kwargs.get('subtype_id', False)
+        if not subtype_id:
+            subtype = subtype or 'mt_note'
             if '.' not in subtype:
                 subtype = 'mail.%s' % subtype
             subtype_id = self.env['ir.model.data'].xmlid_to_res_id(subtype)
@@ -1604,8 +1556,10 @@ class MailThread(models.AbstractModel):
 
         # Post-process: subscribe author, update message_last_post
         if model and model != 'mail.thread' and self.ids and subtype_id:
-            # done with SUPERUSER_ID, because on some models users can post only with read access, not necessarily write access
-            self.sudo().write({'message_last_post': fields.datetime.now()})
+            subtype_rec = self.env['mail.message.subtype'].sudo().browse(subtype_id)
+            if not subtype_rec.internal:
+                # done with SUPERUSER_ID, because on some models users can post only with read access, not necessarily write access
+                self.sudo().write({'message_last_post': fields.Datetime.now()})
         if new_message.author_id and model and self.ids and message_type != 'notification' and not self._context.get('mail_create_nosubscribe'):
             self.message_subscribe([new_message.author_id.id])
         return new_message
@@ -1876,29 +1830,6 @@ class MailThread(models.AbstractModel):
         ''', (self.ids, self._name, partner_id))
         self.env['mail.notification'].invalidate_cache(['is_read'])
         return True
-
-    @api.model
-    def get_suggested_thread(self, removed_suggested_threads=None):
-        """Return a list of suggested threads, sorted by the numbers of followers"""
-        # TDE HACK: originally by MAT from portal/mail_mail.py but not working until the inheritance graph bug is not solved in trunk
-        # TDE FIXME: relocate in portal when it won't be necessary to reload the hr.employee model in an additional bridge module
-        if 'is_portal' in self.pool['res.groups']._fields:
-            if any(group.is_portal for group in self.env.user.sudo().groups_id):
-                return []
-
-        threads = []
-        if removed_suggested_threads is None:
-            removed_suggested_threads = []
-
-        for thread in self.search([('id', 'not in', removed_suggested_threads), ('message_is_follower', '=', False)]):
-            data = {
-                'id': thread.id,
-                'popularity': len(thread.message_follower_ids),
-                'name': thread.name,
-                'image_small': thread.image_small
-            }
-            threads.append(data)
-        return sorted(threads, key=lambda x: (x['popularity'], x['id']), reverse=True)[:3]
 
     @api.multi
     def message_change_thread(self, new_thread):

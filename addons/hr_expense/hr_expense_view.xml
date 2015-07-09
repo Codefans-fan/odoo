@@ -31,8 +31,8 @@
                     <field name="date"/>
                     <field name="user_id" invisible="1"/>
                     <field name="name" string="Expense Sheet"/>
-                    <field name="currency_id" groups="base.group_multi_currency"/>
                     <field name="amount" sum="Total Amount" widget="monetary"/>
+                    <field name="currency_id" groups="base.group_multi_currency"/>
                     <field name="state"/>
                     <field name="message_unread" invisible="1"/>
                 </tree>
@@ -46,7 +46,7 @@
                 <tree decoration-warning="state == 'draft'" decoration-muted="state == 'cancelled'" string="Expenses" editable="top">
                     <field name="employee_id"/>
                     <field name="date"/>
-                    <field name="department_id" groups="hr.group_multi_departments"/>
+                    <field name="department_id"/>
                     <field name="name" string="Expense Sheet"/>
                     <field name="amount" widget="monetary"/>
                     <field name="state"/>
@@ -76,7 +76,7 @@
                         <group>
                             <field name="employee_id" on_change="onchange_employee_id(employee_id)"/>
                             <field name="date"/>
-                            <field name="department_id" groups="hr.group_multi_departments"/>
+                            <field name="department_id"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                         <group>
@@ -159,7 +159,7 @@
                     <field name="name" string="Expenses"/>
                     <field name="date"/>
                     <field name="employee_id"/>
-                    <field name="department_id" groups="hr.group_multi_departments" string="Department" context="{'invisible_department': False}"/>
+                    <field name="department_id" string="Department" context="{'invisible_department': False}"/>
                     <filter domain="[('state','=','draft')]" string="New" help="New Expense"/>
                     <filter domain="[('state','=','confirm')]" string="To Approve" name="confirm" help="Confirmed Expenses"/>
                     <filter domain="[('state','=','accepted')]" string="To Pay" name="approved" help="Expenses to Invoice"/>
@@ -170,7 +170,7 @@
                     <filter string="New Mail" name="message_unread" domain="[('message_unread','=',True)]"/>
                     <group expand="0" string="Group By">
                         <filter string="Employee" domain="[]" context="{'group_by':'employee_id'}"/>
-                        <filter string="Department" domain="[]" context="{'group_by':'department_id'}" groups="hr.group_multi_departments"/>
+                        <filter string="Department" domain="[]" context="{'group_by':'department_id'}"/>
                         <filter string="Expenses Month" domain="[]" context="{'group_by':'date'}" help="Expenses by Month"/>
                     </group>
                     <separator />
@@ -266,15 +266,12 @@
 
         <menuitem id="menu_expense_approved" parent="account.menu_finance_payables" 
             action="action_approved_expense" sequence="15"/>
-        <menuitem id="menu_hr_expense_root" name="Expenses" sequence="100"/>
+        <menuitem id="menu_hr_expense_root" name="Expenses" sequence="100" web_icon="hr_expense,static/description/icon.png"/>
         <menuitem id="menu_hr_expense_configuration" name="Configuration" parent="menu_hr_expense_root"
-            sequence="100" groups="base.group_configuration"/>
-        <menuitem id="menu_hr_product" name="Expense Products" parent="menu_hr_expense_configuration" 
-            action="hr_expense_product" groups="base.group_hr_manager"/>
+            sequence="100" groups="base.group_configuration,base.group_hr_manager" action="hr_expense_product"/>
         <menuitem action="expense_all" id="menu_expense_all" name="Expenses" parent="menu_hr_expense_root"/>
         <menuitem action="action_request_approve_expense" id="menu_expense_to_approve" name="Approvals" 
             parent="menu_hr_expense_root" groups="base.group_hr_user"/>
-        <menuitem name="Reports" id="menu_hr_expense_report" sequence="99" parent="menu_hr_expense_root"/>
 
         <record id="hr_expense_action_from_department" model="ir.actions.act_window">
             <field name="name">Expenses to Approve</field>

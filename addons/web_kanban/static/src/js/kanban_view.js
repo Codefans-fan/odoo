@@ -101,6 +101,7 @@ var KanbanView = View.extend({
                 }
             }
         }
+        this.trigger('kanban_view_loaded');
     },
 
     do_search: function(domain, context, group_by) {
@@ -170,9 +171,11 @@ var KanbanView = View.extend({
             // legends for kanban state management (states_legend) are fetched in
             // one call.
             var group_by_fields_to_read = [];
+            var group_options = {};
             var recurse = function(node) {
-                if (node.tag === "field" && node.attrs && node.attrs.options) {
+                if (node.tag === "field" && node.attrs && node.attrs.options && node.attrs.name === group_by_field) {
                     var options = pyeval.py_eval(node.attrs.options);
+                    group_options = options;
                     var states_fields_to_read = _.map(
                         options && options.states_legend || {},
                         function (value, key, list) { return value; });
@@ -183,6 +186,7 @@ var KanbanView = View.extend({
                         group_by_fields_to_read,
                         states_fields_to_read,
                         tooltip_fields_to_read);
+                    return;
                 }
                 _.each(node.children, function(child) {
                     recurse(child);
@@ -202,6 +206,7 @@ var KanbanView = View.extend({
                             group.title = result ? result.display_name : _t("Undefined");
                             group.values = result;
                             group.id = group_id;
+                            group.options = group_options;
                         });
                         return groups;
                     });
@@ -292,6 +297,7 @@ var KanbanView = View.extend({
         this.pager = new Pager(this, this.dataset.size(), 1, this.limit, options);
         this.pager.appendTo($node);
         this.pager.on('pager_changed', this, function (state) {
+            self.limit = state.limit;
             self.load_records(state.current_min - 1)
                 .then(function (data) {
                     self.data = data;
@@ -306,7 +312,7 @@ var KanbanView = View.extend({
             if (this.grouped) {
                 this.pager.do_hide();
             } else {
-                this.pager.set_state({size: this.dataset.size(), current_min: 1});
+                this.pager.update_state({size: this.dataset.size(), current_min: 1});
             }
         }
     },
@@ -446,7 +452,7 @@ var KanbanView = View.extend({
             });
         }
         if (this.options.confirm_on_delete) {
-            Dialog.confirm(this, _t("Are you sure you want to delete this record ?"), do_it);
+            Dialog.confirm(this, _t("Are you sure you want to delete this record ?"), { confirm_callback: do_it });
         } else {
             do_it();
         }
@@ -468,7 +474,7 @@ var KanbanView = View.extend({
 
     /*
     *  postprocessing of fields type many2many
-    *  make the rpc request for all ids/model and insert value inside .oe_tags fields
+    *  make the rpc request for all ids/model and insert value inside .o_form_field_many2manytags fields
     */
     postprocess_m2m_tags: function(records) {
         var self = this;
@@ -483,7 +489,7 @@ var KanbanView = View.extend({
         records.forEach(function(record) {
             self.many2manys.forEach(function(name) {
                 var field = record.record[name];
-                var $el = record.$('.oe_form_field.oe_tags[name=' + name + ']');
+                var $el = record.$('.oe_form_field.o_form_field_many2manytags[name=' + name + ']');
                 // fields declared in the kanban view may not be used directly
                 // in the template declaration, for example fields for which the
                 // raw value is used -> $el[0] is undefined, leading to errors
@@ -594,7 +600,7 @@ var KanbanView = View.extend({
         var self = this;
         var column = event.target;
         var context = {};
-        context['default_' + this.group_by_field] = column.value;
+        context['default_' + this.group_by_field] = column.values.id;
         var name = event.data.value;
         this.dataset.name_create(name, context).then(function on_success (data) {
             add_record(data[0]);
@@ -696,7 +702,7 @@ function transform_qweb_template (node, fvg, many2manys) {
                     many2manys.push(node.attrs.name);
                 }
                 node.tag = 'div';
-                node.attrs['class'] = (node.attrs['class'] || '') + ' oe_form_field oe_tags o_kanban_tags';
+                node.attrs['class'] = (node.attrs['class'] || '') + ' oe_form_field o_form_field_many2manytags o_kanban_tags';
             } else if (fields_registry.contains(ftype)) {
                 // do nothing, the kanban record will handle it
             } else {

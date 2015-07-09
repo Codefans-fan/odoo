@@ -65,6 +65,7 @@ class pos_config(osv.osv):
         'iface_precompute_cash': fields.boolean('Prefill Cash Payment',  help='The payment input will behave similarily to bank payment input, and will be prefilled with the exact due amount'),
         'iface_tax_included':   fields.boolean('Include Taxes in Prices', help='The displayed prices will always include all taxes, even if the taxes have been setup differently'),
         'iface_start_categ_id': fields.many2one('pos.category','Start Category', help='The point of sale will display this product category by default. If no category is specified, all available products will be shown'),
+        'iface_display_categ_images': fields.boolean('Display Category Pictures', help="The product categories will be displayed with pictures."),
         'receipt_header': fields.text('Receipt Header',help="A short text that will be inserted as a header in the printed receipt"),
         'receipt_footer': fields.text('Receipt Footer',help="A short text that will be inserted as a footer in the printed receipt"),
         'proxy_ip':       fields.char('IP Address', help='The hostname or ip address of the hardware proxy, Will be autodetected if left empty', size=45),
@@ -550,6 +551,16 @@ class pos_order(osv.osv):
     _description = "Point of Sale"
     _order = "id desc"
 
+    def _amount_line_tax(self, cr, uid, line, context=None):
+        taxes = line.product_id.taxes_id.filtered(lambda t: t.company_id.id == line.order_id.company_id.id)
+        price = line.price_unit * (1 - (line.discount or 0.0) / 100.0)
+        cur = line.order_id.pricelist_id.currency_id
+        taxes = taxes.compute_all(price, cur, line.qty, product=line.product_id, partner=line.order_id.partner_id or False)['taxes']
+        val = 0.0
+        for c in taxes:
+            val += c.get('amount', 0.0)
+        return val
+
     def _order_fields(self, cr, uid, ui_order, context=None):
         process_line = partial(self.pool['pos.order.line']._order_line_fields, cr, uid, context=context)
         return {
@@ -689,10 +700,10 @@ class pos_order(osv.osv):
                 res[order.id]['amount_paid'] +=  payment.amount
                 res[order.id]['amount_return'] += (payment.amount < 0 and payment.amount or 0)
             for line in order.lines:
-                val1 += line.price_subtotal_incl
+                val1 += self._amount_line_tax(cr, uid, line, context=context)
                 val2 += line.price_subtotal
-            res[order.id]['amount_tax'] = cur_obj.round(cr, uid, cur, val1-val2)
-            res[order.id]['amount_total'] = cur_obj.round(cr, uid, cur, val1)
+            res[order.id]['amount_tax'] = cur_obj.round(cr, uid, cur, val1)
+            res[order.id]['amount_total'] = cur_obj.round(cr, uid, cur, val1+val2)
         return res
 
     _columns = {
@@ -881,9 +892,9 @@ class pos_order(osv.osv):
         journal = self.pool['account.journal'].browse(cr, uid, journal_id, context=context)
         # use the company of the journal and not of the current user
         company_cxt = dict(context, force_company=journal.company_id.id)
-        account_def = property_obj.get(cr, uid, 'property_account_receivable', 'res.partner', context=company_cxt)
-        args['account_id'] = (order.partner_id and order.partner_id.property_account_receivable \
-                             and order.partner_id.property_account_receivable.id) or (account_def and account_def.id) or False
+        account_def = property_obj.get(cr, uid, 'property_account_receivable_id', 'res.partner', context=company_cxt)
+        args['account_id'] = (order.partner_id and order.partner_id.property_account_receivable_id \
+                             and order.partner_id.property_account_receivable_id.id) or (account_def and account_def.id) or False
 
         if not args['account_id']:
             if not args['partner_id']:
@@ -974,7 +985,7 @@ class pos_order(osv.osv):
             if not order.partner_id:
                 raise UserError(_('Please provide a partner for the sale.'))
 
-            acc = order.partner_id.property_account_receivable.id
+            acc = order.partner_id.property_account_receivable_id.id
             inv = {
                 'name': order.name,
                 'origin': order.name,
@@ -1073,12 +1084,12 @@ class pos_order(osv.osv):
             current_company = order.sale_journal.company_id
 
             group_tax = {}
-            account_def = property_obj.get(cr, uid, 'property_account_receivable', 'res.partner', context=context)
+            account_def = property_obj.get(cr, uid, 'property_account_receivable_id', 'res.partner', context=context)
 
             order_account = order.partner_id and \
-                            order.partner_id.property_account_receivable and \
-                            order.partner_id.property_account_receivable.id or \
-                            account_def and account_def.id or current_company.account_receivable.id
+                            order.partner_id.property_account_receivable_id and \
+                            order.partner_id.property_account_receivable_id.id or \
+                            account_def and account_def.id
 
             if move_id is None:
                 # Create an entry for the sale
@@ -1146,10 +1157,10 @@ class pos_order(osv.osv):
                 amount = line.price_subtotal
 
                 # Search for the income account
-                if  line.product_id.property_account_income.id:
-                    income_account = line.product_id.property_account_income.id
-                elif line.product_id.categ_id.property_account_income_categ.id:
-                    income_account = line.product_id.categ_id.property_account_income_categ.id
+                if  line.product_id.property_account_income_id.id:
+                    income_account = line.product_id.property_account_income_id.id
+                elif line.product_id.categ_id.property_account_income_categ_id.id:
+                    income_account = line.product_id.categ_id.property_account_income_categ_id.id
                 else:
                     raise UserError(_('Please define income '\
                         'account for this product: "%s" (id:%d).') \

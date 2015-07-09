@@ -3,7 +3,7 @@
 
 from openerp.osv import fields, osv
 import openerp.addons.decimal_precision as dp
-from openerp.tools import float_compare
+from openerp.tools import float_compare, float_round
 from openerp.tools.translate import _
 import product
 from openerp.exceptions import UserError
@@ -84,7 +84,7 @@ class stock_landed_cost(osv.osv):
         accounts = product_obj.browse(cr, uid, line.product_id.product_tmpl_id.id, context=context).get_product_accounts()
         debit_account_id = accounts.get('stock_valuation', False) and accounts['stock_valuation'].id or False
         already_out_account_id = accounts['stock_output'].id
-        credit_account_id = line.cost_line_id.account_id.id or cost_product.property_account_expense.id or cost_product.categ_id.property_account_expense_categ.id
+        credit_account_id = line.cost_line_id.account_id.id or cost_product.property_account_expense_id.id or cost_product.categ_id.property_account_expense_categ_id.id
 
         if not credit_account_id:
             raise UserError(_('Please configure Stock Expense Account for product: %s.') % (cost_product.name))
@@ -178,7 +178,7 @@ class stock_landed_cost(osv.osv):
             if cost.state != 'draft':
                 raise UserError(_('Only draft landed costs can be validated'))
             if not cost.valuation_adjustment_lines or not self._check_sum(cr, uid, cost, context=context):
-                raise UserError(_('You cannot validate a landed cost which has no valid valuation lines.'))
+                raise UserError(_('You cannot validate a landed cost which has no valid valuation adjustments lines. Did you click on Compute?'))
             move_id = self._create_account_move(cr, uid, cost, context=context)
             quant_dict = {}
             for line in cost.valuation_adjustment_lines:
@@ -220,6 +220,7 @@ class stock_landed_cost(osv.osv):
         line_obj = self.pool.get('stock.valuation.adjustment.lines')
         unlink_ids = line_obj.search(cr, uid, [('cost_id', 'in', ids)], context=context)
         line_obj.unlink(cr, uid, unlink_ids, context=context)
+        digits = dp.get_precision('Product Price')(cr)
         towrite_dict = {}
         for cost in self.browse(cr, uid, ids, context=None):
             if not cost.picking_ids:
@@ -242,6 +243,7 @@ class stock_landed_cost(osv.osv):
                 total_line += 1
 
             for line in cost.cost_lines:
+                value_split = 0.0
                 for valuation in cost.valuation_adjustment_lines:
                     value = 0.0
                     if valuation.cost_line_id and valuation.cost_line_id.id == line.id:
@@ -261,6 +263,11 @@ class stock_landed_cost(osv.osv):
                             value = valuation.former_cost * per_unit
                         else:
                             value = (line.price_unit / total_line)
+
+                        if digits:
+                            value = float_round(value, precision_digits=digits[1], rounding_method='UP')
+                            value = min(value, line.price_unit - value_split)
+                            value_split += value
 
                         if valuation.id not in towrite_dict:
                             towrite_dict[valuation.id] = value
@@ -291,7 +298,7 @@ class stock_landed_cost_lines(osv.osv):
         result['name'] = product.name
         result['split_method'] = product.split_method
         result['price_unit'] = product.standard_price
-        result['account_id'] = product.property_account_expense and product.property_account_expense.id or product.categ_id.property_account_expense_categ.id
+        result['account_id'] = product.property_account_expense_id and product.property_account_expense_id.id or product.categ_id.property_account_expense_categ_id.id
         return {'value': result}
 
     _columns = {

@@ -36,10 +36,10 @@ Main Features
         'views/mail_mail_views.xml',
         'views/mail_followers_views.xml',
         'views/mail_thread_views.xml',
-        'views/mail_group_views.xml',
+        'views/mail_channel_views.xml',
         'views/res_config_views.xml',
         'data/mail_data.xml',
-        'data/mail_group_data.xml',
+        'data/mail_channel_data.xml',
         'security/mail_security.xml',
         'security/ir.model.access.csv',
         'views/mail_alias_views.xml',
@@ -53,7 +53,7 @@ Main Features
     ],
     'demo': [
         'data/mail_demo.xml',
-        'data/mail_group_demo.xml',
+        'data/mail_channel_demo.xml',
     ],
     'installable': True,
     'application': True,
@@ -61,6 +61,5 @@ Main Features
         'static/src/xml/mail.xml',
         'static/src/xml/mail_followers.xml',
         'static/src/xml/announcement.xml',
-        'static/src/xml/suggestions.xml',
     ],
 }

@@ -248,12 +248,11 @@ class sale_order(osv.osv):
 
     def onchange_delivery_id(self, cr, uid, ids, company_id, partner_id, delivery_id, fiscal_position_id, context=None):
         r = {'value': {}}
-        if not fiscal_position_id:
-            if not company_id:
-                company_id = self._get_default_company(cr, uid, context=context)
-            fiscal_position = self.pool['account.fiscal.position'].get_fiscal_position(cr, uid, partner_id, delivery_id, context=context)
-            if fiscal_position:
-                r['value']['fiscal_position_id'] = fiscal_position
+        if not company_id:
+            company_id = self._get_default_company(cr, uid, context=context)
+        fiscal_position = self.pool['account.fiscal.position'].get_fiscal_position(cr, uid, partner_id, delivery_id, context=context)
+        if fiscal_position:
+            r['value']['fiscal_position_id'] = fiscal_position
         return r
 
     def onchange_partner_id(self, cr, uid, ids, part, context=None):
@@ -264,7 +263,7 @@ class sale_order(osv.osv):
         addr = self.pool.get('res.partner').address_get(cr, uid, [part.id], ['delivery', 'invoice', 'contact'], context=context)
         pricelist = part.property_product_pricelist and part.property_product_pricelist.id or False
         invoice_part = self.pool.get('res.partner').browse(cr, uid, addr['invoice'], context=context)
-        payment_term = invoice_part.property_payment_term and invoice_part.property_payment_term.id or False
+        payment_term = invoice_part.property_payment_term_id and invoice_part.property_payment_term_id.id or False
         dedicated_salesman = part.user_id and part.user_id.id or uid
         val = {
             'partner_invoice_id': addr['invoice'],
@@ -286,7 +285,7 @@ class sale_order(osv.osv):
         if context is None:
             context = {}
         if vals.get('name', '/') == '/':
-            vals['name'] = self.pool.get('ir.sequence').next_by_code(cr, uid, 'sale.order') or '/'
+            vals['name'] = self.pool.get('ir.sequence').next_by_code(cr, uid, 'sale.order', context=context) or '/'
         if vals.get('partner_id') and any(f not in vals for f in ['partner_invoice_id', 'partner_shipping_id', 'pricelist_id', 'fiscal_position_id']):
             defaults = self.onchange_partner_id(cr, uid, [], vals['partner_id'], context=context)['value']
             if not vals.get('fiscal_position_id') and vals.get('partner_shipping_id'):
@@ -329,14 +328,14 @@ class sale_order(osv.osv):
             'origin': order.name,
             'type': 'out_invoice',
             'reference': order.client_order_ref or order.name,
-            'account_id': order.partner_invoice_id.property_account_receivable.id,
+            'account_id': order.partner_invoice_id.property_account_receivable_id.id,
             'partner_id': order.partner_invoice_id.id,
             'journal_id': journal_ids[0],
             'invoice_line_ids': [(6, 0, lines)],
             'currency_id': order.pricelist_id.currency_id.id,
             'comment': order.note,
             'payment_term_id': order.payment_term_id.id,
-            'fiscal_position_id': order.fiscal_position_id.id or order.partner_invoice_id.property_account_position.id,
+            'fiscal_position_id': order.fiscal_position_id.id or order.partner_invoice_id.property_account_position_id.id,
             'date_invoice': context.get('date_invoice', False),
             'company_id': order.company_id.id,
             'user_id': order.user_id and order.user_id.id or False,
@@ -365,7 +364,9 @@ class sale_order(osv.osv):
                     lines.append(inv_line_id)
         inv = self._prepare_invoice(cr, uid, order, lines, context=context)
         inv_id = inv_obj.create(cr, uid, inv, context=context)
-        self.pool['account.invoice'].browse(cr, uid, inv_id, context=context)._onchange_payment_term_date_invoice()
+        invoice = self.pool['account.invoice'].browse(cr, uid, inv_id, context=context)
+        invoice._onchange_payment_term_date_invoice()
+        invoice.compute_taxes()
         return inv_id
 
     def print_quotation(self, cr, uid, ids, context=None):
@@ -808,7 +809,6 @@ class sale_order_line(osv.osv):
         'price_subtotal': fields.function(_amount_line, string='Subtotal', digits=0),
         'price_reduce': fields.function(_get_price_reduce, type='float', string='Price Reduce', digits_compute=dp.get_precision('Product Price')),
         'tax_id': fields.many2many('account.tax', 'sale_order_tax', 'order_line_id', 'tax_id', 'Taxes', readonly=True, states={'draft': [('readonly', False)]}),
-        'address_allotment_id': fields.many2one('res.partner', 'Allotment Partner',help="A partner to whom the particular product needs to be allotted."),
         'product_uom_qty': fields.float('Quantity', digits_compute= dp.get_precision('Product UoS'), required=True, readonly=True, states={'draft': [('readonly', False)]}),
         'product_uom': fields.many2one('product.uom', 'Unit of Measure ', required=True, readonly=True, states={'draft': [('readonly', False)]}),
         'product_uos_qty': fields.float('Quantity (UoS)' ,digits_compute= dp.get_precision('Product UoS'), readonly=True, states={'draft': [('readonly', False)]}),
@@ -868,16 +868,16 @@ class sale_order_line(osv.osv):
         if not line.invoiced:
             if not account_id:
                 if line.product_id:
-                    account_id = line.product_id.property_account_income.id
+                    account_id = line.product_id.property_account_income_id.id
                     if not account_id:
-                        account_id = line.product_id.categ_id.property_account_income_categ.id
+                        account_id = line.product_id.categ_id.property_account_income_categ_id.id
                     if not account_id:
                         raise UserError(
                                 _('Please define income account for this product: "%s" (id:%d).') % \
                                     (line.product_id.name, line.product_id.id,))
                 else:
                     prop = self.pool.get('ir.property').get(cr, uid,
-                            'property_account_income_categ', 'product.category',
+                            'property_account_income_categ_id', 'product.category',
                             context=context)
                     account_id = prop and prop.id or False
             uosqty = self._get_line_qty(cr, uid, line, context=context)
@@ -1024,7 +1024,7 @@ class sale_order_line(osv.osv):
 
         fpos = False
         if not fiscal_position_id:
-            fpos = partner and partner.property_account_position or False
+            fpos = partner and partner.property_account_position_id or False
         else:
             fpos = self.pool['account.fiscal.position'].browse(cr, uid, fiscal_position_id)
         if update_tax:  # The quantity only have changed
@@ -1170,10 +1170,10 @@ class product_product(osv.Model):
     def _sales_count(self, cr, uid, ids, field_name, arg, context=None):
         r = dict.fromkeys(ids, 0)
         domain = [
-            ('state', 'in', ['waiting_date','progress','manual', 'shipping_except', 'invoice_except', 'done']),
+            ('state', 'in', ['waiting_date', 'progress', 'manual', 'shipping_except', 'invoice_except', 'done']),
             ('product_id', 'in', ids),
         ]
-        for group in self.pool['sale.report'].read_group(cr, uid, domain, ['product_id','product_uom_qty'], ['product_id'], context=context):
+        for group in self.pool['sale.report'].read_group(cr, uid, domain, ['product_id', 'product_uom_qty'], ['product_id'], context=context):
             r[group['product_id'][0]] = group['product_uom_qty']
         return r
 

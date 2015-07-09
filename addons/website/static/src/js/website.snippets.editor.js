@@ -646,6 +646,7 @@ var BuildingBlock = Widget.extend({
                                 }
                             });
                         }
+                            $target.closest(".o_editable").trigger("content_changed");
                         // end
 
                         self.make_active($target);
@@ -932,6 +933,9 @@ var Option = Class.extend({
     on_clone: function () {
     },
 
+    on_move: function () {
+    },
+
     on_remove: function () {
     },
 
@@ -1056,6 +1060,26 @@ var Option = Class.extend({
     clean_for_save: dummy
 });
 
+
+var preventParentEmpty = {
+    hide_remove_button: function() {
+        this.$overlay.find('.oe_snippet_remove, .oe_snippet_move').toggleClass("hidden", !this.$target.siblings().length);
+    },
+    on_focus : function () {
+        this._super();
+        this.hide_remove_button();
+    },
+    on_clone: function ($clone) {
+        this._super($clone);
+        this.hide_remove_button();
+    },
+    on_remove: function () {
+        this._super();
+        this.hide_remove_button();
+    },
+};
+
+
 options.background = Option.extend({
     start: function ($change_target) {
         this.$bg = $change_target || this.$target;
@@ -1067,7 +1091,7 @@ options.background = Option.extend({
     },
     background: function(type, value) {
         if (value && value.length) {
-            this.$bg.css("background-image", 'url(' + value + ')');
+            this.$bg.attr("style", 'background-image: url(' + value + ')' + (this.$bg.attr("style") || '').replace(/background-image:[^;]+/, '') );
             this.$bg.addClass("oe_img_bg");
         } else {
             this.$bg.css("background-image", "");
@@ -1169,23 +1193,15 @@ options.colorpicker = Option.extend({
 });
 
 options.slider = Option.extend({
-    unique_id: function () {
-        var id = 0;
-        $(".carousel").each(function () {
-            var cid = 1 + parseInt($(this).attr("id").replace(/[^0123456789]/g, ''),10);
-            if (id < cid) id = cid;
-        });
-        return "myCarousel" + id;
-    },
     drop_and_build_snippet: function() {
-        this.id = this.unique_id();
+        this.id = "myCarousel" + new Date().getTime();
         this.$target.attr("id", this.id);
         this.$target.find("[data-slide]").attr("data-cke-saved-href", "#" + this.id);
         this.$target.find("[data-target]").attr("data-target", "#" + this.id);
         this.rebind_event();
     },
     on_clone: function ($clone) {
-        var id = this.unique_id();
+        this.id = "myCarousel" + new Date().getTime();
         $clone.attr("id", id);
         $clone.find("[data-slide]").attr("href", "#" + id);
         $clone.find("[data-slide-to]").attr("data-target", "#" + id);
@@ -1453,6 +1469,7 @@ options.marginAndResize = Option.extend({
                     self.BuildingBlock.editor_busy = false;
                 },0);
                 self.$target.removeClass("resize_editor_busy");
+                    self.$target.closest(".o_editable").trigger("content_changed");
             };
             $body.mousemove(body_mousemove);
             $body.mouseup(body_mouseup);
@@ -1461,6 +1478,7 @@ options.marginAndResize = Option.extend({
             self.$target.css("height", "");
             self.$target.css("overflow", "");
             self.BuildingBlock.cover_target(self.$overlay, self.$target);
+                self.$target.closest(".o_editable").trigger("content_changed");
             return false;
         });
     },
@@ -1527,7 +1545,7 @@ options["margin-y"] = options.marginAndResize.extend({
     },
 });
 
-options["margin-x"] = options.marginAndResize.extend({
+options["margin-x"] = options.marginAndResize.extend(preventParentEmpty).extend({
     getSize: function () {
         this.grid = this._super();
         var width = this.$target.parents(".row:first").first().outerWidth();
@@ -1568,22 +1586,10 @@ options["margin-x"] = options.marginAndResize.extend({
         this.$target.addClass("col-md-offset-" + this.$target.prevAll(".oe_drop_to_remove").length);
         this._super();
     },
-    hide_remove_button: function() {
-        this.$overlay.find('.oe_snippet_remove').toggleClass("hidden", !this.$target.siblings().length);
-    },
-    on_focus : function () {
-        this._super();
-        this.hide_remove_button();
-    },
     on_clone: function ($clone) {
         var _class = $clone.attr("class").replace(/\s*(col-lg-offset-|col-md-offset-)([0-9-]+)/g, '');
         $clone.attr("class", _class);
-        this.hide_remove_button();
         return false;
-    },
-    on_remove: function () {
-        this._super();
-        this.hide_remove_button();
     },
     on_resize: function (compass, beginClass, current) {
         if (compass === 'w') {
@@ -1844,6 +1850,67 @@ options.ul = Option.extend({
     }
 });
 
+
+options.collapse = Option.extend(preventParentEmpty).extend({
+    start: function () {
+        var self = this;
+        this._super();
+        this.$target.on('shown.bs.collapse hidden.bs.collapse', '[role="tabpanel"]', function () {
+            self.BuildingBlock.cover_target(self.$overlay, self.$target);
+        });
+    },
+    create_ids: function ($target) {
+        var time = new Date().getTime();
+        var $tab = $target.find('[data-toggle="collapse"]');
+
+        // link to the parent group
+
+        var $tablist = $target.closest('.panel-group');
+        var tablist_id = $tablist.attr("id");
+        if (!tablist_id) {
+            tablist_id = "myCollapse" + time;
+            $tablist.attr("id", tablist_id);
+        }
+        $tab.attr('data-parent', "#"+tablist_id);
+        $tab.data('parent', "#"+tablist_id);
+
+        // link to the collapse
+
+        var $panel = $target.find('.panel-collapse');
+        var panel_id = $panel.attr("id");
+        if (!panel_id) {
+            while($('#'+(panel_id = "myCollapseTab" + time)).length) {
+                time++;
+            }
+            $panel.attr("id", panel_id);
+        }
+        $tab.attr('data-target', "#"+panel_id);
+        $tab.data('target', "#"+panel_id);
+    },
+    drop_and_build_snippet: function () {
+        this._super();
+        this.create_ids(this.$target);
+    },
+    on_clone: function ($clone) {
+        this._super();
+        this.create_ids($clone);
+    },
+    on_move: function () {
+        this._super();
+        this.create_ids(this.$target);
+        var $panel = this.$target.find('.panel-collapse').removeData('bs.collapse');
+        if ($panel.attr('aria-expanded') === 'true') {
+            $panel.closest('.panel-group').find('.panel-collapse[aria-expanded="true"]')
+                .filter(function () {return this !== $panel[0];})
+                .collapse('hide')
+                .one('hidden.bs.collapse', function () {
+                    $panel.trigger('shown.bs.collapse');
+                });
+        }
+    }
+});
+
+
 var SnippetEditor = Class.extend({
     init: function (BuildingBlock, dom) {
         this.BuildingBlock = BuildingBlock;
@@ -1947,6 +2014,10 @@ var SnippetEditor = Class.extend({
                 this.$target.insertBefore(next);
             } else {
                 $parent.prepend(this.$target);
+            }
+
+            for (var i in this.styles){
+                this.styles[i].on_move();
             }
         }
 

@@ -7,15 +7,16 @@ from openerp.tools.misc import mute_logger
 class test_portal(TestMail):
 
     def test_mail_compose_access_rights(self):
-        port_msg = self.group_portal.message_post(body='Message')
+        self.group_pigs.write({'group_public_id': self.env.ref('base.group_portal').id})
+        port_msg = self.group_pigs.message_post(body='Message')
 
         # Do: Chell comments Pigs, ok because can write on it (public group)
-        self.group_portal.sudo(self.user_portal).message_post(body='I love Pigs')
+        self.group_pigs.sudo(self.user_portal).message_post(body='I love Pigs', message_type='comment', subtype='mail.mt_comment')
         # Do: Chell creates a mail.compose.message record on Pigs, because he uses the wizard
         compose = self.env['mail.compose.message'].with_context({
             'default_composition_mode': 'comment',
-            'default_model': 'mail.group',
-            'default_res_id': self.group_portal.id
+            'default_model': 'mail.channel',
+            'default_res_id': self.group_pigs.id
         }).sudo(self.user_portal).create({
             'subject': 'Subject',
             'body': 'Body text',
@@ -41,7 +42,7 @@ class test_portal(TestMail):
         # Do: create a mail_wizard_invite, validate it
         self._init_mock_build_email()
         mail_invite = self.env['mail.wizard.invite'].with_context({
-            'default_res_model': 'mail.group',
+            'default_res_model': 'mail.channel',
             'default_res_id': group_pigs.id}).create({
             'partner_ids': [(4, partner_carine.id)], 'send_mail': True})
         mail_invite.add_followers()
@@ -86,7 +87,7 @@ class test_portal(TestMail):
     @mute_logger('openerp.addons.mail.models.mail_mail', 'openerp.models')
     def test_inbox_redirection_portal(self):
         group_pigs = self.group_pigs
-        port_act_id = self.ref('portal.action_mail_inbox_feeds_portal')
+        port_act_id = self.ref('portal.mail_message_action_inbox_portal')
         # Data: post a message on pigs
         msg = group_pigs.message_post(body='My body', partner_ids=[self.user_employee.partner_id.id, self.user_portal.partner_id.id], type='comment', subtype='mail.mt_comment')
         # Chell has no read access to pigs -> should redirect to Portal Inbox

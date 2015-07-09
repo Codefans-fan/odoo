@@ -79,7 +79,7 @@
                 <field name="user_id"/>
                 <field name="category_id"/>
                 <field name="kanban_state"/>
-                <field name="message_summary"/>
+                <field name="message_unread_counter"/>
                 <templates>
                     <t t-name="kanban-tooltip">
                        <ul class="oe_kanban_tooltip">
@@ -89,9 +89,12 @@
                     </t>
                     <t t-name="kanban-box">
                         <div t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click oe_semantic_html_override">
-                            <div class="oe_dropdown_toggle oe_dropdown_kanban">
-                                <i class="fa fa-bars fa-lg" />
-                                <ul class="oe_dropdown_menu">
+                            <div class="o_dropdown_kanban dropdown">
+
+                                <a class="dropdown-toggle btn" data-toggle="dropdown" href="#" >
+                                    <span class="fa fa-bars fa-lg"/>
+                                </a>
+                                <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
                                     <t t-if="widget.editable"><li><a type="edit">Edit...</a></li></t>
                                     <t t-if="widget.deletable"><li><a type="delete">Delete</a></li></t>
                                     <li><ul class="oe_kanban_colorpicker" data-field="color"/></li>
@@ -105,7 +108,9 @@
                                     <span class="oe_grey" t-if="record.equipment_id.raw_value"><field name="equipment_id"/><br/></span>
                                 </div>
                                 <div class="oe_kanban_footer_left" style="margin-top:2px;">
-                                    <t t-raw="record.message_summary.raw_value"/>
+                                    <t t-if="record.message_unread_counter.raw_value">
+                                        <span class='oe_kanban_mail_new' title='Unread Messages'><i class='fa fa-comments'/><t t-raw="record.message_unread_counter.raw_value"/></span>
+                                    </t>
                                     <span t-if="record.category_id.raw_value"><field name="category_id"/></span>
                                 </div>
                                 <div class="oe_kanban_bottom_right">
@@ -251,7 +256,7 @@
                 <field name="category_id"/>
                 <field name="serial_no"/>
                 <field name="model"/>
-                <field name="message_summary"/>
+                <field name="message_unread_counter"/>
                 <field name="maintenance_ids"/>
                 <templates>
                     <t t-name="kanban-tooltip">
@@ -262,9 +267,12 @@
                     </t>
                     <t t-name="kanban-box">
                         <div t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click">
-                            <div class="oe_dropdown_toggle oe_dropdown_kanban">
-                                <i class="fa fa-bars fa-lg" />
-                                <ul class="oe_dropdown_menu">
+                            <div class="o_dropdown_kanban dropdown">
+
+                                <a class="dropdown-toggle btn" data-toggle="dropdown" href="#" >
+                                    <span class="fa fa-bars fa-lg"/>
+                                </a>
+                                <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
                                     <t t-if="widget.editable"><li><a type="edit">Edit...</a></li></t>
                                     <t t-if="widget.deletable"><li><a type="delete">Delete</a></li></t>
                                     <li><ul class="oe_kanban_colorpicker" data-field="color"/></li>
@@ -287,7 +295,9 @@
                                     <img t-att-src="kanban_image('hr.employee', 'image_small', record.employee_id.raw_value)" t-att-title="record.employee_id.value" width="27" height="27" class="oe_kanban_avatar"/>
                                 </div>
                                 <div class="oe_kanban_footer_left" style="margin-top:5px;">
-                                    <t t-raw="record.message_summary.raw_value"/>
+                                    <t t-if="record.message_unread_counter.raw_value">
+                                        <span class='oe_kanban_mail_new' title='Unread Messages'><i class='fa fa-comments'/><t t-raw="record.message_unread_counter.raw_value"/></span>
+                                    </t>
                                     <span t-if="record.model.raw_value"><field name="model"/></span>
                                 </div>
                             </div>
@@ -515,6 +525,7 @@
     <menuitem
         id="menu_equipment_title"
         name="Equipments"
+        web_icon="hr_equipment,static/description/icon.png"
         sequence="110"/>
 
     <menuitem

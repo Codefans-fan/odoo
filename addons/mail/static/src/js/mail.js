@@ -1,9 +1,11 @@
 odoo.define('mail.mail', function (require) {
 "use strict";
 
+var ajax = require('web.ajax');
 var mail_utils = require('mail.utils');
 var core = require('web.core');
 var data = require('web.data');
+var Dialog = require('web.Dialog');
 var form_common = require('web.form_common');
 var session = require('web.session');
 var SystrayMenu = require('web.SystrayMenu');
@@ -49,6 +51,7 @@ var TimelineRecordThread = form_common.AbstractField.extend ({
             'readonly': this.node.attrs.readonly || false,
             'compose_placeholder' : this.node.attrs.placeholder || false,
             'display_log_button' : this.options.display_log_button || true,
+            'internal_subtypes' : this.options.internal_subtypes || [],
             'show_compose_message': true,
             'show_link': this.parent.is_action_enabled('edit') || true,
         }, this.node.params);
@@ -124,12 +127,6 @@ var TimelineView = View.extend ({
 
         this.qweb = new QWeb2.Engine();
         this.has_been_loaded = $.Deferred();
-    },
-
-    start: function () {
-        var wall_sidebar = new Sidebar(this);
-        wall_sidebar.appendTo(this.$('.o_timeline_inbox_aside'));
-        return this._super.apply(this, arguments);
     },
 
     view_loading: function (fields_view_get) {
@@ -352,12 +349,8 @@ var MailThread = Attachment.extend ({
             this.partner_ids.push(this.parent_message.author_id);
         }
 
-        if (!this.root) {
-            this.context = _.extend(this.context, {
-                'default_model': this.parent_message.model,
-                'default_res_id': this.parent_message.res_id,
-            });
-        }
+        this.context.default_model = this.parent_message.model || this.context.default_model;
+        this.context.default_res_id = this.parent_message.res_id || this.context.default_res_id;
 
         this.options.root_thread = this.options.root_thread != undefined ? this.options.root_thread : this;
         this.options.show_compose_message = this.root ? false : this.options.root_thread.view.options.show_compose_message;
@@ -788,10 +781,10 @@ var MailThread = Attachment.extend ({
         }
         else {
             var ds_model = new data.DataSetSearch(this, this.model, this.context);
-            ds_model.call('read_followers_data', [this.follower_ids.slice(0, this.options.followers_limit)]).then(function (records) {
+            ajax.jsonRpc('/mail/read_followers', 'call', {'follower_ids': this.follower_ids.slice(0, this.options.followers_limit)}).then(function (records) {
                 self.followers_data = [];
                 _.each(records, function(f) {
-                    self.followers_data.push(f[1] + '</br>');
+                    self.followers_data.push(f.name + '</br>');
                 });
                 if (self.nb_followers - self.followers_limit > 0) {
                     self.followers_data.push('and ' + self.nb_followers - self.followers_limit + 'more ... </br>');
@@ -1051,14 +1044,27 @@ var ComposeMessage = Attachment.extend ({
         this.view = parent.view;
         this.session = session;
 
-        core.bus.on('clear_uncommitted_changes', this, function (e) {
-            if (this.show_composer && !e.isDefaultPrevented()) {
-                if (!confirm(_t("You are currently composing a message, your message will be discarded.\n\nAre you sure you want to leave this page ?"))) {
-                    e.preventDefault();
-                }
-                else {
-                    this.on_cancel();
-                }
+        core.bus.on('clear_uncommitted_changes', this, function (chain_callbacks) {
+            if (this.show_composer) {
+                var self = this;
+                chain_callbacks(function() {
+                    var def = $.Deferred();
+                    var message = _t("You are currently composing a message, your message will be discarded. Are you sure you want to leave this page ?");
+                    var options = {
+                        title: _t("Warning"),
+                        confirm_callback: function() {
+                            self.on_cancel();
+                            this.on('closed', null, function() { // 'this' is the dialog widget
+                                def.resolve();
+                            });
+                        },
+                        cancel_callback: function() {
+                            def.reject();
+                        },
+                    };
+                    Dialog.confirm(this, message, options);
+                    return def;
+                });
             }
         });
     },
@@ -1084,7 +1090,7 @@ var ComposeMessage = Attachment.extend ({
         var ev_stay = {};
         ev_stay.mouseup = ev_stay.keydown = ev_stay.focus = function () {self.stay_open = false;};
         this.$('textarea').on(ev_stay);
-        this.$('textarea').autosize();
+        autosize(this.$('textarea'));
     },
 
     on_cancel: function (event) {
@@ -1210,10 +1216,16 @@ var ComposeMessage = Attachment.extend ({
             'content_subtype': 'plaintext',
         };
 
-        if(log){
-            values.subtype = false;
-        }else{
-            values.subtype = 'mail.mt_comment';
+        if (log) {
+            var subtype_id = parseInt(this.$('select').first().val());
+            if (_.indexOf(_.pluck(self.options.internal_subtypes, 'id'), subtype_id) == -1) {
+                values['subtype'] = 'mail.mt_note'
+            }
+            else {
+                values['subtype_id'] = subtype_id;
+            }
+        } else {
+            values['subtype'] = 'mail.mt_comment';
         }
 
         this.parent_thread.ds_thread._model.call('message_post', [this.context.default_res_id], values).done(function (message_id) {
@@ -1266,18 +1278,17 @@ var ComposeMessage = Attachment.extend ({
                 var partner_id = partner_info.partner_id;
                 var parsed_email = mail_utils.parse_email(partner_name);
 
-                var pop = new form_common.FormOpenPopup(this);                    
-                pop.show_element(
-                    'res.partner',
-                    partner_id,
-                    {   'force_email': true,
+                var pop = new form_common.FormViewDialog(this, {
+                    res_model: 'res.partner',
+                    res_id: partner_id,
+                    context: {
+                        'force_email': true,
                         'ref': "compound_context",
                         'default_name': parsed_email[0],
                         'default_email': parsed_email[1],
-                    }, {
-                        title: _t("Please complete partner's informations"),
-                    }
-                );
+                    },
+                    title: _t("Please complete partner's informations"),
+                }).open();
                 pop.on('closed', self, function () {
                     deferred.resolve();
                 });
@@ -1480,18 +1491,6 @@ var ComposeMessage = Attachment.extend ({
 
 /**
  * ------------------------------------------------------------
- * Aside Widget
- * ------------------------------------------------------------
- *
- * This widget handles the display of a sidebar in the inbox. Its main
- * use is to display group and employees suggestion (if hr is installed).
- */
-var Sidebar = Widget.extend({
-    template: 'TimelineSidebar',
-});
-
-/**
- * ------------------------------------------------------------
  * UserMenu
  * ------------------------------------------------------------
  *
@@ -1536,7 +1535,6 @@ return {
     TimelineView: TimelineView,
     MailThread: MailThread,
     TimelineRecordThread: TimelineRecordThread,
-    Sidebar: Sidebar,
 };
 
 });

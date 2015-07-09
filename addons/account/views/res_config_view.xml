@@ -55,23 +55,15 @@
                                     type="action"
                                     class="oe_link" attrs="{'invisible': [('has_chart_of_accounts','!=',False)]}"/>
                             </div>
-                            <div attrs="{'invisible': [('chart_template_id','=',False)]}">
-                                <label for="bank_account_code_char"/>
-                                <field name="bank_account_code_char" class="oe_inline" require="1"/>
-                            </div>
-                            <div attrs="{'invisible': [('chart_template_id','=',False)]}">
-                                <label for="code_digits"/>
-                                <field name="code_digits" class="oe_inline"/>
-                            </div>
                             <div attrs="{'invisible': ['|', '|', ('chart_template_id','=',False), ('complete_tax_set','=',False), ('has_chart_of_accounts','!=',False)]}">
-                                <label for="sale_tax"/>
-                                <field name="sale_tax"
+                                <label for="sale_tax_id"/>
+                                <field name="sale_tax_id"
                                     domain="[('chart_template_id', '=', chart_template_id),('type_tax_use','in',('sale','all'))]"
                                     class="oe_inline"/>
                             </div>
                             <div attrs="{'invisible': ['|', '|', ('chart_template_id','=',False), ('complete_tax_set','=',False), ('has_chart_of_accounts','!=',False)]}">
-                                <label for="purchase_tax"/>
-                                <field name="purchase_tax"
+                                <label for="purchase_tax_id"/>
+                                <field name="purchase_tax_id"
                                     domain="[('chart_template_id', '=', chart_template_id),('type_tax_use','in',('purchase', 'all'))]"
                                     class="oe_inline"/>
                             </div>
@@ -115,15 +107,8 @@
                         <label for="id" string="Options"/>
                         <div name="account_config">
                             <div>
-                                <label for="use_anglo_saxon"/>
-                                <field name="use_anglo_saxon" class="oe_inline"/>
-                            </div>
-                            <div>
                                 <label for="currency_id"/>
                                 <field name="currency_id" options="{'no_create': True}" class="oe_inline"/>
-                            </div>
-                            <div>
-                                <field name="tax_calculation_rounding_method" class="oe_inline" />
                             </div>
                         </div>
                         <label for="id" string="Features"/>
@@ -134,8 +119,6 @@
                                 <group attrs="{'invisible': [('group_multi_currency', '&lt;&gt;', True)]}" col="2">
                                     <group>
                                         <field name="currency_exchange_journal_id"/>
-                                        <field name="income_currency_exchange_account_id"/>
-                                        <field name="expense_currency_exchange_account_id"/>
                                     </group>
                                     <group>
                                     </group>
@@ -162,33 +145,16 @@
                     <separator string="eInvoicing &amp; Payments"/>
                     <group>
                         <label for="id" string="Customer"/>
-                        <div>
+                        <div name="customer_payments">
                             <div attrs="{'invisible': [('has_chart_of_accounts','=',False)]}">
-                                <label for="default_sale_tax"/>
-                                <field name="default_sale_tax"
-                                    domain="[('type_tax_use','=','sale'), ('company_id','=',company_id)]"
+                                <label for="default_sale_tax_id"/>
+                                <field name="default_sale_tax_id"
+                                    domain="[('type_tax_use', 'in', ('sale', 'all')), ('company_id', '=', company_id)]"
                                     class="oe_inline"/>
-                            </div>
-                            <div attrs="{'invisible': [('has_chart_of_accounts','=',False)]}">
-                                <label for="sale_sequence_next"/>
-                                <field name="sale_sequence_prefix"
-                                    class="oe_inline"
-                                    help='If you put "%%(year)s" in the prefix, it will be replaced by the current year.'/>
-                                <field name="sale_sequence_next"
-                                    class="oe_inline"
-                                    attrs="{'readonly': [('sale_journal_id','=',False)]}"/>
                             </div>
                             <div>
                                 <field name="group_proforma_invoices" class="oe_inline"/>
                                 <label for="group_proforma_invoices"/>
-                            </div>
-                            <div>
-                                <field name="module_account_voucher" class="oe_inline"/>
-                                <label for="module_account_voucher"/>
-                            </div>
-                            <div>
-                                <field name="module_account_followup" class="oe_inline"/>
-                                <label for="module_account_followup"/>
                             </div>
                             <div>
                                 <field name="module_product_email_template" class="oe_inline"/>
@@ -200,19 +166,10 @@
                         <label for="id" string="Supplier"/>
                         <div name="other_cofing">
                             <div attrs="{'invisible': [('has_chart_of_accounts','=',False)]}">
-                                <label for="default_purchase_tax"/>
-                                <field name="default_purchase_tax"
-                                    domain="[('type_tax_use','=','purchase'), ('company_id','=',company_id)]"
+                                <label for="default_purchase_tax_id"/>
+                                <field name="default_purchase_tax_id"
+                                    domain="[('type_tax_use', 'in', ('purchase', 'all')), ('company_id', '=', company_id)]"
                                     class="oe_inline"/>
-                            </div>
-                            <div attrs="{'invisible': [('has_chart_of_accounts','=',False)]}">
-                                <label for="purchase_sequence_next"/>
-                                <field name="purchase_sequence_prefix"
-                                    class="oe_inline"
-                                    help='If you put "%%(year)s" in the prefix, it will be replaced by the current year.'/>
-                                <field name="purchase_sequence_next"
-                                    class="oe_inline"
-                                    attrs="{'readonly': [('purchase_journal_id','=',False)]}"/>
                             </div>
                             <div>
                                 <field name="module_account_check_writing" class="oe_inline"/>
@@ -245,7 +202,7 @@
                             </div>
                         </div>
                         <label for="id" string="Bank Statements"/>
-                        <div>
+                        <div name="bank_statement_import_options">
                             <div>
                                 <field name="module_account_bank_statement_import_ofx" class="oe_inline"/>
                                 <label for="module_account_bank_statement_import_ofx"/>
@@ -253,10 +210,6 @@
                             <div>
                                 <field name="module_account_bank_statement_import_qif" class="oe_inline"/>
                                 <label for="module_account_bank_statement_import_qif"/>
-                            </div>
-                            <div name="plaid_credentials">
-                                <field name="module_account_plaid" class="oe_inline"/>
-                                <label for="module_account_plaid"/>
                             </div>
                         </div>
                     </group>
@@ -269,8 +222,6 @@
                         <label for="id" string="Purchase"/>
                         <div/>
                     </group>
-                    <field name="sale_journal_id" invisible="1"/>
-                    <field name="purchase_journal_id" invisible="1"/>
                 </form>
             </field>
         </record>

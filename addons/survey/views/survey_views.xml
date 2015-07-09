@@ -139,9 +139,9 @@
                                 </field>
                             </page>
                             <page string="Options">
-                                <group colspan="4">
-                                    <field name="users_can_go_back" string="User can come back in the previous page" />
-                                    <field name="auth_required" />
+                                <group class="o_label_nowrap">
+                                    <field name="users_can_go_back" string="User can come back in the previous page"/>
+                                    <field name="auth_required"/>
                                     <field name="quizz_mode" groups="base.group_no_one"/>
                                 </group>
                             </page>
@@ -183,9 +183,12 @@
                     <field name="public_url" />
                     <templates>
                         <div t-name="kanban-box" t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click">
-                            <div class="oe_dropdown_toggle oe_dropdown_kanban" t-if="widget.editable">
-                                <i class="fa fa-bars fa-lg"/>
-                                <ul class="oe_dropdown_menu">
+                            <div class="o_dropdown_kanban dropdown" t-if="widget.editable">
+
+                                <a class="dropdown-toggle btn" data-toggle="dropdown" href="#" >
+                                    <span class="fa fa-bars fa-lg"/>
+                                </a>
+                                <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
                                     <li><a type="edit">Edit Survey</a></li>
                                     <li t-if="widget.deletable"><a type="delete">Delete</a></li>
                                     <li><ul class="oe_kanban_colorpicker" data-field="color"/></li>
@@ -396,22 +399,28 @@
                                 </field>
                             </page>
                             <page string="Options">
-                                <group string="Constraints" >
-                                    <field name="constr_mandatory" string="Mandatory Answer"/>
-                                    <field name="constr_error_msg" attrs="{'invisible': [('constr_mandatory', '=', False)]}"/>
-                                    <group colspan="2" nolabel="1" attrs="{'invisible': [('type', 'not in', ['textbox', 'numerical_box', 'datetime'])]}">
-                                        <field name="validation_required" attrs="{'invisible': [('validation_email', '=', True), ('type', '=', 'textbox')]}"/>
-                                        <group colspan="2" nolabel="1" attrs="{'invisible': [('validation_required', '=', False)]}">
-                                        <field name="validation_length_min" attrs="{'invisible': [('type', '!=', 'textbox')]}"/>
-                                        <field name="validation_length_max" attrs="{'invisible': [('type', '!=', 'textbox')]}"/>
-                                        <field name="validation_min_float_value" attrs="{'invisible': [('type', '!=', 'numerical_box')]}"/>
-                                        <field name="validation_max_float_value" attrs="{'invisible': [('type', '!=', 'numerical_box')]}"/>
-                                        <field name="validation_min_date" attrs="{'invisible': [('type', '!=', 'datetime')]}"/>
-                                        <field name="validation_max_date" attrs="{'invisible': [('type', '!=', 'datetime')]}"/>
-                                        <field name="validation_error_msg" />
-                                        </group>
+                                <group string="Constraints">
+                                    <group colspan="2" col="4">
+                                        <field name="constr_mandatory" string="Mandatory Answer"/>
+                                        <field name="constr_error_msg" attrs="{'invisible': [('constr_mandatory', '=', False)]}"/>
                                     </group>
-                                    <field name="matrix_subtype" attrs="{'invisible':[('type','not in',['matrix'])]}"/>
+                                    <div colspan="2" attrs="{'invisible': [('type', 'not in', ['textbox', 'numerical_box', 'datetime'])]}">
+                                        <group>
+                                            <field name="validation_required" attrs="{'invisible': [('validation_email', '=', True), ('type', '=', 'textbox')]}"/>
+                                        </group>
+                                        <group col="4" attrs="{'invisible': [('validation_required', '=', False)]}">
+                                            <field name="validation_length_min" attrs="{'invisible': [('type', '!=', 'textbox')]}"/>
+                                            <field name="validation_length_max" attrs="{'invisible': [('type', '!=', 'textbox')]}"/>
+                                            <field name="validation_min_float_value" attrs="{'invisible': [('type', '!=', 'numerical_box')]}"/>
+                                            <field name="validation_max_float_value" attrs="{'invisible': [('type', '!=', 'numerical_box')]}"/>
+                                            <field name="validation_min_date" attrs="{'invisible': [('type', '!=', 'datetime')]}"/>
+                                            <field name="validation_max_date" attrs="{'invisible': [('type', '!=', 'datetime')]}"/>
+                                            <field name="validation_error_msg" colspan="4"/>
+                                        </group>
+                                    </div>
+                                    <group>
+                                        <field name="matrix_subtype" attrs="{'invisible':[('type','not in',['matrix'])]}"/>
+                                    </group>
                                 </group>
                                 <group string="Display mode" attrs="{'invisible':[('type','not in',['simple_choice', 'multiple_choice'])]}">
                                     <field name="display_mode" string="Format" attrs="{'invisible':[('type','not in',['simple_choice'])],'required':[('type','=','simple_choice')]}"/>
@@ -586,7 +595,7 @@
         <!-- MENU ELEMENTS -->
 
         <!-- Left menu categories-->
-        <menuitem name="Surveys" id="menu_surveys" sequence="70" groups="base.group_survey_user"/>
+        <menuitem name="Surveys" id="menu_surveys" sequence="70" groups="base.group_survey_user"  web_icon="survey,static/description/icon.png"/>
 
         <!-- Left menu elements: Survey -->
         <menuitem name="Surveys" id="menu_survey_form" action="action_survey_form" parent="menu_surveys" sequence="1"/>

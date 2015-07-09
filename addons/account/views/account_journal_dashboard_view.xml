@@ -40,7 +40,7 @@
                                 </div>
                             </div>
                             <div class="o_kanban_manage_button_section">
-                                <a class="o_kanban_manage_toggle_button">More <i class="fa fa-caret-down"/></a>
+                                <a class="o_kanban_manage_toggle_button" href="#">More <i class="fa fa-caret-down"/></a>
                             </div>
                         </div>
                     </t>
@@ -260,14 +260,12 @@
                     </t>
                     <t t-name="JournalBodyGraph">
                         <div class="row">
-                            <div class="col-xs-12 o_kanban_graph_section">
-                                <t t-if="dashboard.show_import">
-                                    <button t-if="journal_type == 'bank'" type="object" name="import_statement" class="btn btn-primary btn-sm">Import Statement</button>
-                                    <button t-if="journal_type == 'cash'" type="object" name="create_cash_bank" class="btn btn-primary btn-sm">Register Transactions</button>
-                                </t>
-                                <div t-if="!dashboard.show_import">
-                                    <field name="kanban_dashboard_graph" t-att-graph_type="_.contains(['cash','bank'],journal_type) ? 'line' : 'bar'" widget="dashboard_graph"></field>
-                                </div>
+                            <div t-if="dashboard.show_import" class="col-xs-12 o_kanban_primary_left">
+                                <button t-if="journal_type == 'bank'" type="object" name="import_statement" class="btn btn-primary btn-sm">Import Statement</button>
+                                <button t-if="journal_type == 'cash'" type="object" name="create_cash_bank" class="btn btn-primary btn-sm">Register Transactions</button>
+                            </div>
+                            <div t-if="!dashboard.show_import" class="o_kanban_graph_section">
+                                <field name="kanban_dashboard_graph" t-att-graph_type="_.contains(['cash','bank'],journal_type) ? 'line' : 'bar'" widget="dashboard_graph"></field>
                             </div>
                         </div>
                     </t>
@@ -285,7 +283,7 @@
         <field name="context">{'search_default_dashboard':1}</field>
         <field name="domain">[]</field>
         <field name="help" type="html">
-            <p style="margin-left: -90px;">
+            <p>
                 This Dashboard helps you manage your accounting.
                 If you have not yet installed a chart of account, please install one first.
                <a type="action" name="%(open_account_charts_modules)d">Go to the list</a>

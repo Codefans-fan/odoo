@@ -62,10 +62,7 @@ var WidgetButton = common.FormWidget.extend({
                 var dialog = new Dialog(this, {
                     title: _t('Confirm'),
                     buttons: [
-                        {text: _t("Cancel"), click: function() {
-                                this.parents('.modal').modal('hide');
-                            }
-                        },
+                        {text: _t("Cancel"), close: true},
                         {text: _t("Ok"), click: function() {
                                 var self2 = this;
                                 self.on_confirmed().always(function() {
@@ -74,8 +71,9 @@ var WidgetButton = common.FormWidget.extend({
                             }
                         }
                     ],
-                }, $('<div/>').text(self.node.attrs.confirm)).open();
-                dialog.on("closing", null, function() {def.resolve();});
+                    $content: $('<div/>').text(self.node.attrs.confirm)
+                }).open();
+                dialog.on("closed", null, function() {def.resolve();});
                 return def.promise();
             } else {
                 return self.on_confirmed();
@@ -230,6 +228,7 @@ var KanbanSelection = FieldChar.extend({
         var dd_fetched = this.prepare_dropdown_selection();
         return $.when(dd_fetched).then(function (states) {
             self.states = states;
+            self.$el.addClass('oe_right');
             self.$el.html(QWeb.render("KanbanSelection", {'widget': self}));
             self.$el.find('li').on('click', self.set_kanban_selection.bind(self));
         });
@@ -414,47 +413,61 @@ var FieldFloat = FieldChar.extend({
 });
 
 var FieldCharDomain = common.AbstractField.extend(common.ReinitializeFieldMixin, {
+    template: "FieldCharDomain",
+    events: {
+        'click button': 'on_click',
+        'change .o_debug_input': function(e) {
+            this.set('value', $(e.target).val());
+        }
+    },
+    init: function() {
+        this._super.apply(this, arguments);
+        this.debug = session.debug;
+    },
     render_value: function() {
         var self = this;
-        this.$el.html(QWeb.render("FieldCharDomain", {widget: this}));
+
         if (this.get('value')) {
             var model = this.options.model || this.field_manager.get_field_value(this.options.model_field);
             var domain = pyeval.eval('domain', this.get('value'));
             var ds = new data.DataSetStatic(self, model, self.build_context());
             ds.call('search_count', [domain]).then(function (results) {
-                $('.oe_domain_count', self.$el).text(results + ' records selected');
+                self.$('.o_count').text(results + ' selected records');
                 if (self.get('effective_readonly')) {
-                    $('button span', self.$el).text(' See selection');
+                    self.$('button').text('See selection ');
                 }
                 else {
-                    $('button span', self.$el).text(' Change selection');
+                    self.$('button').text('Change selection ');
                 }
+                self.$('button').append($("<span/>").addClass('fa fa-arrow-right'));
             });
+
+            if(this.debug) {
+                this.$('.o_debug_input').val(this.get('value'));
+            }
         } else {
-            $('.oe_domain_count', this.$el).text('0 record selected');
-            $('button span', this.$el).text(' Select records');
+            this.$('.o_count').text('No selected record');
+            var $arrow = this.$('button span').detach();
+            this.$('button').text('Select records ').append($("<span/>").addClass('fa fa-arrow-right'));
         }
-        this.$('.select_records').on('click', self.on_click);
     },
     on_click: function(event) {
         event.preventDefault();
-        var self = this;
-        var model = this.options.model || this.field_manager.get_field_value(this.options.model_field);
 
-        var options = {
-                title: this.get('effective_readonly') ? 'Selected records' : 'Select records...',
-                readonly: this.get('effective_readonly'),
-                disable_multiple_selection: this.get('effective_readonly'),
-                no_create: this.get('effective_readonly'),
-            };
-        var domain = this.get('value');
-        var popup = new common.DomainEditorPopup(this);
-        popup.select_element(model, options, domain, {});
-        popup.on("elements_selected", self, function(selected_ids) {
-            if (!self.get('effective_readonly')) {
-                self.set_value(popup.get_domain(selected_ids));
+        var self = this;
+        var dialog = new common.DomainEditorDialog(this, {
+            res_model: this.options.model || this.field_manager.get_field_value(this.options.model_field),
+            default_domain: this.get('value'),
+            title: this.get('effective_readonly') ? 'Selected records' : 'Select records...',
+            readonly: this.get('effective_readonly'),
+            disable_multiple_selection: this.get('effective_readonly'),
+            no_create: this.get('effective_readonly'),
+            on_selected: function(selected_ids) {
+                if (!self.get('effective_readonly')) {
+                    self.set_value(dialog.get_domain(selected_ids));
+                }
             }
-        });
+        }).open();
     },
 });
 
@@ -561,7 +574,7 @@ var FieldText = common.AbstractField.extend(common.ReinitializeFieldMixin, {
             this.$textarea.val(show_value);
             if (! this.auto_sized) {
                 this.auto_sized = true;
-                this.$textarea.autosize();
+                autosize(this.$textarea);
             } else {
                 this.$textarea.trigger("autosize");
             }
@@ -698,6 +711,7 @@ var FieldProgressBar = common.AbstractField.extend(common.ReinitializeFieldMixin
 
         this.progressbar = new ProgressBar(this, {
             readonly: this.get('effective_readonly'),
+            edit_on_click: true,
             value: this.get('value') || 0,
         });
 
@@ -706,8 +720,8 @@ var FieldProgressBar = common.AbstractField.extend(common.ReinitializeFieldMixin
             self.progressbar.$el.addClass(self.$el.attr('class'));
             self.replaceElement(self.progressbar.$el);
 
-            self.progressbar.on('change:value', self, function() {
-                self.set('value', self.progressbar.get('value'));
+            self.progressbar.on('update', self, function(update) {
+                self.set('value', update.changed_value);
             });
         });
     }
@@ -954,9 +968,8 @@ var LabelSelection = FieldSelection.extend({
     render_value: function() {
         this._super.apply(this, arguments);
         if (this.get("effective_readonly")) {
-            var value = this.get('value'),
-            bt_class = this.classes[value] || 'default';
-            this.$el.html(_.str.sprintf("<span class='label label-%s'>%s<span>", bt_class, this.$el.html()));
+            var btn_class = this.classes[this.get('value')] || 'default';
+            this.$el.wrapInner($('<span/>').addClass('label label-' + btn_class));
         }
     },
 });
@@ -1290,7 +1303,18 @@ var FieldBinaryFile = FieldBinary.extend({
         this._super.apply(this, arguments);
         this.$el.find('input').eq(0).val('');
         this.set_filename('');
-    }
+    },
+    set_value: function(value_){
+        var changed = value_ !== this.get_value();
+        this._super.apply(this, arguments);
+        // Trigger value change if size is the same
+        if (!changed){
+            this.trigger("change:value", this, {
+                oldValue: value_,
+                newValue: value_
+            });
+        }
+     }
 });
 
 var FieldBinaryImage = FieldBinary.extend({
@@ -1514,7 +1538,7 @@ var FieldMonetary = FieldFloat.extend({
     init: function() {
         this._super.apply(this, arguments);
         this.set({"currency": false});
-        var currency_field = (this.options && this.options.currency_field) || this.currency_field || 'currency_id';
+        var currency_field = (this.options && this.options.currency_field) || this.field.currency_field || 'currency_id';
         if (currency_field) {
             this.field_manager.on("field_changed:" + currency_field, this, function() {
                 this.set({"currency": this.field_manager.get_field_value(currency_field)});

@@ -53,7 +53,7 @@
                     Odoo helps you keep track of your sales pipeline to follow
                     up potential sales and better forecast your future revenues.
                 </p><p>
-                    You will be able to plan meetings and phone calls from
+                    You will be able to plan meetings and log activities from
                     opportunities, convert them into quotations, attach related
                     documents, track all discussions, and much more.
                 </p>
@@ -88,13 +88,13 @@
                         <field name="use_leads"/><label for="use_leads" string="Leads"/>
                         <field name="use_opportunities" class="oe_inline"/><label for="use_opportunities"/>
                     </xpath>
-                    <xpath expr="//page[@string='Team Members']" position="after">
+                    <xpath expr="//page[@name='members']" position="after">
                         <page string="Stages">
                             <separator string="Select Stages for this Sales Team"/>
                                 <field name="stage_ids"/>
                         </page>
                    </xpath>
-                   <xpath expr="//field[@name='change_responsible']" position="after">
+                   <xpath expr="//field[@name='active']" position="before">
                         <group name="alias_info" string="Leads Email Alias" class="oe_inline" attrs="{'invisible': [('alias_domain', '=', False)]}">
                             <label for="alias_name" string="Email Alias"
                                 attrs="{'invisible': [('alias_domain', '=', False)]}"/>

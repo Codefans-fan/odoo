@@ -7,6 +7,7 @@
             id="menu_point_root"
             groups="group_pos_manager,group_pos_user"
             icon="fa-suitcase"
+            web_icon="point_of_sale,static/description/icon.png"
             sequence="20"/>
 
         <record model="ir.ui.view" id="view_pos_pos_form">
@@ -73,7 +74,7 @@
                                 </tree>
                             </field>
                         </page>
-                        <page string="Extra Info">
+                        <page name="extra" string="Extra Info">
                             <group string="General Information">
                                 <field name="company_id" groups="base.group_multi_company"/>
                                 <field name="location_id" widget="selection" groups="stock.group_locations"/>
@@ -663,9 +664,7 @@
                         <button string="Set to Active" name="set_active" type="object" states="inactive,deprecated"/>
                         <button string="Set to Inactive" name="set_inactive" type="object" states="active" />
                         <button string="Set to Deprecated" name="set_deprecate" type="object" states="active,inactive" />
-                        <div class="oe_right">
-                            <field name="state" widget="statusbar" statusbar_visible="active,inactive,deprecated" statusbar_colors='{"deprecated" : "red"}' nolabel="1"/>
-                        </div>
+                        <field name="state" widget="statusbar" statusbar_visible="active,inactive,deprecated" statusbar_colors='{"deprecated" : "red"}' nolabel="1"/>
                     </header>
 
                     <sheet>
@@ -693,7 +692,7 @@
                                 <field name="type" />
                             </tree>
                         </field>
-                        <group string="Features" >
+                        <group name="features" string="Features" >
                             <group>
                                 <field name="iface_vkeyboard" />
                                 <field name="iface_invoicing" />
@@ -706,6 +705,7 @@
                                 <field name="iface_fullscreen" />
                                 <field name="iface_big_scrollbars" />
                                 <field name="iface_print_auto" />
+                                <field name="iface_display_categ_images" />
                                 <field name="iface_print_skip_screen"  attrs="{'invisible' : [('iface_print_auto', '=', False)]}" />
                             </group>
                         </group>
@@ -716,7 +716,7 @@
                             <field name="iface_electronic_scale" />
                             <field name="iface_cashdrawer" />
                         </group>
-                        <group string="Receipt" >
+                        <group name="receipt" string="Receipt" >
                             <field name="receipt_header" string="Header" placeholder="A custom receipt header message"/>
                             <field name="receipt_footer" string="Footer" placeholder="A custom receipt footer message"/>
                         </group>
@@ -761,7 +761,7 @@
             domain="[('config_id', '=', active_id)]" />
 
         <record model="ir.actions.act_window" id="action_pos_config_pos">
-            <field name="name">Point of Sales</field>
+            <field name="name">Point of Sale</field>
             <field name="type">ir.actions.act_window</field>
             <field name="res_model">pos.config</field>
             <field name="view_type">form</field>
@@ -915,7 +915,7 @@
                     <field name="user_id" />
                     <group expand="0" string="Group By">
                         <filter string="User" icon="terp-personal" domain="[]" context="{'group_by' : 'user_id'}" />
-                        <filter string="Point of Sales" domain="[]" context="{'group_by': 'user_id'}" />
+                        <filter string="Point of Sale" domain="[]" context="{'group_by': 'user_id'}" />
                     </group>
                 </search>
             </field>

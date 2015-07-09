@@ -26,9 +26,6 @@
 <div t-name="TimelineWall" t-attf-class="o_timeline #{widget.options.view_inbox ? 'o_timeline_inbox' : 'o_timeline_chatter'}">
     <div class="o_timeline_buttons"/>
     <div class="o_timeline-placeholder"></div>
-    <t t-if="widget.options.view_inbox">
-        <aside class="o_timeline_inbox_aside"></aside>
-    </t>
 </div>
 
 <t t-name="ComposeMessage">
@@ -37,10 +34,18 @@
         <div class="o_timeline_msg o_timeline_msg_composer">
             <div class="o_timeline_msg_center">
                 <div class="o_timeline_msg_content">
-                    <button class="oe_full" title="Open the full mail composer">
+                    <button t-if="! widget.is_log" class="oe_full" title="Open the full mail composer">
                         <i class='fa fa-pencil-square-o'/>
                     </button>
                     <t t-call="ThreadListRecipients"/>
+                    <t t-if="widget.is_log and widget.options.internal_subtypes.length > 1">
+                        <label>Activity</label>
+                        <select class="">
+                            <t t-foreach="widget.options.internal_subtypes" t-as="subtype">
+                                <option t-att-value="subtype['id']"><t t-raw="subtype['name']"/></option>
+                            </t>
+                        </select>
+                    </t>
                     <textarea class="field_text"></textarea>
                 </div>
                 <div class="o_timeline_msg_footer">
@@ -236,10 +241,6 @@
 
 <t t-name="NoMessage">
     <div class="oe_view_nocontent">No message.</div>
-</t>
-
-<t t-name="TimelineSidebar">
-    <div class="o_timeline_sidebar"></div>
 </t>
 
 <!--

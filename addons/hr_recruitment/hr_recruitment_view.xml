@@ -210,7 +210,7 @@
                 <separator/>
                 <filter string="New Mail" name="message_unread" domain="[('message_unread','=',True)]"/>
                 <field name="job_id"/>
-                <field name="department_id" groups="hr.group_multi_departments"/>
+                <field name="department_id"/>
                 <field name="user_id"/>
                 <field name="stage_id" domain="[]"/>
                 <separator/>
@@ -261,21 +261,24 @@
                 <field name="title_action"/>
                 <field name="department_id"/>
                 <field name="categ_ids"/>
-                <field name="message_summary"/>
+                <field name="message_unread_counter"/>
                 <field name="attachment_number"/>
                 <templates>
                     <t t-name="kanban-tooltip">
                         <ul class="oe_kanban_tooltip">
                             <li t-if="record.type_id.raw_value"><b>Degree:</b> <field name="type_id"/></li>
                             <li t-if="record.partner_id.raw_value"><b>Contact:</b> <field name="partner_id"/></li>
-                            <li t-if="record.department_id.raw_value"><b>Departement:</b> <field name="department_id" groups="hr.group_multi_departments"/></li>
+                            <li t-if="record.department_id.raw_value"><b>Departement:</b> <field name="department_id"/></li>
                         </ul>
                     </t>
                     <t t-name="kanban-box">
                         <div t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click oe_applicant_kanaban oe_semantic_html_override">
-                            <div class="oe_dropdown_toggle oe_dropdown_kanban">
-                                <i class="fa fa-bars fa-lg"/>
-                                <ul class="oe_dropdown_menu">
+                            <div class="o_dropdown_kanban dropdown">
+
+                                <a class="dropdown-toggle btn" data-toggle="dropdown" href="#" >
+                                    <span class="fa fa-bars fa-lg"/>
+                                </a>
+                                <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
                                     <t t-if="widget.deletable"><li><a type="delete">Delete</a></li></t>
                                     <li><a name="action_makeMeeting" type="object">Schedule Interview</a></li>
                                     <li><ul class="oe_kanban_colorpicker" data-field="color"/></li>
@@ -298,7 +301,9 @@
                                     </div>
                                 </div>
                                 <div class="oe_kanban_bottom_left oe_margin_top_4">
-                                    <t t-raw="record.message_summary.raw_value"/>
+                                    <t t-if="record.message_unread_counter.raw_value">
+                                        <span class='oe_kanban_mail_new' title='Unread Messages'><i class='fa fa-comments'/><t t-raw="record.message_unread_counter.raw_value"/></span>
+                                    </t>
                                     <a t-if="record.attachment_number" name="action_get_attachment_tree_view" type="object"> <field name="attachment_number"/> Documents</a>
                                 </div>
                                 <div class="oe_kanban_footer_left oe_margin_top_4">
@@ -518,8 +523,6 @@
         name="Applications"
         parent="menu_hr_recruitment_root"
         id="menu_crm_case_categ0_act_job" action="crm_case_categ0_act_job" sequence="2"/>
-    <menuitem name="Reports" id="report_hr_recruitment" parent="menu_hr_recruitment_root" 
-    sequence="99"/>
 
     <!-- Stage Tree View -->
     <record model="ir.ui.view" id="hr_recruitment_stage_tree">

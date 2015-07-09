@@ -35,7 +35,7 @@
                     <separator/>
                     <filter string="To Do" name="todo" domain="[('payslip_status', '=', False), ('holiday_status_id.active', '=', True)]"/>
                     <field name="employee_id"/>
-                    <field name="department_id" groups="hr.group_multi_departments"/>
+                    <field name="department_id"/>
                     <field name="holiday_status_id"/>
                     <group expand="0" string="Group By">
                         <filter name="group_name" string="Description" context="{'group_by':'name'}"/>
@@ -87,12 +87,13 @@
                         <group>
                             <field name="name" attrs="{'readonly':[('state','!=','draft'),('state','!=','confirm')]}" required="1"/>
                             <field name="holiday_status_id" context="{'employee_id':employee_id}"/>
-                                <label for="number_of_days_temp" string="Duration"/>
+                            <label for="number_of_days_temp" string="Duration"/>
                             <div>
-                                <group col="3" attrs="{'invisible': [('type', '=', 'add')]}">
-                                    <field name="date_from" nolabel="1" on_change="onchange_date_from(date_to, date_from)" attrs="{'required':[('type', '=', 'remove')]}" class="oe_inline"/><label string="-" class="oe_inline"/>
-                                    <field name="date_to" nolabel="1" on_change="onchange_date_to(date_to, date_from)"  attrs="{'required':[('type', '=', 'remove')]}" class="oe_inline"/>
-                                </group>
+                                <div attrs="{'invisible': [('type', '=', 'add')]}">
+                                    <field name="date_from" on_change="onchange_date_from(date_to, date_from)" attrs="{'required':[('type', '=', 'remove')]}" class="oe_inline"/>
+                                    <label string="-" class="oe_inline"/>
+                                    <field name="date_to" on_change="onchange_date_to(date_to, date_from)"  attrs="{'required':[('type', '=', 'remove')]}" class="oe_inline"/>
+                                </div>
                                 <div>
                                     <field name="number_of_days_temp" class="oe_inline"/> days
                                 </div>
@@ -232,7 +233,7 @@
             </field>
         </record>
 
-        <menuitem name="Leaves" id="menu_hr_holidays_root" sequence="95"/>
+        <menuitem name="Leaves" id="menu_hr_holidays_root" sequence="95" web_icon="hr_holidays,static/description/icon.png"/>
         <menuitem name="My Leaves" id="menu_hr_holidays_my_leaves" parent="menu_hr_holidays_root" sequence="1"/>
         <menuitem name="Approvals" id="menu_hr_holidays_approvals" parent="menu_hr_holidays_root" sequence="2"/>
         <menuitem name="Reports" id="menu_hr_holidays_report" parent="menu_hr_holidays_root" sequence="99"/>
@@ -507,8 +508,7 @@
 
         <menuitem sequence="3" id="hr.menu_open_view_attendance_reason_config" parent="hr.menu_hr_configuration" name="Leaves" groups="base.group_hr_manager"/>
         <menuitem id="menu_hr_holidays_configuration" name="Configuration" parent="menu_hr_holidays_root"
-            sequence="100" groups="base.group_configuration"/>
-        <menuitem name="Leave Types" action="open_view_holiday_status" id="menu_open_view_holiday_status" parent="menu_hr_holidays_configuration" sequence="4" groups="base.group_hr_manager"/>
+            sequence="100" groups="base.group_configuration,base.group_hr_manager" action="open_view_holiday_status"/>
 
         <!-- Holiday on resource leave -->
         <record id="resource_calendar_leave_form_inherit" model="ir.ui.view">

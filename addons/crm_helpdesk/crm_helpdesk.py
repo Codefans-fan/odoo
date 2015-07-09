@@ -86,20 +86,6 @@ class crm_helpdesk(osv.osv):
                 values['date_closed'] = fields.datetime.now()
         return super(crm_helpdesk, self).write(cr, uid, ids, values, context=context)
 
-    def case_escalate(self, cr, uid, ids, context=None):
-        """ Escalates case to parent level """
-        data = {'active': True}
-        for case in self.browse(cr, uid, ids, context=context):
-            if case.team_id and case.team_id.parent_id:
-                parent_id = case.team_id.parent_id
-                data['team_id'] = parent_id.id
-                if parent_id.change_responsible and parent_id.user_id:
-                    data['user_id'] = parent_id.user_id.id
-            else:
-                raise UserError(_('You can not escalate, you are already at the top level regarding your sales-team category.'))
-            self.write(cr, uid, [case.id], data, context=context)
-        return True
-
     # -------------------------------------------------------
     # Mail gateway
     # -------------------------------------------------------
@@ -130,3 +116,4 @@ class crm_helpdesk_category(osv.Model):
         'name': fields.char('Name', required=True, translate=True),
         'team_id': fields.many2one('crm.team', 'Sales Team'),
     }
+

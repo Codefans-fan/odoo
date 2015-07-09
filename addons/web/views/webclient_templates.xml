@@ -37,7 +37,7 @@
             <script type="text/javascript" src="/web/static/test/menu.js"></script>
 
             <link rel="stylesheet" href="/web/static/lib/fontawesome/css/font-awesome.css"/>
-            <link rel="stylesheet" href="/web/static/src/font/lato/stylesheet.css" />
+            <link rel="stylesheet" href="/web/static/src/fonts/lato/stylesheet.css" />
 
             <!-- Datetime Picker -->
             <link rel="stylesheet" href="/web/static/lib/bootstrap-datetimepicker/css/bootstrap-datetimepicker.css"/>
@@ -60,7 +60,7 @@
         <template id="web.assets_backend">
             <!-- jQuery addons -->
             <script type="text/javascript" src="/web/static/lib/jquery.validate/jquery.validate.js"></script>
-            <script type="text/javascript" src="/web/static/lib/jquery.autosize/jquery.autosize.js"></script>
+            <script type="text/javascript" src="/web/static/lib/autosize/autosize.js"></script>
             <script type="text/javascript" src="/web/static/lib/jquery.scrollTo/jquery.scrollTo.js"></script>
 
             <link rel="stylesheet" href="/web/static/lib/cleditor/jquery.cleditor.css"/>
@@ -72,9 +72,6 @@
             <link rel="stylesheet" href="/web/static/lib/select2/select2.css"/>
             <script type="text/javascript" src="/web/static/lib/select2/select2.js"></script>
 
-            <link rel="stylesheet" href='/website/static/src/less/import_bootstrap.less'/>
-            <link rel="stylesheet" href="/web/static/src/less/enterprise_compatibility.less"/>
-            <link rel="stylesheet" href="/web/static/src/less/utils.less"/>
             <script src="/web/static/lib/bootstrap/js/affix.js"></script>
             <script src="/web/static/lib/bootstrap/js/alert.js"></script>
             <script src="/web/static/lib/bootstrap/js/button.js"></script>
@@ -113,6 +110,11 @@
             <link rel="stylesheet" href="/web/static/src/css/base.css"/>
             <link rel="stylesheet" href="/web/static/src/css/data_export.css"/>
             <link rel="stylesheet" href="/base/static/src/css/modules.css"/>
+
+            <link rel="stylesheet" href='/website/static/src/less/import_bootstrap.less'/>
+            <link rel="stylesheet" href="/web/static/src/less/enterprise_compatibility.less"/>
+            <link rel="stylesheet" href="/web/static/src/less/utils.less"/>
+            <link rel="stylesheet" href="/web/static/src/less/modal.less"/>
 
             <script type="text/javascript" src="/web/static/lib/py.js/lib/py.js"></script>
 
@@ -241,7 +243,6 @@
                 t-att-data-menu="menu['id']"
                 t-att-data-action-model="menu['action'] and menu['action'].split(',')[0] or ''"
                 t-att-data-action-id="menu['action'] and menu['action'].split(',')[1] or ''">
-                <i t-if="menu.get('icon')" t-attf-class="fa #{menu.get('icon')} fa-lg fa-fw"/>
                 <span class="oe_menu_text">
                     <t t-esc="menu['name']"/>
                 </span>

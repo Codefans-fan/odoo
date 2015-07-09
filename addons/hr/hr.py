@@ -165,7 +165,6 @@ class hr_employee(osv.osv):
         'ssnid': fields.char('SSN No', help='Social Security Number'),
         'sinid': fields.char('SIN No', help="Social Insurance Number"),
         'identification_id': fields.char('Identification No'),
-        'otherid': fields.char('Other Id'),
         'gender': fields.selection([('male', 'Male'), ('female', 'Female'), ('other', 'Other')], 'Gender'),
         'marital': fields.selection([('single', 'Single'), ('married', 'Married'), ('widower', 'Widower'), ('divorced', 'Divorced')], 'Marital Status'),
         'department_id': fields.many2one('hr.department', 'Department'),
@@ -248,10 +247,14 @@ class hr_employee(osv.osv):
         return {'value': value}
 
     def onchange_user(self, cr, uid, ids, user_id, context=None):
-        work_email = False
         if user_id:
-            work_email = self.pool.get('res.users').browse(cr, uid, user_id, context=context).email
-        return {'value': {'work_email': work_email}}
+            user = self.pool['res.users'].browse(cr, uid, user_id, context=context)
+            values = {
+                'name': user.name,
+                'work_email': user.email,
+                'image': user.image,
+            }
+            return {'value': values}
 
     def action_follow(self, cr, uid, ids, context=None):
         """ Wrapper because message_subscribe_users take a user_ids=None
@@ -262,15 +265,6 @@ class hr_employee(osv.osv):
         """ Wrapper because message_unsubscribe_users take a user_ids=None
             that receive the context without the wrapper. """
         return self.message_unsubscribe_users(cr, uid, ids, context=context)
-
-    def get_suggested_thread(self, cr, uid, removed_suggested_threads=None, context=None):
-        """Show the suggestion of employees if display_employees_suggestions if the
-        user perference allows it. """
-        user = self.pool.get('res.users').browse(cr, uid, uid, context)
-        if not user.display_employees_suggestions:
-            return []
-        else:
-            return super(hr_employee, self).get_suggested_thread(cr, uid, removed_suggested_threads, context)
 
     def _message_get_auto_subscribe_fields(self, cr, uid, updated_fields, auto_follow_fields=None, context=None):
         """ Overwrite of the original method to always follow user_id field,

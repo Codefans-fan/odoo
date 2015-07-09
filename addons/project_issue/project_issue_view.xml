@@ -35,8 +35,6 @@
                             <label for="project_id"/>
                             <div name="project">
                                 <field name="project_id" on_change="on_change_project(project_id)" class="oe_inline" context="{'default_use_issues':1}"/>
-                                <field name="can_escalate" invisible="1"/>
-                                <button name="case_escalate" string="Escalate" type="object" class="btn-default" attrs="{'invisible':[('can_escalate','=',False)]}" groups="base.group_user"/>
                             </div>
                         </group>
                         <group>
@@ -149,13 +147,13 @@
             <field name="name">Project Issue Kanban</field>
             <field name="model">project.issue</field>
             <field name="arch" type="xml">
-                <kanban default_group_by="stage_id">
+                <kanban default_group_by="stage_id" class="o_kanban_small_column">
                     <field name="stage_id" options='{"group_by_tooltip": {"description": "Description", "legend_priority": "Use of stars"}}'/>
                     <field name="color"/>
                     <field name="user_email"/>
                     <field name="user_id"/>
                     <field name="date_deadline"/>
-                    <field name="message_summary"/>
+                    <field name="message_unread_counter"/>
                     <templates>
                         <t t-name="kanban-tooltip">
                            <ul class="oe_kanban_tooltip">
@@ -165,9 +163,12 @@
                         </t>
                         <t t-name="kanban-box">
                             <div t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click oe_semantic_html_override">
-                                <div class="oe_dropdown_toggle oe_dropdown_kanban" groups="base.group_user">
-                                    <i class="fa fa-bars fa-lg"/>
-                                    <ul class="oe_dropdown_menu">
+                                <div class="o_dropdown_kanban dropdown" groups="base.group_user">
+
+                                    <a class="dropdown-toggle btn" data-toggle="dropdown" href="#" >
+                                        <span class="fa fa-bars fa-lg"/>
+                                    </a>
+                                    <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
                                         <t t-if="widget.editable"><li><a type="edit">Edit Issue</a></li></t>
                                         <t t-if="widget.deletable"><li><a type="delete">Delete</a></li></t>
                                         <li><ul class="oe_kanban_colorpicker" data-field="color"/></li>
@@ -182,7 +183,9 @@
                                         <field name="tag_ids"/>
                                     </div>
                                     <div class="oe_kanban_bottom_left">
-                                        <t t-raw="record.message_summary.raw_value"/>
+                                        <t t-if="record.message_unread_counter.raw_value">
+                                            <span class='oe_kanban_mail_new' title='Unread Messages'><i class='fa fa-comments'/><t t-raw="record.message_unread_counter.raw_value"/></span>
+                                        </t>
                                     </div>
                                     <div class="oe_kanban_bottom_right">
                                         <img t-att-src="kanban_image('res.users', 'image_small', record.user_id.raw_value)" t-att-title="record.user_id.value" width="24" height="24" class="oe_kanban_avatar pull-right"/>
@@ -290,9 +293,6 @@
                 <xpath expr='//field[@name="use_tasks"]' position="attributes">
                     <attribute name="attrs">{'on_change': 'on_change_use_tasks_or_issues(use_tasks, use_issues)'}</attribute>
                 </xpath>
-                <field name="sequence" position="before">
-                    <field name="project_escalation_id"/>
-                </field>
             </field>
        </record>
 

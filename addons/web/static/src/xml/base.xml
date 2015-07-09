@@ -25,38 +25,30 @@
 </t>
 <t t-name="Dialog">
     <div class="modal" tabindex="-1" data-backdrop="static" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
+        <div class="modal-dialog">
+            <div class="modal-content openerp">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-                    <h3 class="modal-title"><t t-raw="title"/><span class="text-muted"><t t-esc="subtitle"/></span></h3>
+                    <h4 class="modal-title"><t t-raw="title"/><span class="o_subtitle text-muted"><t t-esc="subtitle"/></span></h4>
                 </div>
-                <div class="modal-body">
-                </div>
+                <div class="modal-body"/>
+                <div class="modal-footer"/>
             </div>
         </div>
     </div>
 </t>
 <t t-name="CrashManager.warning">
-    <table cellspacing="0" cellpadding="0" border="0" class="oe_dialog_warning">
-    <tr>
-        <td>
-            <p>
-                <t t-js="d">
-                    var message = d.message ? d.message : d.error.data.message;
-                    d.html_error = context.engine.tools.html_escape(message)
-                        .replace(/\n/g, '<br/>');
-                </t>
-                <t t-raw="html_error"/>
-            </p>
-        </td>
-    </tr>
-    </table>
+    <div class="o_dialog_warning">
+        <t t-js="d">
+            var message = d.message ? d.message : d.error.data.message;
+            d.html_error = context.engine.tools.html_escape(message).replace(/\n/g, '<br/>');
+        </t>
+        <t t-raw="html_error"/>
+    </div>
 </t>
 <t t-name="CrashManager.error">
-    <div class="oe_error_detail">
+    <div class="o_error_detail">
         <pre><t t-esc="error.message"/></pre>
-        <hr/>
         <pre><t t-esc="error.data.debug"/></pre>
     </div>
 </t>
@@ -330,7 +322,6 @@
             <tr>
                 <td colspan="2" align="right">
                     <button class='oe_button oe_form_button'>Change Password</button>
-                    <span class="oe_fade oe_form_button"> or </span>
                     <button type="button" class="oe_button oe_form_button_cancel oe_form_button oe_link" href="javascript:void(0)"><span>Cancel</span></button>
                 </td>
             </tr>
@@ -383,22 +374,22 @@
                         <ul class="list-inline text-center navigation">
                             <li class="active">
                                 <a data-toggle="tab" href="#settings">
-                                    <span class="glyphicon glyphicon-cog"></span>
+                                    <span class="fa fa-cog fa-lg"></span>
                                 </a>
                             </li>
                             <li>
                                 <a data-toggle="tab" href="#email">
-                                    <span class="glyphicon glyphicon-envelope"></span>
+                                    <span class="fa fa-envelope fa-lg"></span>
                                 </a>
                             </li>
                             <li>
                                 <a data-toggle="tab" href="#events">
-                                    <span class="glyphicon glyphicon-calendar"></span>
+                                    <span class="fa fa-calendar fa-lg"></span>
                                 </a>
                             </li>
                              <li>
                                 <a data-toggle="tab" href="#social">
-                                    <span class="glyphicon glyphicon-share"></span>
+                                    <span class="fa fa-share-square-o fa-lg"></span>
                                 </a>
                             </li>
                         </ul>
@@ -479,8 +470,8 @@
     </div>
 </t>
 
-<t t-name="One2ManyControlPanel">
-    <div class="oe-o2m-control-panel container-fluid">
+<t t-name="X2ManyControlPanel">
+    <div class="oe-x2m-control-panel container-fluid">
         <div class="oe-cp-buttons pull-left"/>
         <div class="oe-cp-pager pull-right"/>
     </div>
@@ -749,7 +740,7 @@
             ><t t-raw="render_cell(record, column)"/></td>
     </t>
     <td t-if="options.deletable" class='oe_list_record_delete' width="13px">
-        <button type="button" name="delete" class="oe_i">d</button>
+        <span name="delete" class="fa fa-trash-o"/>
     </td>
 </tr>
 <t t-extend="ListView.buttons">
@@ -815,7 +806,7 @@
     <span class="oe_form_pager_state"></span>
 </t>
 <form t-name="FormView.set_default">
-    <t t-set="args" t-value="widget.dialog_options.args"/>
+    <t t-set="args" t-value="widget.args"/>
     <table style="width: 100%">
         <tr>
             <td>
@@ -1175,12 +1166,10 @@
 </t>
 <t t-name="FieldCharDomain">
     <div class="oe_form_field">
-        <span class="oe_domain_count"/>
-        <button class="oe_button oe_link select_records" type="button"
-            t-att-style="widget.node.attrs.style"
-            t-att-accesskey="widget.node.attrs.accesskey">
-            <span class="fa fa-arrow-right"/>
-        </button>
+        <span class="o_count"/>
+        <button class="btn btn-link" type="button"
+            t-att-accesskey="widget.node.attrs.accesskey"/>
+        <input t-if="widget.debug" type="text" class="o_form_input o_debug_input"/>
     </div>
 </t>
 <t t-name="web.datepicker">
@@ -1273,19 +1262,12 @@
 <t t-name="Many2OneButton.cell"
     ><img t-attf-src="#{prefix}/web/static/src/img/icons/#{widget.icon}.png" t-att-alt="widget.string" width="16" height="16"/>
 </t>
-<t t-name="FieldMany2ManyTags">
-    <div class="oe_form_field oe_tags" t-att-style="widget.node.attrs.style">
-        <t t-if="! widget.get('effective_readonly')">
-            <textarea rows="1" style="width: 100%"
-                t-att-placeholder="widget.node.attrs.placeholder"></textarea>
-        </t>
-    </div>
-</t>
 <t t-name="FieldMany2ManyTag">
     <t t-set="i" t-value="0"/>
     <t t-foreach="elements" t-as="el">
-        <span class="oe_tag" t-att-data-index="i">
+        <span class="badge" t-att-data-index="i" t-att-data-id="el[0]">
             <t t-esc="el[1]"/>
+            <span t-if="!readonly" class="fa fa-times o_delete"/>
         </span>
         <t t-set="i" t-value="i + 1"/>
     </t>
@@ -1497,8 +1479,7 @@
     </div>
 </t>
 <t t-name="WidgetButton">
-    <span t-if="widget.pre_text"> <t t-esc="widget.pre_text"/> </span>
-    <button type="button" t-att-class="widget.is_stat_button ? 'oe_stat_button btn btn-default' : 'oe_button oe_form_button ' + (widget.node.attrs.class ? widget.node.attrs.class : '')"
+    <button type="button" t-attf-class="btn btn-sm oe_button #{widget.node.attrs.class or ''}"
         t-att-style="widget.node.attrs.style"
         t-att-tabindex="widget.node.attrs.tabindex"
         t-att-autofocus="widget.node.attrs.autofocus"
@@ -1506,9 +1487,8 @@
         <img t-if="!widget.is_stat_button and widget.node.attrs.icon " t-att-src="_s + widget.node.attrs.icon" width="16" height="16"/>
         <div t-if="widget.is_stat_button and widget.icon_class" t-att-class="widget.icon_class"></div>
         <span t-if="widget.string and !widget.is_stat_button"><t t-esc="widget.string"/></span>
-        <div t-if="widget.string and widget.is_stat_button"><t t-esc="widget.string"/></div>
+        <div t-if="widget.string and widget.is_stat_button" class="o_stat_info"><t t-esc="widget.string"/></div>
     </button>
-    <span t-if="widget.post_text"> <t t-esc="widget.post_text"/> </span>
 </t>
 <t t-name="WidgetButton.tooltip" t-extend="WidgetLabel.tooltip">
     <t t-jquery="div.oe_tooltip_string" t-operation="replace">
@@ -1542,51 +1522,13 @@
     </t>
 </t>
 
-<t t-name="AbstractFormPopup.render">
-    <div>
-        <div class="o-modal-header">
-            <div class="o-popup-search"/>
-            <div class="o-search-options oe-search-options"/>
-            <div class="oe_popup_list_pager"/>
-        </div>
-        <div class="oe_popup_list"/>
-        <div class="oe_popup_form"/>
-    </div>
-</t>
-<t t-name="SelectCreatePopup.search.buttons">
-    <t t-if="! widget.options.disable_multiple_selection">
-        <button type="button" class="oe_button oe_selectcreatepopup-search-select oe_highlight" disabled="disabled">Select</button>
-    </t>
-    <t t-if="!widget.options.no_create">
-    <button type="button" class="oe_button oe_selectcreatepopup-search-create">Create</button>
-    or </t><a class="oe_selectcreatepopup-search-close oe_bold oe_form_button_cancel" href="javascript:void(0)">Cancel</a>
-</t>
-<t t-name="AbstractFormPopup.buttons">
-    <t t-if="! readonly">
-        <t t-if="! multi_select">
-            <button type="button" class="oe_button oe_abstractformpopup-form-save oe_highlight">Save</button>
-        </t>
-        <t t-if="multi_select">
-            <button type="button" class="oe_button oe_abstractformpopup-form-save oe_highlight">Save &amp; Close</button>
-            <button type="button" class="oe_button oe_abstractformpopup-form-save-new oe_highlight">Save &amp; New</button>
-        </t>
-        or
-    </t>
-    <a class="oe_abstractformpopup-form-close oe_bold oe_form_button_cancel" href="javascript:void(0)">
-        <t t-if="! readonly">
-            Discard
-        </t>
-        <t t-if="readonly">
-            Close
-        </t>
-    </a>
-</t>
 
 <t t-name="One2Many.formview" t-extend="FormView">
     <t t-jquery=".oe_form_buttons" t-operation="inner">
         <button type="button" class="oe_button oe_form_button_create">Add</button>
     </t>
 </t>
+
 <t t-name="One2Many.listview" t-extend="ListView">
     <t t-jquery="thead > tr:first">
         this.removeAttr('t-if');
@@ -1895,9 +1837,6 @@
     <button class="oe_button oe_export_button_export" id="delete_export_list" type="button">Delete</button>
 </t>
 
-<div t-name="Many2ManyKanban.quick_create" class="oe_kanban_quick_create">
-    <input t-att-placeholder="_t('Type name to search')"/>
-</div>
 <t t-name="Throbber">
     <div>
         <div class="oe_blockui_spin" style="height: 50px">
@@ -1958,10 +1897,10 @@
 </button>
 
 <div t-name="Pager">
-    <span class="o-pager-value"></span>
+    <span class="o_pager_value"></span> / <span class="o_pager_limit"></span>
     <span class="btn-group btn-group-sm">
-        <button type="button" class="fa fa-chevron-left btn btn-icon o-pager-previous" accesskey="O"/>
-        <button type="button" class="fa fa-chevron-right btn btn-icon o-pager-next" accesskey="P"/>
+        <button type="button" class="fa fa-chevron-left btn btn-icon o_pager_previous" accesskey="O"/>
+        <button type="button" class="fa fa-chevron-right btn btn-icon o_pager_next" accesskey="P"/>
     </span>
 </div>
 

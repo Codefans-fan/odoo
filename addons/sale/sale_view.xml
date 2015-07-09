@@ -9,6 +9,7 @@
         -->
         <menuitem name="Sales"
             id="base.menu_base_partner"
+            web_icon="sale,static/description/icon.png"
             groups="base.group_sale_salesman,base.group_sale_manager" sequence="6"/>
 
         <menuitem
@@ -153,9 +154,9 @@
                         </button>
                     </div>
                     <div class="oe_title">
+                        <label string="Quotation" attrs="{'invisible': [('state', 'not in', ('draft', 'sent'))]}"/>
+                        <label string="Sales Order" attrs="{'invisible': [('state', 'in', ('draft', 'sent'))]}"/>
                         <h1>
-                            <label string="Quotation " attrs="{'invisible': [('state', 'not in', ('draft', 'sent'))]}"/>
-                            <label string="Sales Order " attrs="{'invisible': [('state', 'in', ('draft', 'sent'))]}"/>
                             <field name="name" class="oe_inline" readonly="1"/>
                         </h1>
                     </div>
@@ -212,8 +213,6 @@
                                         <group>
                                             <field name="tax_id" widget="many2many_tags" domain="[('type_tax_use','=','sale')]"/>
                                             <field name="th_weight"/>
-                                            <!-- we should put a config wizard for these two fields -->
-                                            <field name="address_allotment_id"/>
                                         </group>
                                     </group>
                                     <label for="name"/>
@@ -289,8 +288,8 @@
                                 </div>
                                 <field name="amount_total" nolabel="1" class="oe_subtotal_footer_separator" widget='monetary' options="{'currency_field': 'currency_id'}"/>
                             </group>
-                            <div class="oe_clear"/>
                             <field name="note" class="oe_inline" placeholder="An administrator can set up default Terms and conditions in your Company settings."/>
+                            <div class="oe_clear"/>
                         </page>
                         <page string="Other Information" groups="base.group_user">
                             <group>
@@ -355,7 +354,7 @@
                     <filter string="New Mail" name="message_unread" domain="[('message_unread','=',True)]"/>
                     <group expand="0" string="Group By">
                         <filter string="Salesperson" domain="[]" context="{'group_by':'user_id'}"/>
-                        <filter string="Customer" domain="[]" context="{'group_by':'partner_id'}"/>
+                        <filter name="customer" string="Customer" domain="[]" context="{'group_by':'partner_id'}"/>
                         <filter string="Order Month" domain="[]" context="{'group_by':'date_order'}"/>
                     </group>
                </search>
@@ -412,7 +411,7 @@
             <field name="res_model">sale.order</field>
             <field name="view_type">form</field>
             <field name="view_id" ref="view_quotation_tree"/>
-            <field name="view_mode">tree,form,calendar,pivot,graph</field>
+            <field name="view_mode">tree,kanban,form,calendar,pivot,graph</field>
             <field name="context">{}</field>
             <field name="domain">[('state','in',('draft','sent','cancel'))]</field>
             <field name="search_view_id" ref="view_sales_order_filter"/>
@@ -511,6 +510,8 @@
                 <search string="Search Sales Order">
                     <filter icon="terp-dolar_ok!" string="To Invoice" domain="[('invoiced','&lt;&gt;', 1),('state','=','done')]"  help="Sales Order Lines ready to be invoiced"/>
                     <separator/>
+                    <filter string="Confirmed" domain="[('state', 'in', ['waiting_date','progress','manual', 'shipping_except', 'invoice_except', 'confirmed', 'done'])]" name="confirmed"/>
+                    <separator/>
                     <filter string="My Sales Order Lines" icon="terp-personnal" domain="[('salesman_id','=',uid)]" help="Sales Order Lines related to a Sales Order of mine"/>
                     <field name="order_id"/>
                     <field name="order_partner_id" operator="child_of"/>
@@ -556,7 +557,7 @@
             <field name="type">ir.actions.act_window</field>
             <field name="res_model">sale.order.line</field>
             <field name="view_type">form</field>
-            <field name="view_mode">tree,form</field>
+            <field name="view_mode">tree</field>
             <field name="search_view_id" ref="view_sales_order_uninvoiced_line_filter"/>
             <field name="context">{"search_default_uninvoiced":1}</field>
             <field name="filter" eval="True"/>
@@ -584,6 +585,7 @@
             <field name="name">Sales Order Lines</field>
             <field name="res_model">sale.order.line</field>
             <field name="view_id" ref="view_order_line_tree"/>
+            <field name="context">{'search_default_confirmed': 1}</field>
         </record>
         <record model="ir.ui.view" id="product_form_view_sale_order_button">
             <field name="name">product.product.sale.order</field>
@@ -593,7 +595,7 @@
             <field name="arch" type="xml">
                 <div name="button_box" position="inside">
                     <button class="oe_stat_button" name="action_view_sales"
-                        type="object" icon="fa-strikethrough">
+                        type="object" icon="fa-usd">
                         <field string="Sales" name="sales_count" widget="statinfo" />
                     </button>
                 </div>
@@ -608,7 +610,7 @@
             <field name="arch" type="xml">
                 <div name="button_box" position="inside">
                     <button class="oe_stat_button" name="action_view_sales" 
-                        type="object" icon="fa-strikethrough">
+                        type="object" icon="fa-usd">
                         <field string="Sales" name="sales_count" widget="statinfo" />
                     </button>
                 </div>
@@ -638,7 +640,7 @@
                 <xpath expr="//field[@name='user_id']" position="after">
                     <field name="team_id" groups="base.group_multi_salesteams"/>
                 </xpath>
-                <xpath expr="//group/filter[@string='Status']" position="after">
+                <xpath expr="//group/filter[@name='status']" position="after">
                     <filter string="Sales Team" domain="[]" context="{'group_by':'team_id'}" groups="base.group_multi_salesteams"/>
                 </xpath>
             </field>

@@ -70,13 +70,13 @@
                             </group>
                         </group>
                         <notebook colspan="4">
-                            <page string="Team Members">
+                            <page name="members" string="Team Members">
                                 <field name="member_ids" widget="many2many_kanban">
                                     <kanban quick_create="false" create="true" delete="true">
                                         <field name="name"/>
                                         <templates>
                                             <t t-name="kanban-box">
-                                                <div>
+                                                <div class="oe_kanban_global_click" style="position: relative">
                                                     <a t-if="! read_only_mode" type="delete" style="position: absolute; right: 0; padding: 4px; diplay: inline-block">X</a>
                                                     <div class="oe_module_vignette">
                                                         <img t-att-src="kanban_image('res.users', 'image_small', record.id.value)" class="oe_avatar oe_kanban_avatar_smallbox"/>
@@ -92,13 +92,8 @@
                             </page>
                             <page string="More Info" groups="base.group_sale_manager">
                                 <group name="sales_team_more_info">
-                                    <group string="Escalation">
-                                        <field name="parent_id"/>
-                                        <field name="change_responsible"/>                                
-                                    </group>
-                                    <group>
-                                        <field name="active"/>
-                                        <field name="company_id" groups="base.group_multi_company"
+                                    <group string="Company" groups="base.group_multi_company">
+                                        <field name="company_id" 
                                             options="{'no_create': True}"/>
                                     </group>
                                 </group>                                
@@ -152,7 +147,6 @@
         <template id="assets_backend" name="sales_team assets" inherit_id="web.assets_backend">
             <xpath expr="." position="inside">
                 <link rel="stylesheet" href="/sales_team/static/src/css/sales_team.css"/>
-                <link rel="stylesheet" href="/sales_team/static/src/less/sales_team_dashboard.less"/>
                 <script type="text/javascript" src="/sales_team/static/src/js/sales_team.js"></script>
             </xpath>
         </template>

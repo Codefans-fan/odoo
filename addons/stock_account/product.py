@@ -50,17 +50,24 @@ class product_template(osv.osv):
 
     @api.multi
     def _get_product_accounts(self):
-        """ To get the stock input account, stock output account and stock journal related to product.
-        @param product_id: product id
-        @return: dictionary which contains information regarding stock input account, stock output account and stock journal
+        """ Add the stock accounts related to product to the result of super()
+        @return: dictionary which contains information regarding stock accounts and super (income+expense accounts)
         """
         accounts = super(product_template, self)._get_product_accounts()
         accounts.update({
-            'stock_input': self.property_stock_account_input or self.categ_id.property_stock_account_input_categ,
-            'stock_output': self.property_stock_account_output or self.categ_id.property_stock_account_output_categ,
+            'stock_input': self.property_stock_account_input or self.categ_id.property_stock_account_input_categ_id,
+            'stock_output': self.property_stock_account_output or self.categ_id.property_stock_account_output_categ_id,
             'stock_valuation': self.categ_id.property_stock_valuation_account_id or False,
-            'stock_journal': self.categ_id.property_stock_journal or False,
         })
+        return accounts
+
+    @api.multi
+    def get_product_accounts(self, fiscal_pos=None):
+        """ Add the stock journal related to product to the result of super()
+        @return: dictionary which contains all needed information regarding stock accounts and journal and super (income+expense accounts)
+        """
+        accounts = super(product_template, self).get_product_accounts(fiscal_pos=fiscal_pos)
+        accounts.update({'stock_journal': self.categ_id.property_stock_journal or False})
         return accounts
 
     def do_change_standard_price(self, cr, uid, ids, new_price, context=None):
@@ -135,19 +142,19 @@ class product_category(osv.osv):
             type='many2one',
             string='Stock Journal',
             help="When doing real-time inventory valuation, this is the Accounting Journal in which entries will be automatically posted when stock moves are processed."),
-        'property_stock_account_input_categ': fields.property(
+        'property_stock_account_input_categ_id': fields.property(
             type='many2one',
             relation='account.account',
             string='Stock Input Account',
-            domain=[('deprecated', '=', False)],
+            domain=[('deprecated', '=', False)], oldname="property_stock_account_input_categ",
             help="When doing real-time inventory valuation, counterpart journal items for all incoming stock moves will be posted in this account, unless "
                  "there is a specific valuation account set on the source location. This is the default value for all products in this category. It "
                  "can also directly be set on each product"),
-        'property_stock_account_output_categ': fields.property(
+        'property_stock_account_output_categ_id': fields.property(
             type='many2one',
             relation='account.account',
             domain=[('deprecated', '=', False)],
-            string='Stock Output Account',
+            string='Stock Output Account', oldname="property_stock_account_output_categ",
             help="When doing real-time inventory valuation, counterpart journal items for all outgoing stock moves will be posted in this account, unless "
                  "there is a specific valuation account set on the destination location. This is the default value for all products in this category. It "
                  "can also directly be set on each product"),
