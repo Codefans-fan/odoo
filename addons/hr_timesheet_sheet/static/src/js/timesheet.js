@@ -5,7 +5,7 @@ var core = require('web.core');
 var data = require('web.data');
 var form_common = require('web.form_common');
 var formats = require('web.formats');
-var Model = require('web.Model');
+var Model = require('web.DataModel');
 var time = require('web.time');
 var utils = require('web.utils');
 
@@ -81,7 +81,10 @@ var WeeklyTimesheet = form_common.FormWidget.extend(form_common.ReinitializeWidg
         if (self.querying)
             return;
         self.updating = true;
-        self.field_manager.set_values({timesheet_ids: self.get("sheets")}).done(function() {
+        var commands = self.get("sheets").map(function (data) {
+            return form_common.commands.create(data);
+        });
+        self.field_manager.set_values({'timesheet_ids': commands}).done(function() {
             self.updating = false;
         });
     },

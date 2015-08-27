@@ -10,7 +10,6 @@ from openerp.tools import DEFAULT_SERVER_DATE_FORMAT
 from openerp.tools import float_compare, float_is_zero
 from openerp.tools.translate import _
 from openerp import tools, SUPERUSER_ID
-from openerp.addons.product import _common
 from openerp.exceptions import UserError, AccessError
 
 
@@ -151,6 +150,9 @@ class mrp_bom(osv.osv):
     _description = 'Bill of Material'
     _inherit = ['mail.thread']
 
+    def _get_bom_ids_from_product_template_ids(self, cr, uid, product_template_ids, context=None):
+        return self.pool['mrp.bom'].search(cr, uid, [('product_tmpl_id', 'in', product_template_ids)], context=context)
+
     _columns = {
         'name': fields.char('Name'),
         'code': fields.char('Reference', size=16),
@@ -158,11 +160,16 @@ class mrp_bom(osv.osv):
         'type': fields.selection([('normal','Manufacture this product'),('phantom','Ship this product as a set of components (kit)')], 'BoM Type', required=True,
                 help= "Set: When processing a sales order for this product, the delivery order will contain the raw materials, instead of the finished product."),
         'position': fields.char('Internal Reference', help="Reference to a position in an external plan."),
-        'product_tmpl_id': fields.many2one('product.template', 'Product', domain="[('type', '!=', 'service')]", required=True),
+        'product_tmpl_id': fields.many2one('product.template', 'Product', domain="[('type', 'in', ['product', 'consu'])]", required=True),
         'product_id': fields.many2one('product.product', 'Product Variant',
-            domain="['&', ('product_tmpl_id','=',product_tmpl_id), ('type','!=', 'service')]",
+            domain="['&', ('product_tmpl_id','=',product_tmpl_id), ('type', 'in', ['product', 'consu']]",
             help="If a product variant is defined the BOM is available only for this product."),
         'bom_line_ids': fields.one2many('mrp.bom.line', 'bom_id', 'BoM Lines', copy=True),
+        'categ_id': fields.related('product_tmpl_id', 'categ_id', type='many2one', relation='product.category', string='Product Category', readonly=True,
+            store = {
+                'mrp.bom': (lambda self, cr, uid, ids, c=None: ids, ['product_tmpl_id'], 10),
+                'product.template': (_get_bom_ids_from_product_template_ids, ['categ_id'], 10)
+            }),
         'product_qty': fields.float('Product Quantity', required=True, digits_compute=dp.get_precision('Product Unit of Measure')),
         'product_uom': fields.many2one('product.uom', 'Product Unit of Measure', required=True, help="Unit of Measure (Unit of Measure) is the unit of measurement for the inventory control"),
         'date_start': fields.date('Valid From', help="Validity of this BoM. Keep empty if it's always valid."),
@@ -268,7 +275,10 @@ class mrp_bom(osv.osv):
 
         def _factor(factor, product_efficiency, product_rounding):
             factor = factor / (product_efficiency or 1.0)
-            factor = _common.ceiling(factor, product_rounding)
+            if product_rounding:
+                factor = tools.float_round(factor,
+                                           precision_rounding=product_rounding,
+                                           rounding_method='UP')
             if factor < product_rounding:
                 factor = product_rounding
             return factor
@@ -490,6 +500,12 @@ class mrp_production(osv.osv):
                 result[prod.id]['cycle_total'] += wc.cycle
         return result
 
+    def _get_workcenter_line(self, cr, uid, ids, context=None):
+        result = {}
+        for line in self.pool['mrp.production.workcenter.line'].browse(cr, uid, ids, context=context):
+            result[line.production_id.id] = True
+        return result.keys()
+
     def _src_id_default(self, cr, uid, ids, context=None):
         try:
             location_model, location_id = self.pool.get('ir.model.data').get_object_reference(cr, uid, 'stock', 'stock_location_stock')
@@ -535,6 +551,9 @@ class mrp_production(osv.osv):
             res += self.pool.get("mrp.production").search(cr, uid, [('move_lines', 'in', move.id)], context=context)
         return res
 
+    def _get_mo_ids_from_product_template_ids(self, cr, uid, product_template_ids, context=None):
+        return self.pool["mrp.production"].search(cr, uid , [('product_id.product_tmpl_id', 'in', product_template_ids)], context=context)
+
     _columns = {
         'name': fields.char('Reference', required=True, readonly=True, states={'draft': [('readonly', False)]}, copy=False),
         'origin': fields.char('Source Document', readonly=True, states={'draft': [('readonly', False)]},
@@ -543,7 +562,7 @@ class mrp_production(osv.osv):
             select=True, readonly=True, states=dict.fromkeys(['draft', 'confirmed'], [('readonly', False)])),
 
         'product_id': fields.many2one('product.product', 'Product', required=True, readonly=True, states={'draft': [('readonly', False)]}, 
-                                      domain=[('type','!=','service')]),
+                                      domain=[('type', 'in', ['product', 'consu'])]),
         'product_qty': fields.float('Product Quantity', digits_compute=dp.get_precision('Product Unit of Measure'), required=True, readonly=True, states={'draft': [('readonly', False)]}),
         'product_uom': fields.many2one('product.uom', 'Product Unit of Measure', required=True, readonly=True, states={'draft': [('readonly', False)]}),
         'product_uos_qty': fields.float('Product UoS Quantity', readonly=True, states={'draft': [('readonly', False)]}),
@@ -588,12 +607,23 @@ class mrp_production(osv.osv):
                 "If the stock is available then the status is set to 'Ready to Produce.\n"
                 "When the production gets started then the status is set to 'In Production.\n"
                 "When the production is over, the status is set to 'Done'."),
-        'hour_total': fields.function(_production_calc, type='float', string='Total Hours', multi='workorder', store=True),
-        'cycle_total': fields.function(_production_calc, type='float', string='Total Cycles', multi='workorder', store=True),
+        'hour_total': fields.function(_production_calc, type='float', string='Total Hours', multi='workorder', store={
+            _name: (lambda self, cr, uid, ids, c={}: ids, ['workcenter_lines'], 40),
+            'mrp.production.workcenter.line': (_get_workcenter_line, ['hour', 'cycle'], 40),
+        }),
+        'cycle_total': fields.function(_production_calc, type='float', string='Total Cycles', multi='workorder', store={
+            _name: (lambda self, cr, uid, ids, c={}: ids, ['workcenter_lines'], 40),
+            'mrp.production.workcenter.line': (_get_workcenter_line, ['hour', 'cycle'], 40),
+        }),
         'user_id': fields.many2one('res.users', 'Responsible'),
         'company_id': fields.many2one('res.company', 'Company', required=True),
         'ready_production': fields.function(_moves_assigned, type='boolean', string="Ready for production", store={'stock.move': (_mrp_from_move, ['state'], 10)}),
         'product_tmpl_id': fields.related('product_id', 'product_tmpl_id', type='many2one', relation='product.template', string='Product'),
+        'categ_id': fields.related('product_tmpl_id', 'categ_id', type='many2one', relation='product.category', string='Product Category', readonly=True,
+            store = {
+                'mrp.production': (lambda self, cr, uid, ids, c=None: ids, ['product_tmpl_id'], 10),
+                'product.template': (_get_mo_ids_from_product_template_ids, ['categ_id'], 10)
+            }),
     }
 
     _defaults = {
@@ -872,7 +902,7 @@ class mrp_production(osv.osv):
 
         scheduled_qty = OrderedDict()
         for scheduled in production.product_lines:
-            if scheduled.product_id.type == 'service':
+            if scheduled.product_id.type not in ['product', 'consu']:
                 continue
             qty = uom_obj._compute_qty(cr, uid, scheduled.product_uom.id, scheduled.product_qty, scheduled.product_id.uom_id.id)
             if scheduled_qty.get(scheduled.product_id.id):
@@ -910,8 +940,8 @@ class mrp_production(osv.osv):
                     continue
 
                 q = min(move.product_qty, qty)
-                quants = quant_obj.quants_get_prefered_domain(cr, uid, move.location_id, move.product_id, q, domain=[('qty', '>', 0.0)],
-                                                     prefered_domain_list=[[('reservation_id', '=', move.id)]], context=context)
+                quants = quant_obj.quants_get_preferred_domain(cr, uid, q, move, domain=[('qty', '>', 0.0)],
+                                                     preferred_domain_list=[[('reservation_id', '=', move.id)]], context=context)
                 for quant, quant_qty in quants:
                     if quant:
                         lot_id = quant.lot_id.id
@@ -1254,7 +1284,7 @@ class mrp_production(osv.osv):
 
             stock_moves = []
             for line in production.product_lines:
-                if line.product_id.type != 'service':
+                if line.product_id.type in ['product', 'consu']:
                     stock_move_id = self._make_production_consume_line(cr, uid, line, context=context)
                     stock_moves.append(stock_move_id)
                 else:

@@ -1,11 +1,11 @@
 -
   !python {model: ir.model.data} : |
       import time
-      account_ids = self.pool.get('account.account').search(cr, uid, [('user_type_id.name', '=', 'Revenue'), ('tag_ids.name', 'in', ['Operating Activities'])])
+      xml_id = self.pool.get('ir.model.data').xmlid_to_res_id(cr, uid, 'account.data_account_type_revenue')
+      account_ids = self.pool.get('account.account').search(cr, uid, [('user_type_id', '=', xml_id), ('tag_ids.name', 'in', ['Operating Activities'])])
       if account_ids:
           vals = {
               'name': 'Sales',
-              'code': 'SAL',
               'account_ids': [(6, None, account_ids)],
           }
           self._update(cr, uid, 'account.budget.post', 'account_budget', vals, 'account_budget_post_sales0')
@@ -97,7 +97,6 @@
       if account_ids:
           vals = {
               'name': 'Purchases',
-              'code': 'PUR',
               'account_ids': [(6, None, account_ids)],
           }
           self._update(cr, uid, 'account.budget.post', 'account_budget', vals, 'account_budget_post_purchase0')

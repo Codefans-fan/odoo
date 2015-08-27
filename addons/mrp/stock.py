@@ -14,13 +14,13 @@ class StockMove(osv.osv):
     _inherit = 'stock.move'
 
     _columns = {
-        'production_id': fields.many2one('mrp.production', 'Production Order for Produced Products', select=True),
+        'production_id': fields.many2one('mrp.production', 'Production Order for Produced Products', select=True, copy=False),
         'raw_material_production_id': fields.many2one('mrp.production', 'Production Order for Raw Materials', select=True),
         'consumed_for': fields.many2one('stock.move', 'Consumed for', help='Technical field used to make the traceability of produced products'),
     }
 
-    def check_tracking(self, cr, uid, move, lot_id, context=None):
-        super(StockMove, self).check_tracking(cr, uid, move, lot_id, context=context)
+    def check_tracking(self, cr, uid, move, ops, context=None):
+        super(StockMove, self).check_tracking(cr, uid, move, ops, context=context)
         if move.raw_material_production_id and move.product_id.tracking!='none' and move.location_dest_id.usage == 'production' and move.raw_material_production_id.product_id.tracking != 'none' and not move.consumed_for:
             raise UserError(_("Because the product %s requires it, you must assign a serial number to your raw material %s to proceed further in your production. Please use the 'Produce' button to do so.") % (move.raw_material_production_id.product_id.name, move.product_id.name))
 
@@ -47,7 +47,7 @@ class StockMove(osv.osv):
 
             for line in res[0]:
                 product = prod_obj.browse(cr, uid, line['product_id'], context=context)
-                if product.type != 'service':
+                if product.type in ['product', 'consu']:
                     valdef = {
                         'picking_id': move.picking_id.id if move.picking_id else False,
                         'product_id': line['product_id'],
@@ -156,6 +156,8 @@ class StockMove(osv.osv):
             quantity_rest_uom = move.product_uom_qty - self.pool.get("product.uom")._compute_qty_obj(cr, uid, move.product_id.uom_id, product_qty, move.product_uom)
             if float_compare(quantity_rest_uom, 0, precision_rounding=move.product_uom.rounding) != 0:
                 new_mov = self.split(cr, uid, move, quantity_rest, context=context)
+                if move.production_id:
+                    self.write(cr, uid, [new_mov], {'production_id': move.production_id.id}, context=context)
                 res.append(new_mov)
             vals = {'restrict_lot_id': restrict_lot_id,
                     'restrict_partner_id': restrict_partner_id,
@@ -187,9 +189,9 @@ class StockMove(osv.osv):
             production_ids = production_obj.search(cr, uid, [('move_lines', 'in', [move.id])])
             for prod_id in production_ids:
                 production_obj.signal_workflow(cr, uid, [prod_id], 'button_produce')
-            for new_move in new_moves:
-                production_obj.write(cr, uid, production_ids, {'move_lines': [(4, new_move)]})
-                res.append(new_move)
+            if move.production_id.id:
+                self.write(cr, uid, new_moves, {'production_id': move.production_id.id}, context=context)
+            res.append(new_moves)
         return res
 
     def write(self, cr, uid, ids, vals, context=None):

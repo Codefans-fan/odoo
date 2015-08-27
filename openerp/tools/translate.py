@@ -270,7 +270,7 @@ def xml_translate(callback, value):
         trans.process(root)
         return trans.get_done()
     except etree.ParseError:
-        wrapped = "<div>%s</div>" % value
+        wrapped = "<div>%s</div>" % encode(value)
         root = etree.fromstring(wrapped, etree.HTMLParser())
         # html > body > div
         trans.process(root[0][0])
@@ -767,7 +767,18 @@ def trans_generate(lang, modules, cr):
     def push_translation(module, type, name, id, source, comments=None):
         # empty and one-letter terms are ignored, they probably are not meant to be
         # translated, and would be very hard to translate anyway.
-        if not source or len(source.strip()) <= 1:
+        sanitized_term = (source or '').strip()
+        try:
+            # verify the minimal size without eventual xml tags
+            # wrap to make sure html content like '<a>b</a><c>d</c>' is accepted by lxml
+            wrapped = "<div>%s</div>" % sanitized_term
+            node = etree.fromstring(wrapped)
+            sanitized_term = etree.tostring(node, encoding='UTF-8', method='text')
+        except etree.ParseError:
+            pass
+        # remove non-alphanumeric chars
+        sanitized_term = re.sub(r'\W+', '', sanitized_term)
+        if not sanitized_term or len(sanitized_term) <= 1:
             return
 
         tnx = (module, source, name, id, type, tuple(comments or ()))
@@ -910,6 +921,8 @@ def trans_generate(lang, modules, cr):
         display_path = "addons%s" % frelativepath
         module = get_module_from_path(fabsolutepath)
         if ('all' in modules or module in modules) and module in installed_modules:
+            if os.path.sep != '/':
+                display_path = display_path.replace(os.path.sep, '/')
             return module, fabsolutepath, frelativepath, display_path
         return None, None, None, None
 

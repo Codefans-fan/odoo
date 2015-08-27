@@ -4,7 +4,6 @@
 {
     'name' : 'Analytic Accounting',
     'version': '1.1',
-    'author' : 'OpenERP SA',
     'website' : 'https://www.odoo.com/page/accounting',
     'category': 'Hidden/Dependency',
     'depends' : ['base', 'decimal_precision', 'mail'],
@@ -37,6 +36,9 @@ that have no counterpart in the general financial accounts.
     'demo': [
         'data/analytic_demo.xml',
         'data/analytic_account_demo.xml',
+    ],
+    'test': [
+        'test/analytic_hierarchy.yml',
     ],
     'installable': True,
     'auto_install': False,

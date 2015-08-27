@@ -22,6 +22,7 @@
             <field name="model">delivery.carrier</field>
             <field name="arch" type="xml">
                 <form string="Carrier">
+                    <sheet>
                     <div class="oe_title">
                         <label for="name" class="oe_edit_only"/>
                         <h1>
@@ -86,6 +87,7 @@
                             </notebook>
                         </form>
                    </field>
+                   </sheet>
                 </form>
             </field>
         </record>
@@ -184,27 +186,23 @@
                 <form string="Grid Lines">
                     <group>
                         <field name="name"/>
-                        <field name="sequence"/>
                     </group>
                     <group>
-                        <group>
-                            <label for="type" string="Condition"/>
-                            <div>
-                                <field name="type" class="oe_inline"/>
-                                <field name="operator" class="oe_inline"/>
-                                <field name="max_value" class="oe_inline"/>
-                            </div>
-                            <label for="price_type"/>
-                            <div>
-                                <field name="price_type" class="oe_inline"/>
-                                <label string=" in Function of " class="oe_inline" attrs="{'invisible':[('price_type','=','fixed')]}"/>
-                                <field name="variable_factor" attrs="{'invisible':[('price_type','=','fixed')]}" class="oe_inline"/>
-                            </div>
-                        </group>
-                        <group>
-                            <field name="list_price"/>
-                            <field name="standard_price"/>
-                        </group>
+                        <label for="type" string="Condition"/>
+                        <div>
+                            <field name="type" class="oe_inline"/>
+                            <field name="operator" class="oe_inline"/>
+                            <field name="max_value" class="oe_inline"/>
+                        </div>
+                        <label for="list_base_price" string="Sale Price"/>
+                        <div>
+                            <field name="list_base_price" class="oe_inline"/>
+                            +
+                            <field name="list_price" class="oe_inline"/>
+                            *
+                            <field name="variable_factor" class="oe_inline"/>
+                        </div>
+                        <field name="standard_price"/>
                     </group>
                 </form>
             </field>
@@ -250,7 +248,6 @@
                             <field name="weight" class="oe_inline"/>
                             <field name="weight_uom_id" nolabel="1" class="oe_inline"/>
                         </div>
-                        <field name="weight_net" groups="base.group_no_one"/>
                         <field name="number_of_packages"/>
                     </group>
                 </group>
@@ -286,7 +283,6 @@
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='date_expected']" position="after">
                     <field name="weight"/>
-                    <field name="weight_net" groups="base.group_no_one"/>
                 </xpath>
             </field>
         </record>
@@ -303,7 +299,6 @@
                             <field name="weight" nolabel="1" class="oe_inline"/>
                             <field name="weight_uom_id" nolabel="1" class="oe_inline"/>
                         </div>
-                        <field name="weight_net" groups="base.group_no_one"/>
                     </group>
                 </xpath>
             </field>
@@ -319,12 +314,14 @@
                       <field name="id" invisible="1"/>
                       <label for="carrier_id"/>
                       <div name='carrier_selection'>
-                          <field name="carrier_id" context="{'order_id': id}" class="oe_inline"/>
-                          <button name="delivery_set" string="Set price" type="object" class="fa fa-arrow-right oe_link" attrs="{'invisible':['|',('carrier_id','=',False),('state','not in',('draft','sent'))]}"/>
+                          <div>
+                            <field name="carrier_id" context="{'order_id': id}" class="oe_inline" options="{'no_create': True}" attrs="{'readonly':[('state','not in',('draft','sent'))]}"/>
+                          </div>
+                          <div>
+                            <field name='delivery_price' widget='monetary' class="oe_inline" options="{'currency_field': 'currency_id'}" nolabel="1" attrs="{'invisible': [('carrier_id','=', False)]}"/>
+                            <button name="delivery_set" string="Set price" type="object" class="oe_inline fa fa-arrow-right oe_link" attrs="{'invisible':['|',('carrier_id','=',False),('state','not in',('draft','sent'))]}"/>
+                          </div>
                       </div>
-                  </xpath>
-                  <xpath expr="//div[@name='carrier_selection']" position="after">
-                      <field name='delivery_price' widget='monetary' options="{'currency_field': 'currency_id'}"/>
                   </xpath>
                 </data>
             </field>

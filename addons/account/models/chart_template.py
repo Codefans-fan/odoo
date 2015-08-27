@@ -117,19 +117,6 @@ class AccountChartTemplate(models.Model):
         return True
 
     @api.model
-    def check_created_journals(self, vals_journal, company):
-        """
-        This method used for checking journals already created or not. If not then create new journal.
-        """
-        JournalObj = self.env['account.journal']
-        rec_list = JournalObj.search([('name', '=', vals_journal['name']), ('company_id', '=', company.id)], limit=1)
-        if not rec_list:
-            journal = JournalObj.create(vals_journal)
-            if vals_journal['type'] == 'general' and not company.currency_exchange_journal_id.id:
-                company.write({'currency_exchange_journal_id': journal.id})
-        return True
-
-    @api.model
     def generate_journals(self, acc_template_ref, company, journals_dict=None):
         """
         This method is used for creating journals.
@@ -139,8 +126,11 @@ class AccountChartTemplate(models.Model):
         :param company_id: company_id selected from wizard.multi.charts.accounts.
         :returns: True
         """
+        JournalObj = self.env['account.journal']
         for vals_journal in self._prepare_all_journals(acc_template_ref, company, journals_dict=journals_dict):
-            self.check_created_journals(vals_journal, company)
+            journal = JournalObj.create(vals_journal)
+            if vals_journal['type'] == 'general' and vals_journal['code'] == _('EXCH'):
+                company.write({'currency_exchange_journal_id': journal.id})
         return True
 
     @api.multi
@@ -166,17 +156,17 @@ class AccountChartTemplate(models.Model):
                 default_account = acc_template_ref.get(self.property_account_income_categ_id.id)
             elif journal['type'] == 'purchase':
                 default_account = acc_template_ref.get(self.property_account_expense_categ_id.id)
-            elif journal['type'] == 'general' and journal['name'] == _('Exchange Rate Journal'):
+            elif journal['type'] == 'general' and journal['code'] == _('EXCH'):
                 if type=='credit':
                     default_account = acc_template_ref.get(self.income_currency_exchange_account_id.id)
                 else:
                     default_account = acc_template_ref.get(self.expense_currency_exchange_account_id.id)
             return default_account
 
-        journals = [{'name': _('Customer Invoices'), 'type': 'sale', 'code': _('INV'), 'favorite': True},
-                    {'name': _('Supplier Bills'), 'type': 'purchase', 'code': _('EXJ'), 'favorite': True},
-                    {'name': _('Exchange Rate Journal'), 'type': 'general', 'code': _('EXCH'), 'favorite': False},
-                    {'name': _('Miscellaneous Journal'), 'type': 'general', 'code': _('MISC'), 'favorite': False},]
+        journals = [{'name': _('Customer Invoices'), 'type': 'sale', 'code': _('INV'), 'favorite': True, 'sequence': 5},
+                    {'name': _('Vendor Bills'), 'type': 'purchase', 'code': _('EXJ'), 'favorite': True, 'sequence': 6},
+                    {'name': _('Miscellaneous Operations'), 'type': 'general', 'code': _('MISC'), 'favorite': False, 'sequence': 7},
+                    {'name': _('Exchange Difference'), 'type': 'general', 'code': _('EXCH'), 'favorite': False, 'sequence': 9},]
         if journals_dict != None:
             journals.extend(journals_dict)
 
@@ -712,7 +702,7 @@ class WizardMultiChartsAccounts(models.TransientModel):
         all the provided information to create the accounts, the banks, the journals, the taxes, the
         accounting properties... accordingly for the chosen company.
         '''
-        if self._uid != self.sudo()._uid and not self.env.user.has_group('base.group_erp_manager'):
+        if not self.env.user._is_admin():
             raise AccessError(_("Only administrators can change the settings"))
         ir_values_obj = self.env['ir.values']
         company = self.company_id
@@ -722,6 +712,9 @@ class WizardMultiChartsAccounts(models.TransientModel):
                                'bank_account_code_prefix': self.bank_account_code_prefix,
                                'cash_account_code_prefix': self.cash_account_code_prefix,
                                'chart_template_id': self.chart_template_id.id})
+
+        #set the coa currency to active
+        self.currency_id.write({'active': True})
 
         # When we install the CoA of first company, set the currency to price types and pricelists
         if company.id == 1:
@@ -748,7 +741,7 @@ class WizardMultiChartsAccounts(models.TransientModel):
 
         # Create the current year earning account (outside of the CoA)
         self.env['account.account'].create({
-            'code': '0',
+            'code': '9999',
             'name': _('Undistributed Profits/Losses'),
             'user_type_id': self.env.ref("account.data_unaffected_earnings").id,
             'company_id': company.id,})
@@ -758,42 +751,21 @@ class WizardMultiChartsAccounts(models.TransientModel):
     def _create_bank_journals_from_o2m(self, company, acc_template_ref):
         '''
         This function creates bank journals and its accounts for each line encoded in the field bank_account_ids of the
-        wizard.
+        wizard (which is currently only used to create a default bank and cash journal when the CoA is installed).
 
-        :param company_id: the id of the company for which the wizard is running.
+        :param company: the company for which the wizard is running.
         :param acc_template_ref: the dictionary containing the mapping between the ids of account templates and the ids
             of the accounts that have been generated from them.
-        :return: True
         '''
         self.ensure_one()
-        # Build a list with all the data to process
-        journal_data = []
-        if self.bank_account_ids:
-            for acc in self.bank_account_ids:
-                vals = {
-                    'acc_name': acc.acc_name,
-                    'account_type': acc.account_type,
-                    'currency_id': acc.currency_id.id,
-                }
-                journal_data.append(vals)
-
-        for line in journal_data:
-            if line['account_type'] == 'bank':
-                #create the bank account that will trigger the journal and account.account creation
-                res_partner_bank_vals = {
-                    'acc_number': line['acc_name'],
-                    'currency_id': line['currency_id'],
-                    'company_id': company.id,
-                    'owner_name': company.partner_id.name,
-                    'partner_id': company.partner_id.id,
-                    'footer': True
-                }
-                self.env['res.partner.bank'].create(res_partner_bank_vals)
-            else:
-                #create the cash journal that will trigger the account.account creation
-                vals_journal = self.env['account.journal']._prepare_bank_journal(company, line)
-                self.env['account.journal'].create(vals_journal)
-        return True
+        # Create the journals that will trigger the account.account creation
+        for acc in self.bank_account_ids:
+            self.env['account.journal'].create({
+                'name': acc.acc_name,
+                'type': acc.account_type,
+                'company_id': company.id,
+                'currency_id': acc.currency_id.id,
+            })
 
 
 class AccountBankAccountsWizard(models.TransientModel):

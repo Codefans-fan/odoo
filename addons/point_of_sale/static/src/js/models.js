@@ -5,7 +5,7 @@ var BarcodeParser = require('barcodes.BarcodeParser');
 var PosDB = require('point_of_sale.DB');
 var devices = require('point_of_sale.devices');
 var core = require('web.core');
-var Model = require('web.Model');
+var Model = require('web.DataModel');
 var session = require('web.session');
 var time = require('web.time');
 var utils = require('web.utils');
@@ -92,7 +92,6 @@ exports.PosModel = Backbone.Model.extend({
         });
     },
     after_load_server_data: function(){
-         this.barcode_reader.connect();
          this.load_orders();
          this.set_start_order();
          if(this.config.use_proxy){
@@ -169,6 +168,7 @@ exports.PosModel = Backbone.Model.extend({
         model:  'product.uom',
         fields: [],
         domain: null,
+        context: function(self){ return { active_test: false }; },
         loaded: function(self,units){
             self.units = units;
             var units_by_id = {};
@@ -287,7 +287,7 @@ exports.PosModel = Backbone.Model.extend({
         loaded: function(self, pricelists){ self.pricelist = pricelists[0]; },
     },{
         model: 'res.currency',
-        fields: ['symbol','position','rounding','accuracy'],
+        fields: ['name','symbol','position','rounding','accuracy'],
         ids:    function(self){ return [self.pricelist.currency_id[0]]; },
         loaded: function(self, currencies){
             self.currency = currencies[0];
@@ -1826,9 +1826,7 @@ exports.Order = Backbone.Model.extend({
         }), 0), this.pos.currency.rounding);
     },
     get_total_with_tax: function() {
-        return round_pr(this.orderlines.reduce((function(sum, orderLine) {
-            return sum + orderLine.get_price_with_tax();
-        }), 0), this.pos.currency.rounding);
+        return this.get_total_without_tax() + this.get_total_tax();
     },
     get_total_without_tax: function() {
         return round_pr(this.orderlines.reduce((function(sum, orderLine) {

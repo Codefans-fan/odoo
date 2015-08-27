@@ -23,6 +23,8 @@ var View = Widget.extend({
     // multi_record is used to distinguish views displaying a single record
     // (e.g. FormView) from those that display several records (e.g. ListView)
     multi_record: true,
+    // icon is the font-awesome icon to display in the view switcher
+    icon: 'fa-question',
     init: function(parent, dataset, view_id, options) {
         this._super(parent);
         this.ViewManager = parent;
@@ -166,17 +168,8 @@ var View = Widget.extend({
         this.embedded_view = embedded_view;
     },
     do_show: function () {
-        var self = this;
-        this.$el.show();
-        setTimeout(function () {
-            self.$el.parent().addClass('in');
-        }, 0);
-
+        this._super();
         core.bus.trigger('view_shown', this);
-    },
-    do_hide: function () {
-        this.$el.parent().removeClass('in');
-        this.$el.hide();
     },
     is_active: function () {
         return this.ViewManager.active_view.controller === this;

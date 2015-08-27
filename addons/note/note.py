@@ -28,6 +28,9 @@ class note_tag(osv.osv):
     _columns = {
         'name' : fields.char('Tag Name', required=True),
     }
+    _sql_constraints = [
+            ('name_uniq', 'unique (name)', "Tag name already exists !"),
+    ]
 
 class note_note(osv.osv):
     """ Note """
@@ -153,13 +156,6 @@ class note_note(osv.osv):
             return super(note_note, self).read_group(cr, uid, domain, fields, groupby,
                 offset=offset, limit=limit, context=context, orderby=orderby,lazy=lazy)
 
-
-#upgrade config setting page to configure pad
-class note_base_config_settings(osv.osv_memory):
-    _inherit = 'base.config.settings'
-    _columns = {
-        'module_note_pad': fields.boolean('Use collaborative pads (etherpad)'),
-    }
 
 class res_users(osv.Model):
     _name = 'res.users'

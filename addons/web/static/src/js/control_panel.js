@@ -131,7 +131,7 @@ var ControlPanel = Widget.extend({
      * @param {Boolean} [visible] true to show the control panel, false to hide it
      */
     _toggle_visibility: function(visible) {
-        this.$el.toggle(visible);
+        this.do_toggle(visible);
         if (!visible && !this.$content) {
             this.$content = this.$el.contents().detach();
         } else if (this.$content) {
@@ -189,7 +189,7 @@ var ControlPanel = Widget.extend({
 
         function make_breadcrumb (bc, is_last) {
             var $bc = $('<li>')
-                    .append(is_last ? bc.title : $('<a>').html(bc.title))
+                    .append(is_last ? _.escape(bc.title) : $('<a>').text(bc.title))
                     .toggleClass('active', is_last);
             if (!is_last) {
                 $bc.click(function () {

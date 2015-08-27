@@ -59,6 +59,9 @@ class BlogTag(osv.Model):
             'blog.post', string='Posts',
         ),
     }
+    _sql_constraints = [
+            ('name_uniq', 'unique (name)', "Tag name already exists !"),
+    ]
 
 
 class BlogPost(osv.Model):
@@ -219,8 +222,7 @@ class BlogPost(osv.Model):
                         'blog_slug': slug(post.blog_id),
                         'post_slug': slug(post),
                     },
-                    subtype='website_blog.mt_blog_blog_published',
-                    context=context)
+                    subtype='website_blog.mt_blog_blog_published')
             return True
         return False
 

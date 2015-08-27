@@ -2,7 +2,7 @@
   In order to test Carrier Cost,
 -
   Create sale order with Normal Delivery Charges
-- 
+-
   !record {model: sale.order, id: sale_normal_delivery_charges}:
     partner_id: base.res_partner_18
     partner_invoice_id: base.res_partner_18
@@ -48,16 +48,16 @@
     self.create_invoice(cr, uid, [wiz_id], {"active_ids": ship_ids, "active_id": ship_ids[0]})
 -
   Create one more sale order with Free Delivery Charges
-- 
+-
   !record {model: sale.order, id: sale_free_delivery_charges}:
-    partner_id: base.res_partner_7
+    partner_id: base.res_partner_4
     partner_invoice_id: base.res_partner_address_13
     partner_shipping_id: base.res_partner_address_13
     pricelist_id: product.list0
     order_policy: 'manual'
     order_line:
       - name: 'Service on demand'
-        product_id: product.product_product_consultant
+        product_id: product.product_product_1
         product_uom_qty: 24
         product_uos_qty: 24
         product_uom: product.product_uom_hour
@@ -84,7 +84,6 @@
     assert len(line_ids), "Delivery cost is not Added"
     line_data = self.browse(cr ,uid ,line_ids[0] ,context)
     assert float_compare(line_data.price_subtotal, 0, precision_digits=2) == 0, "Delivey cost is not correspond."
-
 -
   I set default delivery policy.
 -

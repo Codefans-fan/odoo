@@ -156,6 +156,11 @@ class account_analytic_account(osv.osv):
                 result[rec.id] = rec.currency_id.id
         return result
 
+    def _get_contract_type_selection(self, cr, uid, context=None):
+        return [('regular', 'Regular'), ('prepaid', 'Prepaid Support Hours')]
+
+    _contract_type_selection = lambda self, *args, **kwargs: self._get_contract_type_selection(*args, **kwargs)
+
     _columns = {
         'name': fields.char('Account/Contract Name', required=True, track_visibility='onchange'),
         'complete_name': fields.function(_get_full_name, type='char', string='Full Name'),
@@ -165,12 +170,12 @@ class account_analytic_account(osv.osv):
                                   "The type 'Analytic account' stands for usual accounts that you only want to use in accounting.\n"\
                                   "If you select Contract or Project, it offers you the possibility to manage the validity and the invoicing options for this account.\n"\
                                   "The special type 'Template of Contract' allows you to define a template with default data that you can reuse easily."),
-        'template_id': fields.many2one('account.analytic.account', 'Template of Contract'),
+        'template_id': fields.many2one('account.analytic.account', 'Template of Contract', ondelete='restrict'),
         'description': fields.text('Description'),
         'parent_id': fields.many2one('account.analytic.account', 'Parent Analytic Account', select=2),
-        'child_ids': fields.one2many('account.analytic.account', 'parent_id', 'Child Accounts'),
+        'child_ids': fields.one2many('account.analytic.account', 'parent_id', 'Child Accounts', copy=True),
         'child_complete_ids': fields.function(_child_compute, relation='account.analytic.account', string="Account Hierarchy", type='many2many'),
-        'line_ids': fields.one2many('account.analytic.line', 'account_id', 'Analytic Entries'),
+        'line_ids': fields.one2many('account.analytic.line', 'account_id', 'Analytic Entries', copy=False),
         'balance': fields.function(_debit_credit_bal_qtty, type='float', string='Balance', multi='debit_credit_bal_qtty', digits=0),
         'debit': fields.function(_debit_credit_bal_qtty, type='float', string='Debit', multi='debit_credit_bal_qtty', digits=0),
         'credit': fields.function(_debit_credit_bal_qtty, type='float', string='Credit', multi='debit_credit_bal_qtty', digits=0),
@@ -178,7 +183,7 @@ class account_analytic_account(osv.osv):
         'quantity_max': fields.float('Prepaid Service Units', help='Sets the higher limit of time to work on the contract, based on the timesheet. (for instance, number of hours in a limited support contract.)'),
         'partner_id': fields.many2one('res.partner', 'Customer'),
         'user_id': fields.many2one('res.users', 'Project Manager', track_visibility='onchange'),
-        'manager_id': fields.many2one('res.users', 'Account Manager', track_visibility='onchange'),
+        'manager_id': fields.many2one('res.users', 'Sales Rep', track_visibility='onchange'),
         'date_start': fields.date('Start Date'),
         'date': fields.date('Expiration Date', select=True, track_visibility='onchange'),
         'company_id': fields.many2one('res.company', 'Company', required=False), #not required because we want to allow different companies to use the same chart of account, except for leaf accounts.
@@ -188,6 +193,7 @@ class account_analytic_account(osv.osv):
             store = {
                 'res.company': (_get_analytic_account, ['currency_id'], 10),
             }, string='Currency', type='many2one', relation='res.currency'),
+        'contract_type': fields.selection(_contract_type_selection, 'Type of Contract', required=True),
     }
 
     def create(self, cr, uid, vals, context=None):
@@ -217,6 +223,7 @@ class account_analytic_account(osv.osv):
         res['value']['quantity_max'] = template.quantity_max
         res['value']['parent_id'] = template.parent_id and template.parent_id.id or False
         res['value']['description'] = template.description
+        res['value']['contract_type'] = template.contract_type
         return res
 
     def on_change_partner_id(self, cr, uid, ids,partner_id, name, context=None):
@@ -249,6 +256,7 @@ class account_analytic_account(osv.osv):
         'manager_id': lambda self, cr, uid, ctx: ctx.get('manager_id', False),
         'date_start': lambda *a: time.strftime('%Y-%m-%d'),
         'currency_id': _get_default_currency,
+        'contract_type': 'regular',
     }
 
     def check_recursion(self, cr, uid, ids, context=None, parent=None):
@@ -263,6 +271,8 @@ class account_analytic_account(osv.osv):
         raise UserError(_("Quick account creation disallowed."))
 
     def copy(self, cr, uid, id, default=None, context=None):
+        """ executed only on the toplevel copied object of the hierarchy.
+        Subobject are actually copied with copy_data"""
         if not default:
             default = {}
         analytic = self.browse(cr, uid, id, context=context)
@@ -293,17 +303,22 @@ class account_analytic_account(osv.osv):
             args=[]
         if context is None:
             context={}
+        account_ids = []
         if name:
             account_ids = self.search(cr, uid, [('code', '=', name)] + args, limit=limit, context=context)
             if not account_ids:
                 dom = []
-                for name2 in name.split('/'):
-                    name = name2.strip()
-                    account_ids = self.search(cr, uid, dom + [('name', operator, name)] + args, limit=limit, context=context)
-                    if not account_ids: break
-                    dom = [('parent_id','in',account_ids)]
-        else:
-            account_ids = self.search(cr, uid, args, limit=limit, context=context)
+                if '/' in name:
+                    for name2 in name.split('/'):
+                        # intermediate search without limit and args - could be expensive for large tables if `name` is not selective
+                        account_ids = self.search(cr, uid, dom + [('name', operator, name2.strip())], limit=None, context=context)
+                        if not account_ids: break
+                        dom = [('parent_id','in',account_ids)]
+                    if account_ids and args:
+                        # final filtering according to domain (args)4
+                        account_ids = self.search(cr, uid, [('id', 'in', account_ids)] + args, limit=limit, context=context)
+        if not account_ids:
+            return super(account_analytic_account, self).name_search(cr, uid, name, args, operator=operator, context=context, limit=limit)
         return self.name_get(cr, uid, account_ids, context=context)
 
     def _track_subtype(self, cr, uid, ids, init_values, context=None):
@@ -330,6 +345,7 @@ class account_analytic_line(osv.osv):
         'user_id': fields.many2one('res.users', 'User'),
         'company_id': fields.related('account_id', 'company_id', type='many2one', relation='res.company', string='Company', store=True, readonly=True),
         'journal_id': fields.many2one('account.analytic.journal', 'Analytic Journal', required=True, ondelete='restrict', select=True),
+        'partner_id': fields.related('account_id', 'partner_id', type='many2one', relation='res.partner', string='Partner', store=True),
 
     }
 
@@ -359,7 +375,6 @@ class account_analytic_line(osv.osv):
         (_check_no_view, 'You cannot create analytic line on view account.', ['account_id']),
     ]
 
-
 class account_analytic_journal(osv.osv):
     _name = 'account.analytic.journal'
     _description = 'Analytic Journal'
@@ -378,4 +393,13 @@ class account_analytic_journal(osv.osv):
         'active': True,
         'type': 'general',
         'company_id': lambda self, cr, uid, c=None: self.pool.get('res.users').browse(cr, uid, uid, c).company_id.id,
+    }
+
+class res_partner(osv.osv):
+    """ Inherits partner and adds contract information in the partner form """
+    _inherit = 'res.partner'
+
+    _columns = {
+        'contract_ids': fields.one2many('account.analytic.account', \
+                                                    'partner_id', 'Contracts', readonly=True),
     }

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <openerp>
     <data noupdate="1">
+
         <!-- This will set the unit of measure used in projects and tasks.-->
         <record id="base.main_company" model="res.company">
             <field name="project_time_mode_id" ref="product.product_uom_hour"></field>
@@ -26,40 +27,12 @@
         <function id="parent_project_default_set" model="ir.values" name="set" eval="('default',False,'parent_id', [('project.project', False)], all_projects_account, True, False, False, False, True)"/>
         
         <!-- alias domain: project.config.settings -->
-        <function id="default_alias_domain_project" model="ir.values" name="set_default" eval="('project.config.settings', 'generate_project_alias', True)"/>
+        <function id="default_alias_domain_project" model="ir.values" name="set_default" eval="('project.config.settings', 'generate_project_alias', 1)"/>
 
-        <!-- Task Stages -->
-
-        <record id="project_stage_0" model="project.task.type">
-            <field name="sequence">1</field>
-            <field name="name">To Do</field>
-            <field name="legend_blocked">Not validated</field>
-            <field name="legend_priority">Use the priority for tasks related to gold customers</field>
-            <field name="case_default" eval="True"/>
-        </record>
-        <record id="project_stage_1" model="project.task.type">
-            <field name="sequence">10</field>
-            <field name="name">In Progress</field>
-            <field name="legend_blocked">Need functional or technical help</field>
-            <field name="legend_done">Buzz or set as done</field>
-            <field name="case_default" eval="True"/>
-        </record>
-        <record id="project_stage_2" model="project.task.type">
-            <field name="sequence">20</field>
-            <field name="name">Done</field>
-            <field name="case_default" eval="True"/>
-            <field name="fold" eval="True"/>
-        </record>
-        <record id="project_stage_3" model="project.task.type">
-            <field name="sequence">30</field>
-            <field name="name">Cancelled</field>
-            <field name="case_default" eval="True"/>
-            <field name="legend_done">Ready to reopen</field>
-            <field name="fold" eval="True"/>
-        </record>
     </data>
-
     <data>
+
+
         <!-- Task-related subtypes for messaging / Chatter -->
         <record id="mt_task_new" model="mail.message.subtype">
             <field name="name">Task Opened</field>
@@ -91,7 +64,7 @@
             <field name="name">Task Opened</field>
             <field name="sequence">10</field>
             <field name="res_model">project.project</field>
-            <field name="default" eval="False"/>
+            <field name="default" eval="True"/>
             <field name="parent_id" eval="ref('mt_task_new')"/>
             <field name="relation_field">project_id</field>
         </record>
@@ -107,6 +80,7 @@
             <field name="name">Task Ready</field>
             <field name="sequence">12</field>
             <field name="res_model">project.project</field>
+            <field name="default" eval="False"/>
             <field name="parent_id" eval="ref('mt_task_ready')"/>
             <field name="relation_field">project_id</field>
         </record>
@@ -129,6 +103,122 @@
             <field name="body"><![CDATA[<p>Manage multi-level projects and tasks.  You can delegate tasks, track task work, and review your planning.</p>
 <p>You can manage todo lists on tasks by installing the <i>Todo Lists</i> application, supporting the Getting Things Done (GTD) methodology.</p>
 <p>You can also manage issues/bugs in projects by installing the "Issue Tracker" application.</p>]]></field>
+        </record>
+    </data>
+
+    <data noupdate="1">
+        <record id="project_project_data" model="project.project">
+            <field name="name">Discover Odoo</field>
+            <field name="parent_id" ref="all_projects_account"/>
+            <field name="privacy_visibility">followers</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="alias_model">project.task</field>
+        </record>
+
+        <record id="project_stage_data_1" model="project.task.type">
+            <field name="sequence">1</field>
+            <field name="name">Beginner</field>
+        </record>
+
+        <record id="project_stage_data_2" model="project.task.type">
+            <field name="sequence">2</field>
+            <field name="name">Basic</field>
+        </record>
+
+        <record id="project_stage_data_3" model="project.task.type">
+            <field name="sequence">3</field>
+            <field name="name">Advanced</field>
+        </record>
+
+        <record id="project_task_data_3" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">Click on me to see what happen</field>
+            <field name="stage_id" ref="project_stage_data_1"/>
+            <field name="color">3</field>
+        </record>
+
+        <record id="project_task_data_2" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">This is a card</field>
+            <field name="stage_id" ref="project_stage_data_1"/>
+            <field name="color">3</field>
+        </record>
+
+        <record id="project_task_data_1" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">Welcome to Odoo</field>
+            <field name="stage_id" ref="project_stage_data_1"/>
+            <field name="color">3</field>
+        </record>
+
+        <record id="project_task_data_6" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">Use colored tags to organize your tasks</field>
+            <field name="stage_id" ref="project_stage_data_2"/>
+            <field name="color">3</field>
+        </record>
+
+        <record id="project_task_data_5" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">Try to drag a task where your want</field>
+            <field name="stage_id" ref="project_stage_data_2"/>
+            <field name="color">3</field>
+        </record>
+
+        <record id="project_task_data_4" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">Invite someone by adding him in the followers list</field>
+            <field name="stage_id" ref="project_stage_data_2"/>
+            <field name="color">3</field>
+        </record>
+
+        <record id="project_task_data_8" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">Do you want to learn more ? Try our planner !</field>
+            <field name="stage_id" ref="project_stage_data_3"/>
+            <field name="color">3</field>
+            <field name="description">Click on the bar in the upper right corner</field>
+        </record>
+
+        <record id="project_task_data_7" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">Finished with your card ? Archive it !</field>
+            <field name="stage_id" ref="project_stage_data_3"/>
+            <field name="color">3</field>
+        </record>
+
+        <record id="project_task_data_9" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">You want to add a stage ? Add a new column !</field>
+            <field name="stage_id" ref="project_stage_data_3"/>
+            <field name="color">3</field>
+        </record>
+
+        <record id="project_task_data_10" model="project.task">
+            <field name="user_id" ref="base.user_root"/>
+            <field name="priority">0</field>
+            <field name="project_id" ref="project.project_project_data"/>
+            <field name="name">Use the chatter to collaborate with your members</field>
+            <field name="stage_id" ref="project_stage_data_3"/>
+            <field name="color">3</field>
         </record>
     </data>
 </openerp>

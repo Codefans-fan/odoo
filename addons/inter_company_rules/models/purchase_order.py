@@ -54,7 +54,7 @@ class purchase_order(models.Model):
             so_line_vals = self.sudo()._prepare_sale_order_line_data(line, company, sale_order.id)
             SaleOrderLine.sudo(intercompany_uid).create(so_line_vals)
 
-        # write supplier reference field on PO
+        # write vendor reference field on PO
         if not self.partner_ref:
             self.partner_ref = sale_order.name
 
@@ -74,7 +74,7 @@ class purchase_order(models.Model):
             :param direct_delivery_address : the address of the SO
             :rtype direct_delivery_address : res.partner record
         """
-        partner_addr = partner.sudo().address_get(['default', 'invoice', 'delivery', 'contact'])
+        partner_addr = partner.sudo().address_get(['invoice', 'delivery', 'contact'])
         return {
             'name': self.env['ir.sequence'].sudo().next_by_code('sale.order') or '/',
             'company_id': company.id,

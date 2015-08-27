@@ -21,8 +21,8 @@
                        </group>
                    </sheet>
                    <footer>
-                        <button name="print_report" string="Print" colspan="1" type="object" class="oe_highlight"/> or
-                        <button special="cancel" string="Cancel" class="oe_link"/>
+                        <button name="print_report" string="Print" colspan="1" type="object" class="btn-primary"/>
+                        <button special="cancel" string="Cancel" class="btn-default"/>
                    </footer>
                </form>
             </field>
@@ -39,7 +39,7 @@
 
            <menuitem action="action_hr_timesheet_analytic_profit"
             id="menu_hr_timesheet_analytic_profit"
-            parent="hr_timesheet.menu_timesheets_reports" sequence="3" icon="STOCK_PRINT"/>
+            parent="hr_timesheet.menu_timesheets_reports" sequence="3"/>
 
     </data>
 </openerp>

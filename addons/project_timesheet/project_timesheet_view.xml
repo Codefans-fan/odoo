@@ -8,9 +8,9 @@
             <field name="inherit_id" ref="project.view_project"/>
             <field name="arch" type="xml">
                 <field name="partner_id" position="after">
-                    <field name="planned_hours" widget="float_time"/>
+                    <field name="planned_hours" widget="float_time" groups="project.group_time_work_estimation_tasks"/>
                     <field name="total_hours" widget="float_time"/>
-                    <field name="effective_hours" widget="float_time"/>
+                    <field name="effective_hours" widget="float_time" groups="project.group_time_work_estimation_tasks"/>
                     <field name="progress_rate" widget="progressbar"/>
                 </field>
             </field>
@@ -114,7 +114,7 @@
               </p>
             </field>
         </record>
-        
+
         <!--
             Time Tracking menu in project Management
         -->
@@ -126,7 +126,7 @@
             <field name="view_mode">tree,form,graph</field>
             <field name="context">{}</field>
             <field name="domain">[('type','=','normal')]</field>
-            <field name="search_view_id" ref="account_analytic_analysis.view_account_analytic_account_overdue_search"/>
+            <field name="search_view_id" ref="sale_contract.view_account_analytic_account_overdue_search"/>
             <field name="help" type="html">
               <p class="oe_view_nocontent_create">
                 Click to add a customer contract.
@@ -136,7 +136,7 @@
               </p>
             </field>
         </record>
-
+        
         <record model="ir.ui.view" id="view_task_form2_inherited">
             <field name="name">project.task.form.inherited</field>
             <field name="model">project.task</field>
@@ -155,20 +155,20 @@
                                 groups="project.group_time_work_estimation_tasks"/>
                 </field>
                 <xpath expr="//notebook/page[@name='description_page']" position="after">
-                    <page string="Timesheets">
+                    <page string="Timesheets" groups="project.group_tasks_work_on_tasks,project.group_time_work_estimation_tasks">
                     <field name="timesheet_ids" groups="project.group_tasks_work_on_tasks" context="{'default_account_id' : analytic_account_id, 'default_is_timesheet' : 1}">
                         <tree editable="top" string="Timesheet Activities">
                             <field name="date"/>
                             <field name="user_id" required="1"/>
                             <field name="name"/>
-                            <field name="account_id" on_change="on_change_account_id(account_id, user_id, is_timesheet, context)"/>
+                            <field name="account_id" on_change="on_change_account_id(account_id, user_id, unit_amount, is_timesheet, context)"/>
                             <field name="unit_amount" string="Duration" on_change="on_change_unit_amount(product_id, unit_amount, False, product_uom_id,journal_id, context)" sum="Total time" widget="float_time"/>
                             <field name="to_invoice"/>
                             <field name="product_uom_id" on_change="on_change_unit_amount(product_id, unit_amount, False, product_uom_id,journal_id, context)" invisible="1"/>
                             <field name="journal_id" invisible="1"/>
                             <field name="amount" sum="Total cost" invisible="1"/>
                             <field name="general_account_id" invisible="1"/>
-                            <field name="product_id" on_change="on_change_unit_amount(product_id, unit_amount, False, product_uom_id,journal_id, context)" required="1" domain="[('type','=','service')]" invisible="1"/>
+                            <field name="product_id" on_change="on_change_unit_amount(product_id, unit_amount, False, product_uom_id,journal_id, context)" domain="[('type','=','service')]" invisible="1"/>
                             <field name="is_timesheet" invisible="1"/>
                         </tree>
                     </field>

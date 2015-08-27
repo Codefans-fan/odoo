@@ -98,12 +98,11 @@ class delivery_carrier(osv.osv):
 
             # not using advanced pricing per destination: override grid
             grid_id = grid_pool.search(cr, uid, [('carrier_id', '=', record.id)], context=context)
-            if grid_id and not (record.normal_price or record.free_if_more_than):
+            if grid_id and not (record.normal_price is not False or record.free_if_more_than):
                 grid_pool.unlink(cr, uid, grid_id, context=context)
                 grid_id = None
 
-            # Check that float, else 0.0 is False
-            if not (isinstance(record.normal_price,float) or record.free_if_more_than):
+            if not (record.normal_price is not False or record.free_if_more_than):
                 continue
 
             if not grid_id:
@@ -127,10 +126,10 @@ class delivery_carrier(osv.osv):
                     'operator': '>=',
                     'max_value': record.amount,
                     'standard_price': 0.0,
-                    'list_price': 0.0,
+                    'list_base_price': 0.0,
                 }
                 grid_line_pool.create(cr, uid, line_data, context=context)
-            if isinstance(record.normal_price,float):
+            if record.normal_price is not False:
                 line_data = {
                     'grid_id': grid_id and grid_id[0],
                     'name': _('Default price'),
@@ -138,7 +137,7 @@ class delivery_carrier(osv.osv):
                     'operator': '>=',
                     'max_value': 0.0,
                     'standard_price': record.normal_price,
-                    'list_price': record.normal_price,
+                    'list_base_price': record.normal_price,
                 }
                 grid_line_pool.create(cr, uid, line_data, context=context)
         return True
@@ -206,17 +205,13 @@ class delivery_grid(osv.osv):
         for line in grid.line_ids:
             test = eval(line.type+line.operator+str(line.max_value), price_dict)
             if test:
-                if line.price_type=='variable':
-                    price = line.list_price * price_dict[line.variable_factor]
-                else:
-                    price = line.list_price
+                price = line.list_base_price + line.list_price * price_dict[line.variable_factor]
                 ok = True
                 break
         if not ok:
             raise UserError(_("Selected product in the delivery method doesn't fulfill any of the delivery grid(s) criteria."))
 
         return price
-
 
 
 class delivery_grid_line(osv.osv):
@@ -231,16 +226,19 @@ class delivery_grid_line(osv.osv):
                                   'Variable', required=True),
         'operator': fields.selection([('==','='),('<=','<='),('<','<'),('>=','>='),('>','>')], 'Operator', required=True),
         'max_value': fields.float('Maximum Value', required=True),
-        'price_type': fields.selection([('fixed','Fixed'),('variable','Variable')], 'Price Type', required=True),
         'variable_factor': fields.selection([('weight','Weight'),('volume','Volume'),('wv','Weight * Volume'), ('price','Price'), ('quantity','Quantity')], 'Variable Factor', required=True),
+        'list_base_price': fields.float('Sale Base Price', digits_compute=dp.get_precision('Product Price'), required=True),
         'list_price': fields.float('Sale Price', digits_compute= dp.get_precision('Product Price'), required=True),
-        'standard_price': fields.float('Cost Price', digits_compute= dp.get_precision('Product Price'), required=True),
+        'standard_price': fields.float('Shipper Price', digits_compute= dp.get_precision('Product Price'), required=True),
     }
+
     _defaults = {
         'sequence': lambda *args: 10,
         'type': lambda *args: 'weight',
         'operator': lambda *args: '<=',
-        'price_type': lambda *args: 'fixed',
         'variable_factor': lambda *args: 'weight',
+        'list_price': 0.0,
+        'list_base_price': 0.0,
+        'standard_price': 0.0,
     }
     _order = 'sequence, list_price'

@@ -14,6 +14,7 @@ var utils = require('web.utils');
 var web_client = require('web.web_client');
 var Widget = require('web.Widget');
 var View = require('web.View');
+var formats = require('web.formats');
 
 var _t = core._t;
 var QWeb = core.qweb;
@@ -68,7 +69,7 @@ var TimelineRecordThread = form_common.AbstractField.extend ({
     },
 
     _check_visibility: function () {
-        this.$el.toggle(this.view.get("actual_mode") !== "create");
+        this.do_toggle(this.view.get("actual_mode") !== "create");
     },
 
     render_value: function () {
@@ -110,6 +111,7 @@ var TimelineView = View.extend ({
         this.model = dataset.model;
         this.domain = dataset.domain || [];
         this.context = dataset.context || {};
+        this.parent_view = parent.parent ? parent.parent : this;
 
         var opt = _.clone(this.context.options);
         this.options = options || {};
@@ -252,7 +254,7 @@ var Attachment = Widget.extend ({
         for (var l in message.attachment_ids) {
             var attach = message.attachment_ids[l];
             if (!attach.formating) {
-                attach.url = mail_utils.get_attachment_url(session, message.id, attach.id);
+                attach.url = '/web/content/' + attach.id + '?download=true';
                 attach.name = mail_utils.breakword(attach.name || attach.filename);
                 attach.formating = true;
             }
@@ -262,13 +264,6 @@ var Attachment = Widget.extend ({
 
     display_attachments: function (message) {
         return QWeb.render('ThreadMessageAttachments', {'record': message, 'widget': this});
-    },
-
-    /**
-     * Return the link to resized image
-     */
-    attachments_resize_image: function (id, resize) {
-        return mail_utils.get_image(session, 'ir.attachment', 'datas', id, resize);
     },
 });
 
@@ -297,8 +292,6 @@ var MailThread = Attachment.extend ({
         'click .o_timeline_msg .oe_star':'on_star',
         'click .o_timeline_parent_message .oe_reply':'on_message_reply',
         'click .o_timeline_parent_message .oe_read':'on_thread_read',
-        'click .o_timeline_vote':'on_vote',
-        'mouseenter .o_timeline_vote_count':'on_vote_count',
         'click .o_timeline_action_author':'on_record_author_clicked',
         'click .o_timeline_msg_expandable':'on_message_expandable',
         'click .o_timeline_parent_expandable':'on_thread_expandable',
@@ -322,6 +315,7 @@ var MailThread = Attachment.extend ({
         this.domain = dataset.domain || [];
         this.context = _.clone(dataset.context) || {};
         this.options = _.clone(options);
+        this.parent_view = parent.parent_view;
 
         this.is_ready = $.Deferred();
         this.root = parent instanceof TimelineView ? parent : false;
@@ -561,7 +555,13 @@ var MailThread = Attachment.extend ({
             }
         }
         var message_ids = _.map(messages, function (val) {return val.id;});
-        return this.ds_message.call('set_message_read', [message_ids, read_value, true, this.context]).then(function (nb_read) {
+        if (read_value) {
+            var method = 'set_message_done';
+        }
+        else {
+            var method = 'set_message_needaction';
+        }
+        return this.ds_message.call(method, [message_ids, undefined, this.context]).then(function (nb_read) {
             // apply modification
             _.each(messages, function (msg) {
                 msg.to_read = !read_value;
@@ -583,7 +583,7 @@ var MailThread = Attachment.extend ({
         var button = self.$('.oe_star:first');
         event.stopPropagation();
 
-        this.ds_message.call('set_message_starred', [[msg_id], !msg.is_favorite, true]).then(function (star) {
+        this.ds_message.call('set_message_starred', [[msg_id], !msg.is_favorite]).then(function (star) {
             msg.is_favorite = star;
             if (msg.is_favorite) {
                 button.addClass('oe_starred');
@@ -605,66 +605,6 @@ var MailThread = Attachment.extend ({
         event.stopPropagation();
         this.on_compose_message(event, 'reply');
         return false;
-    },
-
-    /**
-     * Add or remove a vote for a message and display the result
-     */
-    on_vote: function (event) {
-        var self = this;
-        var msg_id = $(event.target).data('id');
-        var msg = _.findWhere(this.messages, {id: msg_id});
-        event.stopPropagation();
-
-        this.ds_message.call('vote_toggle', [[msg_id]]).then(_.bind(function (vote) {
-            msg.has_voted = vote;
-            msg.vote_nb += msg.has_voted ? 1 : -1;
-        }, self)). then(function () {
-            $(event.target).html(QWeb.render("MessageVote", {record: msg}));
-        });
-
-        return false;
-    },
-
-    /**
-     * display users who voted for the message (tooltip)
-     */
-    on_vote_count : function (event) {
-        var voter = "";
-        var limit = 10;
-        var msg_id = $(event.target).data('id');
-        event.stopPropagation();
-
-        var $target = $(event.target).hasClass("fa-thumbs-o-up") ? $(event.target).parent() : $(event.target);
-        // Note: We can set data-content attr on target element once we fetch data so that
-        // next time when one moves mouse on element it saves call
-        // But if there is new like comes then we'll not have new likes in popover in that case
-        if ($target.data('liker-list'))
-        {
-            voter = $target.data('liker-list');
-            mail_utils.bindTooltipTo($target, voter, 'top');
-            $target.tooltip('hide').tooltip('show');
-            $(".tooltip").on("mouseleave", function () {
-                $(this).remove();
-            });
-        } else {
-            this.ds_message.call('get_likers_list', [msg_id, limit]).done(function (data) {
-                _.each(data, function(people, index) {
-                    voter = voter + people.substring(0,1).toUpperCase() + people.substring(1);
-                    if (index != data.length-1) {
-                        voter = voter + "<br/>";
-                    }
-                });
-                $target.data('liker-list', voter);
-                mail_utils.bindTooltipTo($target, voter, 'top');
-                $target.tooltip('hide').tooltip('show');
-                $(".tooltip").on("mouseleave", function () {
-                    $(this).remove();
-                });
-            });
-        }
-
-        return true;
     },
 
     /**
@@ -855,12 +795,16 @@ var MailThread = Attachment.extend ({
 
         this.followers_loaded = $.Deferred();
 
-        if ((! this.nb_followers || !this.follower_ids) && (this.model && this.res_id)) {
+        if ((! this.nb_followers || !this.follower_ids) && (this.model && this.res_id) && this.options.view_inbox) {
             this.nb_followers = 0;
             this.follower_ids = [];
 
-            this.ds_res = new data.DataSetSearch(this, this.model, this.context, [['id', '=', this.res_id]]);
-            this.ds_res.read_slice(['id', 'message_follower_ids']).then(function (data) {
+            var ctx = this.context;
+            ctx['active_test'] = true;
+            this.ds_res = new data.DataSet(this, this.model, ctx);
+            this.ds_res.read_ids([this.res_id], ['id', 'message_follower_ids'], {
+                'context': ctx,
+            }).then(function (data) {
                 self.follower_ids = data[0].message_follower_ids;
                 self.nb_followers = data[0].message_follower_ids.length;
                 self.followers_loaded.resolve();
@@ -957,11 +901,9 @@ var MailThread = Attachment.extend ({
             avt = ('/mail/static/src/img/email_icon.png');
         }
         else if (author) {
-            avt  = mail_utils.get_image(
-                session, 'res.partner', 'image_small', author[0]);
+            avt  = '/web/image/res.partner/' + author[0] + '/image_small';
         }else {
-            avt = mail_utils.get_image(
-                session, 'res.users', 'image_small', session.uid);
+            avt  = '/web/image/res.users/' + session.uid + '/image_small';
         }
         return avt;
     },
@@ -1365,7 +1307,9 @@ var ComposeMessage = Attachment.extend ({
                 target: 'new',
                 context: context,
             };
-            self.do_action(action);
+            self.do_action(action, {
+                'on_close': function(){ self.is_log && self.parent_thread.message_fetch() }
+            });
             self.on_cancel();
         });
     },
@@ -1414,7 +1358,8 @@ var ComposeMessage = Attachment.extend ({
                 'name': filename,
                 'filename': filename,
                 'url': '',
-                'upload': true
+                'upload': true,
+                'mimetype': ''
             });
 
             this.$(".o_timeline_msg_attachment_list").html(this.display_attachments(this));
@@ -1436,7 +1381,8 @@ var ComposeMessage = Attachment.extend ({
                         'id': result.id,
                         'name': result.name,
                         'filename': result.filename,
-                        'url': mail_utils.get_attachment_url(session, this.id, result.id)
+                        'mimetype': result.mimetype,
+                        'url': '/web/content/' + result.id + '?download=true'
                     };
                 }
             }
@@ -1536,5 +1482,14 @@ return {
     MailThread: MailThread,
     TimelineRecordThread: TimelineRecordThread,
 };
+
+});
+
+odoo.define('mail.compatibility', function (require) {
+var mail = require('mail.mail');
+
+window.openerp = window.openerp || {};
+openerp.mail = {};
+openerp.mail.Wall = mail.Wall;
 
 });

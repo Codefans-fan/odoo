@@ -3,6 +3,7 @@
 
 from datetime import datetime, timedelta
 import time
+from openerp import SUPERUSER_ID
 from openerp.addons.analytic.models import analytic
 from openerp.osv import fields, osv
 from openerp.tools.translate import _
@@ -196,6 +197,8 @@ class sale_order(osv.osv):
         for s in sale_orders:
             if s['state'] in ['draft', 'cancel']:
                 unlink_ids.append(s['id'])
+            elif s['state'] == 'sent':
+                raise UserError(_('In order to delete already sent quotation(s), you must cancel it before!'))
             else:
                 raise UserError(_('In order to delete a confirmed sales order, you must cancel it before!'))
 
@@ -218,26 +221,17 @@ class sale_order(osv.osv):
 
     def _track_subtype(self, cr, uid, ids, init_values, context=None):
         record = self.browse(cr, uid, ids[0], context=context)
-        if 'state' in init_values and record.state == 'manual':
+        if 'state' in init_values and record.state in ['manual', 'progress']:
             return 'sale.mt_order_confirmed'
         elif 'state' in init_values and record.state == 'sent':
             return 'sale.mt_order_sent'
         return super(sale_order, self)._track_subtype(cr, uid, ids, init_values, context=context)
 
     def onchange_pricelist_id(self, cr, uid, ids, pricelist_id, order_lines, context=None):
-        context = context or {}
         if not pricelist_id:
             return {}
-        value = {
-            'currency_id': self.pool.get('product.pricelist').browse(cr, uid, pricelist_id, context=context).currency_id.id
-        }
-        if not order_lines or order_lines == [(6, 0, [])]:
-            return {'value': value}
-        warning = {
-            'title': _('Pricelist Warning!'),
-            'message' : _('If you change the pricelist of this order (and eventually the currency), prices of existing order lines will not be updated.')
-        }
-        return {'warning': warning, 'value': value}
+        pricelist = self.pool['product.pricelist'].browse(cr, uid, pricelist_id, context=context)
+        return {'value': {'currency_id': pricelist.currency_id.id}}
 
     def get_salenote(self, cr, uid, ids, partner_id, context=None):
         context_lang = context.copy()
@@ -432,7 +426,7 @@ class sale_order(osv.osv):
         for line in order.order_line:
             if line.state == 'cancel':
                 continue
-            if line.product_id and (line.product_id.type != 'service'):
+            if line.product_id and (line.product_id.type in ['consu', 'product']):
                 return False
         return True
 
@@ -524,8 +518,12 @@ class sale_order(osv.osv):
         return True
 
     def action_button_confirm(self, cr, uid, ids, context=None):
+        if not context:
+            context = {}
         assert len(ids) == 1, 'This option should only be used for a single id at a time.'
         self.signal_workflow(cr, uid, ids, 'order_confirm')
+        if context.get('send_email'):
+            self.force_quotation_send(cr, uid, ids, context=context)
         return True
 
     def action_wait(self, cr, uid, ids, context=None):
@@ -574,6 +572,29 @@ class sale_order(osv.osv):
             'target': 'new',
             'context': ctx,
         }
+
+    def force_quotation_send(self, cr, uid, ids, context=None):
+        for order_id in ids:
+            email_act = self.action_quotation_send(cr, uid, [order_id], context=context)
+            if email_act and email_act.get('context'):
+                composer_obj = self.pool['mail.compose.message']
+                composer_values = {}
+                email_ctx = email_act['context']
+                template_values = [
+                    email_ctx.get('default_template_id'),
+                    email_ctx.get('default_composition_mode'),
+                    email_ctx.get('default_model'),
+                    email_ctx.get('default_res_id'),
+                ]
+                composer_values.update(composer_obj.onchange_template_id(cr, uid, None, *template_values, context=context).get('value', {}))
+                if not composer_values.get('email_from'):
+                    composer_values['email_from'] = self.browse(cr, uid, order_id, context=context).company_id.email
+                for key in ['attachment_ids', 'partner_ids']:
+                    if composer_values.get(key):
+                        composer_values[key] = [(6, 0, composer_values[key])]
+                composer_id = composer_obj.create(cr, uid, composer_values, context=email_ctx)
+                composer_obj.send_mail(cr, uid, [composer_id], context=email_ctx)
+        return True
 
     def action_done(self, cr, uid, ids, context=None):
         for order in self.browse(cr, uid, ids, context=context):
@@ -1028,7 +1049,14 @@ class sale_order_line(osv.osv):
         else:
             fpos = self.pool['account.fiscal.position'].browse(cr, uid, fiscal_position_id)
         if update_tax:  # The quantity only have changed
-            result['tax_id'] = self.pool['account.fiscal.position'].map_tax(cr, uid, fpos, product_obj.taxes_id)
+            # The superuser is used by website_sale in order to create a sale order. We need to make
+            # sure we only select the taxes related to the company of the partner. This should only
+            # apply if the partner is linked to a company.
+            if uid == SUPERUSER_ID and partner.company_id:
+                taxes = product_obj.taxes_id.filtered(lambda r: r.company_id == partner.company_id)
+            else:
+                taxes = product_obj.taxes_id
+            result['tax_id'] = self.pool['account.fiscal.position'].map_tax(cr, uid, fpos, taxes)
 
         if not flag:
             result['name'] = Product.name_get(cr, uid, [product_obj.id], context=ctx_product)[0][1]
@@ -1069,13 +1097,17 @@ class sale_order_line(osv.osv):
             uom2 = product_obj.uom_id
 
         if pricelist and partner_id:
+            ctx = dict(
+                context,
+                uom=uom or result.get('product_uom'),
+                date=date_order,
+            )
             price = self.pool['product.pricelist'].price_get(cr, uid, [pricelist],
-                    product, qty or 1.0, partner_id, {
-                        'uom': uom or result.get('product_uom'),
-                        'date': date_order,
-                        })[pricelist]
+                    product, qty or 1.0, partner_id, ctx)[pricelist]
         else:
             price = Product.price_get(cr, uid, [product], ptype='list_price', context=ctx_product)[product] or False
+        if context.get('uom_qty_change', False):
+            result, domain = {}, {}
         result.update({'price_unit': price})
         return {'value': result, 'domain': domain}
 
@@ -1117,6 +1149,8 @@ class account_invoice(osv.Model):
 
     _columns = {
         'team_id': fields.many2one('crm.team', 'Sales Team', oldname='section_id'),
+        'sale_ids': fields.many2many('sale.order', 'sale_order_invoice_rel', 'invoice_id', 'order_id', 'Sale Orders',
+                             readonly=True, copy=False, help="This is the list of sale orders related to this invoice. One invoice may have multiple sale orders related. "),
     }
 
     _defaults = {
@@ -1141,6 +1175,15 @@ class account_invoice(osv.Model):
             for id in ids:
                 workflow.trg_validate(uid, 'account.invoice', id, 'invoice_cancel', cr)
         return super(account_invoice, self).unlink(cr, uid, ids, context=context)
+
+
+class account_invoice_line(osv.Model):
+    _inherit = 'account.invoice.line'
+
+    _columns= {
+        'sale_line_ids': fields.many2many('sale.order.line', 'sale_order_line_invoice_rel', 'invoice_id', 'order_line_id',
+                                          'Sale Order Lines', readonly=True, copy=False)
+    }
 
 
 class procurement_order(osv.osv):
@@ -1170,7 +1213,7 @@ class product_product(osv.Model):
     def _sales_count(self, cr, uid, ids, field_name, arg, context=None):
         r = dict.fromkeys(ids, 0)
         domain = [
-            ('state', 'in', ['waiting_date', 'progress', 'manual', 'shipping_except', 'invoice_except', 'done']),
+            ('state', 'in', ['confirmed', 'done']),
             ('product_id', 'in', ids),
         ]
         for group in self.pool['sale.report'].read_group(cr, uid, domain, ['product_id', 'product_uom_qty'], ['product_id'], context=context):

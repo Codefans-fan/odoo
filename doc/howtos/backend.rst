@@ -1,3 +1,5 @@
+:banner: banners/build_a_module.jpg
+
 .. queue:: backend/series
 
 =================
@@ -621,7 +623,7 @@ instead of a single view its ``arch`` field is composed of any number of
     <!-- improved idea categories list -->
     <record id="idea_category_list2" model="ir.ui.view">
         <field name="name">id.category.list2</field>
-        <field name="model">idea.category/field>
+        <field name="model">idea.category</field>
         <field name="inherit_id" ref="id_category_list"/>
         <field name="arch" type="xml">
             <!-- find field description inside tree, and add the field
@@ -972,18 +974,30 @@ Tree views can take supplementary attributes to further customize their
 behavior:
 
 ``colors``
-    mappings of colors to conditions. If the condition evaluates to ``True``,
-    the corresponding color is applied to the row:
+    .. deprecated:: 9.0
+        replaced by ``decoration-{$name}``
+
+``decoration-{$name}``
+    allow changing the style of a row's text based on the corresponding
+    record's attributes.
+
+    Values are Python expressions. For each record, the expression is evaluated
+    with the record's attributes as context values and if ``true``, the
+    corresponding style is applied to the row. Other context values are
+    ``uid`` (the id of the current user) and ``current_date`` (the current date
+    as a string of the form ``yyyy-MM-dd``).
+
+    ``{$name}`` can be ``bf`` (``font-weight: bold``), ``it``
+    (``font-style: italic``), or any bootstrap contextual color (``danger``,
+    ``info``, ``muted``, ``primary``, ``success`` or ``warning``).
 
     .. code-block:: xml
 
-        <tree string="Idea Categories" colors="blue:state=='draft';red:state=='trashed'">
+        <tree string="Idea Categories" decoration-info="state=='draft'"
+            decoration-danger="state=='trashed'">
             <field name="name"/>
             <field name="state"/>
         </tree>
-
-    Clauses are separated by ``;``, the color and condition are separated by
-    ``:``.
 
 ``editable``
     Either ``"top"`` or ``"bottom"``. Makes the tree view editable in-place
@@ -1772,7 +1786,7 @@ with the standard Python libraries ``urllib2`` and ``json``::
     note_id = call(url, "object", "execute", DB, uid, PASS, 'note.note', 'create', args)
 
 Here is the same program, using the library
-`jsonrpclib <https://pypi.python.org/pypi/jsonrpclib>`::
+`jsonrpclib <https://pypi.python.org/pypi/jsonrpclib>`_::
 
     import jsonrpclib
 

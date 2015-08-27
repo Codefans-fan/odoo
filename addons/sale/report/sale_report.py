@@ -26,15 +26,11 @@ class sale_report(osv.osv):
         'categ_id': fields.many2one('product.category','Product Category', readonly=True),
         'nbr': fields.integer('# of Lines', readonly=True),  # TDE FIXME master: rename into nbr_lines
         'state': fields.selection([
-            ('draft', 'Draft Quotation'),
-            ('sent', 'Quotation Sent'),
-            ('waiting_date', 'Waiting Schedule'),
-            ('manual', 'Sale to Invoice'),
-            ('progress', 'Sale Order'),
-            ('invoice_except', 'Invoice Exception'),
-            ('done', 'Done'),
-            ('cancel', 'Cancelled')
-            ], 'Order Status', readonly=True),
+            ('cancel', 'Cancelled'),
+            ('draft', 'Draft'),
+            ('confirmed', 'Confirmed'),
+            ('exception', 'Exception'),
+            ('done', 'Done')], 'Order Status', readonly=True),
         'pricelist_id': fields.many2one('product.pricelist', 'Pricelist', readonly=True),
         'analytic_account_id': fields.many2one('account.analytic.account', 'Analytic Account', readonly=True),
         'invoiced': fields.boolean('Paid', readonly=True),
@@ -47,11 +43,20 @@ class sale_report(osv.osv):
 
     def _select(self):
         select_str = """
+            WITH currency_rate (currency_id, rate, date_start, date_end) AS (
+                    SELECT r.currency_id, r.rate, r.name AS date_start,
+                        (SELECT name FROM res_currency_rate r2
+                        WHERE r2.name > r.name AND
+                            r2.currency_id = r.currency_id
+                         ORDER BY r2.name ASC
+                         LIMIT 1) AS date_end
+                    FROM res_currency_rate r
+                )
              SELECT min(l.id) as id,
                     l.product_id as product_id,
                     t.uom_id as product_uom,
                     sum(l.product_uom_qty / u.factor * u2.factor) as product_uom_qty,
-                    sum(l.product_uom_qty * l.price_unit * (100.0-l.discount) / 100.0) as price_total,
+                    sum(l.product_uom_qty * cr.rate * l.price_unit * (100.0-l.discount) / 100.0) as price_total,
                     count(*) as nbr,
                     s.date_order as date,
                     s.date_confirm as date_confirm,
@@ -81,6 +86,10 @@ class sale_report(osv.osv):
                             left join product_template t on (p.product_tmpl_id=t.id)
                     left join product_uom u on (u.id=l.product_uom)
                     left join product_uom u2 on (u2.id=t.uom_id)
+                    left join product_pricelist pp on (s.pricelist_id = pp.id)
+                    join currency_rate cr on (cr.currency_id = pp.currency_id and
+                        cr.date_start <= coalesce(s.date_order, now()) and
+                        (cr.date_end is null or cr.date_end > coalesce(s.date_order, now())))
         """
         return from_str
 
