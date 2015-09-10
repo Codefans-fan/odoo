@@ -83,7 +83,7 @@ class module_category(osv.osv):
         'name': fields.char("Name", required=True, translate=True, select=True),
         'parent_id': fields.many2one('ir.module.category', 'Parent Application', select=True),
         'child_ids': fields.one2many('ir.module.category', 'parent_id', 'Child Applications'),
-        'module_nr': fields.function(_module_nbr, string='Number of Modules', type='integer'),
+        'module_nr': fields.function(_module_nbr, string='Number of Apps', type='integer'),
         'module_ids': fields.one2many('ir.module.module', 'category_id', 'Modules'),
         'description': fields.text("Description", translate=True),
         'sequence': fields.integer('Sequence'),
@@ -286,6 +286,7 @@ class module(osv.osv):
             ('AGPL-3', 'Affero GPL-3'),
             ('LGPL-3', 'LGPL Version 3'),
             ('Other OSI approved licence', 'Other OSI Approved Licence'),
+            ('OEEL-1', 'Odoo Enterprise Edition License v1.0'),
             ('Other proprietary', 'Other Proprietary')
         ], string='License', readonly=True),
         'menus_by_module': fields.function(_get_views, string='Menus', type='text', multi="meta", store=True),
@@ -300,7 +301,7 @@ class module(osv.osv):
         'state': 'uninstalled',
         'sequence': 100,
         'demo': False,
-        'license': 'AGPL-3',
+        'license': 'LGPL-3',
     }
     _order = 'sequence,name'
 
@@ -616,7 +617,7 @@ class module(osv.osv):
             'maintainer': terp.get('maintainer', False),
             'contributors': ', '.join(terp.get('contributors', [])) or False,
             'website': terp.get('website', ''),
-            'license': terp.get('license', 'AGPL-3'),
+            'license': terp.get('license', 'LGPL-3'),
             'sequence': terp.get('sequence', 100),
             'application': terp.get('application', False),
             'auto_install': terp.get('auto_install', False),

@@ -14,7 +14,6 @@ var utils = require('web.utils');
 var ViewManager = require('web.ViewManager');
 var formats = require('web.formats');
 
-
 var _t = core._t;
 var QWeb = core.qweb;
 var COMMANDS = common.commands;
@@ -224,12 +223,13 @@ var FieldMany2One = common.AbstractField.extend(common.CompletionFieldMixin, com
                 }
                 self.floating = false;
             }
-            if (used && self.get("value") === false && ! self.no_ed && ! (self.options && (self.options.no_create || self.options.no_quick_create))) {
+            var has_changed = (self.get("value") === false || self.display_value["" + self.get("value")] !== self.$input.val());
+            if (used && has_changed && ! self.no_ed && ! (self.options && (self.options.no_create || self.options.no_quick_create))) {
                 self.ed_def.reject();
                 self.uned_def.reject();
                 self.ed_def = $.Deferred();
                 self.ed_def.done(function() {
-                    self.can_create && self.show_error_displayer();
+                    self.can_create && self.$input && self.show_error_displayer();
                     ignore_blur = false;
                     self.trigger('focused');
                 });
@@ -442,19 +442,20 @@ var AbstractManyField = common.AbstractField.extend({
         this.set('value', []);
         this.starting_ids = [];
         this.mutex = new utils.Mutex();
-        this.has_not_committed_changes = false;
         this.view.on("load_record", this, this._on_load_record);
         this.dataset.on('dataset_changed', this, function() {
-            self.has_not_committed_changes = true;
+            var options = _.clone(_.last(arguments));
+            if (!_.isObject(options) || _.isArray(options)) {
+                options = {};
+            }
             // don't trigger changes if all commands are not resolved
             // the editable lists change the dataset without call AbstractManyField methods
-            if (self.mutex.def.state() === "resolved" && !self.internal_dataset_changed) {
-                self.trigger("change:commands");
+            if (!self.internal_dataset_changed && !options.internal_dataset_changed) {
+                self.trigger("change:commands", options);
             }
         });
         this.on("change:commands", this, function (options) {
-            self.has_not_committed_changes = false;
-            self._inhibit_on_change_flag = !!(options||{})._inhibit_on_change_flag;
+            self._inhibit_on_change_flag = !!options._inhibit_on_change_flag;
             self.set({'value': self.dataset.ids.slice()});
             self._inhibit_on_change_flag = false;
         });
@@ -463,9 +464,10 @@ var AbstractManyField = common.AbstractField.extend({
     _on_load_record: function (record) {
         this.starting_ids = [];
         // don't set starting_ids for the new record
-        if (record.id && (!isNaN(record.id) || record.id.indexOf(this.dataset.virtual_id_prefix) === -1)) {
+        if (record.id && record[this.name] && (!isNaN(record.id) || record.id.indexOf(this.dataset.virtual_id_prefix) === -1)) {
             this.starting_ids =  record[this.name].slice();
         }
+        this.trigger("load_record", record);
     },
 
     set_value: function(ids) {
@@ -574,6 +576,7 @@ var AbstractManyField = common.AbstractField.extend({
         var dataset = this.dataset;
         var res = true;
         options = options || {};
+        var internal_options = _.extend({}, options, {'internal_dataset_changed': true});
 
         _.each(command_list, function(command) {
             self.mutex.exec(function() {
@@ -582,12 +585,12 @@ var AbstractManyField = common.AbstractField.extend({
                     case COMMANDS.CREATE:
                         var data = _.clone(command[2]);
                         delete data.id;
-                        return dataset.create(data, options).then(function (id) {
+                        return dataset.create(data, internal_options).then(function (id) {
                             dataset.ids.push(id);
                             res = id;
                         });
                     case COMMANDS.UPDATE:
-                        return dataset.write(id, command[2], options).then(function () {
+                        return dataset.write(id, command[2], internal_options).then(function () {
                             if (dataset.ids.indexOf(id) === -1) {
                                 dataset.ids.push(id);
                                 res = id;
@@ -599,14 +602,14 @@ var AbstractManyField = common.AbstractField.extend({
                         return dataset.unlink([id]);
                     case COMMANDS.LINK_TO:
                         if (dataset.ids.indexOf(id) === -1) {
-                            return dataset.add_ids([id], options);
+                            return dataset.add_ids([id], internal_options);
                         }
                         return;
                     case COMMANDS.DELETE_ALL:
                         return dataset.reset_ids([], {keep_read_data: true});
                     case COMMANDS.REPLACE_WITH:
                         dataset.ids = [];
-                        return dataset.alter_ids(command[2], options);
+                        return dataset.alter_ids(command[2], internal_options);
                     default:
                         throw new Error("send_commands to '"+self.name+"' receive a non command value." +
                             "\n" + JSON.stringify(command_list));
@@ -631,29 +634,27 @@ var AbstractManyField = common.AbstractField.extend({
             replace_with_ids = [],
             add_ids = [],
             command_list = [],
-            id, index, alter_order;
+            id, index, record;
         
-        function format_many2one (values) {
-            values = _.clone(values);
-            for (var k in values) {
-                if ((values[k] instanceof Array) && values[k].length === 2 && typeof values[k][0] === "number" && typeof values[k][1] === "string") {
-                    values[k] = values[k][0];
-                }
-            }
-            return values;
-        }
-
         _.each(this.get('value'), function (id) {
             index = starting_ids.indexOf(id);
             if (index !== -1) {
                 starting_ids.splice(index, 1);
             }
-            if (alter_order = _.detect(self.dataset.to_create, function(x) {return x.id === id;})) {
-                command_list.push(COMMANDS.create(format_many2one(alter_order.values)));
-                return;
-            }
-            if (alter_order = _.detect(self.dataset.to_write, function(x) {return x.id === id;})) {
-                command_list.push(COMMANDS.update(alter_order.id, format_many2one(alter_order.values)));
+            var record = self.dataset.get_cache(id);
+            if (!_.isEmpty(record.changes)) {
+                var values = _.clone(record.changes);
+                // format many2one values
+                for (var k in values) {
+                    if ((values[k] instanceof Array) && values[k].length === 2 && typeof values[k][0] === "number" && typeof values[k][1] === "string") {
+                        values[k] = values[k][0];
+                    }
+                }
+                if (record.to_create) {
+                    command_list.push(COMMANDS.create(values));
+                } else {
+                    command_list.push(COMMANDS.update(record.id, values));
+                }
                 return;
             }
             if (!is_one2many || self.dataset.delete_all) {
@@ -683,7 +684,7 @@ var AbstractManyField = common.AbstractField.extend({
     },
 
     is_valid: function () {
-        return this.mutex.def.state() === "resolved" && !this.has_not_committed_changes && this._super();
+        return this.mutex.def.state() === "resolved" && this._super();
     },
 
     is_false: function() {
@@ -852,10 +853,8 @@ var FieldX2Many = AbstractManyField.extend({
         var view = this.get_active_view();
         if (view && view.type === "list" && view.controller.__focus) {
             var def = $.Deferred();
-            view.controller._on_blur_one2many(true).always(function () {
-                setTimeout(function () {def.resolve();},0);
-            }, function () {
-                setTimeout(function () {def.reject();},0);
+            view.controller._on_blur_one2many().always(function () {
+                def.resolve();
             });
             return def;
         }
@@ -887,17 +886,7 @@ var X2ManyDataSet = data.BufferedDataSet.extend({
             self.context.add(context);
         });
         return this.context;
-    },
-    create: function(data, options) {
-        var self = this;
-        var def = this._super(data, options);
-        def.then(function (id) {
-            setTimeout(function () {
-                self.trigger("dataset_changed", id, data, options);
-            },0);
-        });
-        return def;
-    },
+    }
 });
 
 var X2ManyViewManager = ViewManager.extend({
@@ -914,7 +903,6 @@ var X2ManyViewManager = ViewManager.extend({
         this.set_cp_bus(this.control_panel.get_bus());
         this._super(parent, dataset, views, flags);
         this.registry = core.view_registry.extend(x2many_views);
-        this.__ignore_blur = false;
     },
     start: function() {
         this.control_panel.prependTo(this.$el);
@@ -1014,12 +1002,6 @@ var X2ManyList = ListView.List.extend({
             'class': 'oe_form_field_x2many_list_row_add'
         }).append(
             $('<a>', {href: '#'}).text(_t("Add an item"))
-                .mousedown(function () {
-                    // FIXME: needs to be an official API somehow
-                    if (self.view.editor.is_editing()) {
-                        self.view.__ignore_blur = true;
-                    }
-                })
                 .click(function (e) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1028,7 +1010,7 @@ var X2ManyList = ListView.List.extend({
                         clearTimeout(self.view.editor.form.__blur_timeout);
                         self.view.editor.form.__blur_timeout = false;
                     }
-                    self.view.ensure_saved().done(function () {
+                    self.view.save_edition().done(function () {
                         self.view.do_add_record();
                     });
                 }));
@@ -1046,6 +1028,7 @@ var X2ManyList = ListView.List.extend({
 var One2ManyListView = X2ManyListView.extend({
     _template: 'One2Many.listview',
     init: function (parent, dataset, view_id, options) {
+        var self = this;
         this._super(parent, dataset, view_id, _.extend(options || {}, {
             GroupsType: One2ManyGroups,
             ListType: X2ManyList
@@ -1054,17 +1037,18 @@ var One2ManyListView = X2ManyListView.extend({
         this.on('save:before cancel:before', this, this.proxy('_before_unedit'));
 
         /* detect if the user try to exit the one2many widget */
-        var self = this;
-        this._mousedown_blur_line = function (event) {
-            if (self.__focus) {
-                self.__ignore_blur = true;
-                if ($(event.target).closest("button, *:not(.oe_form_field_x2many_list_row_add) > a").length ||
-                    (!$(event.target).closest(self.editor.$el[0]).length && !$(event.target).closest(self.$el[0]).length)) {
-                    self.__ignore_blur = false;
-                }
-            }
-        };
-        $(document).on('mousedown', this._mousedown_blur_line);
+        core.bus.on('click', this, this._on_click_outside);
+
+        this.dataset.on('dataset_changed', this, function () {
+            this._dataset_changed = true;
+        });
+        this.dataset.x2m.on('load_record', this, function () {
+            this._dataset_changed = false;
+        });
+
+        this.on('warning', this, function(e) { // In case of a one2many, we do not want any warning which comes from the editor
+            e.stop_propagation();
+        });
     },
     do_add_record: function () {
         if (this.editable()) {
@@ -1123,19 +1107,20 @@ var One2ManyListView = X2ManyListView.extend({
         }
         var parent_form = this.x2m.view;
         var self = this;
-        this.ensure_saved().then(function () {
-            if (parent_form)
+        this.save_edition().then(function () {
+            if (parent_form) {
                 return parent_form.save();
-            else
+            } else {
                 return $.when();
+            }
         }).done(function () {
             var ds = self.x2m.dataset;
-            var cached_records = _.any([ds.to_create, ds.to_delete, ds.to_write], function(value) {
-                return value.length;
+            var changed_records = _.find(ds.cache, function(record) {
+                return record.to_create || record.to_delete || !_.isEmpty(record.changes);
             });
-            if (!self.x2m.options.reload_on_button && !cached_records) {
+            if (!self.x2m.options.reload_on_button && !changed_records) {
                 self.handle_button(name, id, callback);
-            }else {
+            } else {
                 self.handle_button(name, id, function(){
                     self.x2m.view.reload();
                 });
@@ -1151,41 +1136,67 @@ var One2ManyListView = X2ManyListView.extend({
     reload_content: function () {
         var self = this;
         if (self.__focus) {
-            self._on_blur_one2many(true);
+            self._on_blur_one2many();
             return this._super().then(function () {
-                self.start_edition(self.records.get(self.editor.form.datarecord.id));
+                var record_being_edited = self.records.get(self.editor.form.datarecord.id);
+                if (record_being_edited) {
+                    self.start_edition(record_being_edited);
+                }
             });
         }
         return this._super();
     },
     _on_focus_one2many: function () {
         this.dataset.x2m.internal_dataset_changed = true;
+        this._dataset_changed = false;
         this.__focus = true;
     },
-    _on_blur_one2many: function (force) {
-        var self = this;
-        var def = $.when();
-
-        if (this.__ignore_blur && !force) {
-            this.__ignore_blur = false;
+    _on_click_outside: function(e) {
+        if(this.__ignore_blur || !this.editor.is_editing()) {
             return;
         }
 
+        var $target = $(e.target);
+
+        // If click on a button, a ui-autocomplete dropdown or modal-backdrop, it is not considered as a click outside
+        var click_outside = ($target.closest('.ui-autocomplete,.btn,.modal-backdrop').length === 0);
+
+        // Check if click inside the current list editable
+        var $o2m = $target.closest(".oe_list_editable");
+        if($o2m.length && $o2m[0] === this.el) {
+            click_outside = false;
+        }
+
+        // Check if click inside a modal which is on top of the current list editable
+        var $modal = $target.closest(".modal");
+        if($modal.length) {
+            var $currentModal = this.$el.closest(".modal");
+            if($currentModal.length === 0 || $currentModal[0] !== $modal[0]) {
+                click_outside = false;
+            }
+        }
+
+        if (click_outside) {
+            this._on_blur_one2many();
+        }
+    },
+    _on_blur_one2many: function() {
+        if(this.__ignore_blur) {
+            return $.when();
+        }
+
+        this.__ignore_blur = true;
         this.__focus = false;
         this.dataset.x2m.internal_dataset_changed = false;
 
-        if (this.editor.form.is_dirty()) {
-            def = this.ensure_saved();
-        } else if (this.editor.record) {
-            def = this.cancel_edition();
-        }
-
-        def.then(function () {
-            if (self.dataset.x2m.has_not_committed_changes) {
+        var self = this;
+        return this.save_edition().done(function () {
+            if (self._dataset_changed) {
                 self.dataset.trigger('dataset_changed');
             }
+        }).always(function() {
+            self.__ignore_blur = false;
         });
-        return def;
     },
     _after_edit: function () {
         this.editor.form.on('blurred', this, this._on_blur_one2many);
@@ -1215,10 +1226,6 @@ var One2ManyListView = X2ManyListView.extend({
 
         return this._super(record);
     },
-    destroy: function () {
-        this._super();
-        $(document).off('mousedown', this._mousedown_blur_line);
-    }
 });
 
 var One2ManyGroups = ListView.Groups.extend({
@@ -1350,7 +1357,10 @@ var FieldMany2ManyTags = AbstractManyField.extend(common.CompletionFieldMixin, c
     events: {
         'click .o_delete': function(e) {
             this.remove_id($(e.target).parent().data('id'));
-        }
+        },
+        'click .badge': 'open_color_picker',
+        'mousedown .o_colorpicker span': 'update_color',
+        'focusout .o_colorpicker': 'close_color_picker',
     },
 
     init: function(field_manager, node) {
@@ -1358,6 +1368,12 @@ var FieldMany2ManyTags = AbstractManyField.extend(common.CompletionFieldMixin, c
         common.CompletionFieldMixin.init.call(this);
         this.set({"value": []});
         this._display_orderer = new utils.DropMisordered();
+
+        var self = this;
+        // We need to know if the field 'color' exists on the model
+        this.dataset.call('fields_get', []).then(function(fields) {
+            self.fields = fields;
+        });
     },
     initialize_content: function() {
         if(!this.get("effective_readonly")) {
@@ -1391,7 +1407,8 @@ var FieldMany2ManyTags = AbstractManyField.extend(common.CompletionFieldMixin, c
         }
     },
     get_render_data: function(ids){
-        return this.dataset.name_get(ids);
+        var fields = this.fields.color ? ['name', 'color'] : ['name'];
+        return this.dataset.read_ids(ids, fields);
     },
     render_tag: function(data) {
         this.$('.badge').remove();
@@ -1405,7 +1422,7 @@ var FieldMany2ManyTags = AbstractManyField.extend(common.CompletionFieldMixin, c
                 return;
             var indexed = {};
             _.each(data, function(el) {
-                indexed[el[0]] = el;
+                indexed[el['id']] = el;
             });
             data = _.map(values, function(el) { return indexed[el]; });
             self.render_tag(data);
@@ -1434,7 +1451,39 @@ var FieldMany2ManyTags = AbstractManyField.extend(common.CompletionFieldMixin, c
         if (!this.get("effective_readonly") && $input) {
             $input.css('height', height);
         }
-    }
+    },
+    open_color_picker: function(ev){
+
+        if (this.fields.color) {
+            this.$color_picker = $(QWeb.render('FieldMany2ManyTag.colorpicker', {
+                'widget': this,
+                'tag_id': $(ev.currentTarget).data('id'),
+            }));
+
+            $(ev.currentTarget).append(this.$color_picker);
+            this.$color_picker.dropdown('toggle');
+            this.$color_picker.attr("tabindex", 1).focus();
+        }
+    },
+    close_color_picker: function(){
+        this.$color_picker.remove();
+    },
+    update_color: function(ev) {
+        ev.preventDefault();
+
+        var color = $(ev.currentTarget).data('color');
+        var id = $(ev.currentTarget).data('id');
+
+        var self = this;
+        this.dataset._model.call('write', [id, {'color': color}]).done(function(){
+            var tag = self.$el.find("span.badge[data-id='" + id + "']");
+            var old_color = tag.data('color');
+            tag.removeClass('o_tag_color_' + old_color);
+            tag.data('color', color);
+            tag.addClass('o_tag_color_' + color);
+        });
+    },
+
 });
 
 /**
@@ -1460,7 +1509,7 @@ var FieldMany2ManyBinaryMultiFiles = AbstractManyField.extend(common.Reinitializ
         $(window).on(this.fileupload_id, _.bind(this.on_file_loaded, this));
     },
     initialize_content: function() {
-        this.$el.on('change', 'input.oe_form_binary_file', this.on_file_change );
+        this.$el.on('change', 'input.o_form_input_file', this.on_file_change );
     },
     get_file_url: function (attachment) {
         return '/web/content/' + attachment.id + '?download=true';
@@ -1492,7 +1541,7 @@ var FieldMany2ManyBinaryMultiFiles = AbstractManyField.extend(common.Reinitializ
             self.$('.oe_placeholder_files, .oe_attachments').replaceWith( render );
 
             // reinit input type file
-            var $input = self.$('input.oe_form_binary_file');
+            var $input = self.$('input.o_form_input_file');
             $input.after($input.clone(true)).remove();
             self.$(".oe_fileupload").show();
 
@@ -1530,7 +1579,7 @@ var FieldMany2ManyBinaryMultiFiles = AbstractManyField.extend(common.Reinitializ
             // TODO : unactivate send on wizard and form
 
             // submit file
-            this.$('form.oe_form_binary_form').submit();
+            this.$('form.o_form_binary_form').submit();
             this.$(".oe_fileupload").hide();
             // add file on data result
             this.data[0] = {
@@ -1626,7 +1675,6 @@ var FieldMany2ManyCheckBoxes = AbstractManyField.extend(common.ReinitializeField
     }
 });
 
-
 core.form_widget_registry
     .add('many2one', FieldMany2One)
     .add('many2many', FieldMany2Many)
@@ -1643,3 +1691,4 @@ return {
 };
 
 });
+

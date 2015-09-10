@@ -12,7 +12,7 @@ class account_invoice_line(osv.osv):
     _inherit = "account.invoice.line"
 
     _columns = {
-        'move_id': fields.many2one('stock.move', string="Move line", help="If the invoice was generated from a stock.picking, reference to the related move line."),
+        'move_id': fields.many2one('stock.move', string="Move line", help="If the invoice was generated from a stock transfer, specify the reference to the related stock move."),
     }
 
     def move_line_get(self, cr, uid, invoice_id, context=None):
@@ -79,7 +79,7 @@ class account_invoice_line(osv.osv):
                         'price':self._get_price(cr, uid, inv, company_currency, i_line, price_unit),
                         'account_id':dacc,
                         'product_id':i_line.product_id.id,
-                        'uos_id':i_line.uos_id.id,
+                        'uom_id':i_line.uom_id.id,
                         'account_analytic_id': False,
                         'taxes':i_line.invoice_line_tax_ids,
                     },
@@ -92,7 +92,7 @@ class account_invoice_line(osv.osv):
                         'price': -1 * self._get_price(cr, uid, inv, company_currency, i_line, price_unit),
                         'account_id':cacc,
                         'product_id':i_line.product_id.id,
-                        'uos_id':i_line.uos_id.id,
+                        'uom_id':i_line.uom_id.id,
                         'account_analytic_id': False,
                         'taxes':i_line.invoice_line_tax_ids,
                     },
@@ -236,8 +236,8 @@ class stock_quant(osv.osv):
             self._account_entry_move(cr, uid, [quant], move, context)
         return quant
 
-    def move_quants_write(self, cr, uid, quants, move, location_dest_id, dest_package_id, lot_id=False, context=None):
-        res = super(stock_quant, self).move_quants_write(cr, uid, quants, move, location_dest_id,  dest_package_id, lot_id=lot_id, context=context)
+    def move_quants_write(self, cr, uid, quants, move, location_dest_id, dest_package_id, lot_id=False, entire_pack=False, context=None):
+        res = super(stock_quant, self).move_quants_write(cr, uid, quants, move, location_dest_id,  dest_package_id, lot_id=lot_id, entire_pack=entire_pack, context=context)
         if move.product_id.valuation == 'real_time':
             self._account_entry_move(cr, uid, quants, move, context=context)
         return res
