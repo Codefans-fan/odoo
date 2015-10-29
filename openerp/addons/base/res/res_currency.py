@@ -9,7 +9,7 @@ from openerp import api, fields as fields2
 from openerp import tools
 from openerp.osv import fields, osv
 from openerp.tools import float_round, float_is_zero, float_compare
-import simplejson as json
+import json
 
 CURRENCY_DISPLAY_PATTERN = re.compile(r'(\w+)\s*(?:\((.*)\))?')
 
@@ -20,7 +20,7 @@ class res_currency(osv.osv):
             context = {}
         res = {}
 
-        date = context.get('date') or time.strftime('%Y-%m-%d')
+        date = context.get('date') or fields2.Datetime.now()
         company_id = context.get('company_id') or self.pool['res.users']._get_company(cr, uid, context=context)
         for id in ids:
             cr.execute("""SELECT rate FROM res_currency_rate 
