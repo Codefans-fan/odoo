@@ -20,7 +20,6 @@ class Users(models.Model):
     alias_id = fields.Many2one('mail.alias', 'Alias', ondelete="restrict", required=True,
             help="Email address internally associated with this user. Incoming "\
                  "emails will appear in the user's notifications.", copy=False, auto_join=True)
-    chatter_needaction_auto = fields.Boolean('Automatically set needaction as Read')
 
     def __init__(self, pool, cr):
         """ Override of __init__ to add access rights on notification_email_send
@@ -47,10 +46,10 @@ class Users(models.Model):
             msg = _("You cannot create a new user from here.\n To create new user please go to configuration panel.")
             raise openerp.exceptions.RedirectWarning(msg, action.id, _('Go to the configuration panel'))
 
-        user = super(Users, self.with_context({
-            'alias_model_name': self._name,
-            'alias_parent_model_name': self._name
-        })).create(values)
+        user = super(Users, self.with_context(
+            alias_model_name=self._name,
+            alias_parent_model_name=self._name
+        )).create(values)
         user.alias_id.sudo().write({"alias_force_thread_id": user.id, "alias_parent_thread_id": user.id})
 
         # create a welcome message

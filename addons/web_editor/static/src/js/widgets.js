@@ -171,11 +171,8 @@ var MediaDialog = Dialog.extend({
         var self = this;
         if (self.media) {
             this.media.innerHTML = "";
-            if (this.active !== this.imageDialog) {
+            if (this.active !== this.imageDialog && this.active !== this.documentDialog) {
                 this.imageDialog.clear();
-            }
-            if (this.active !== this.documentDialog) {
-                this.documentDialog.clear();
             }
             // if not mode only_images
             if (this.iconDialog && this.active !== this.iconDialog) {
@@ -268,6 +265,7 @@ var ImageDialog = Widget.extend({
         this.accept = this.options.accept || this.options.document ? "*/*" : "image/*";
         this.domain = this.options.domain || ['|', ['mimetype', '=', false], ['mimetype', this.options.document ? 'not in' : 'in', ['image/gif', 'image/jpe', 'image/jpeg', 'image/jpg', 'image/gif', 'image/png']]];
         this.parent = parent;
+        this.old_media = media;
         this.media = media;
         this.images = [];
         this.page = 0;
@@ -354,7 +352,7 @@ var ImageDialog = Widget.extend({
         return this.media;
     },
     clear: function () {
-        this.media.className = this.media.className.replace(/(^|\s+)(img(\s|$)|img-(?!circle|rounded|thumbnail)[^\s]*)/g, ' ');
+        this.media.className = this.media.className.replace(/(^|\s+)((img(\s|$)|img-(?!circle|rounded|thumbnail))[^\s]*)/g, ' ');
     },
     cancel: function () {
         this.trigger('cancel');
@@ -597,7 +595,16 @@ rte.Class.include({
     init: function (EditorBar) {
         this._super.apply(this, arguments);
         computeFonts();
-    }
+    },
+    onEnableEditableArea: function ($editable) {
+        if ($editable.data('oe-type') === "monetary") {
+            $editable.attr('contenteditable', false);
+            $editable.find('.oe_currency_value').attr('contenteditable', true);
+        }
+        if ($editable.is('[data-oe-model]') && !$editable.is('[data-oe-model="ir.ui.view"]') && !$editable.is('[data-oe-type="html"]')) {
+            $editable.data('layoutInfo').popover().find('.btn-group:not(.note-history)').remove();
+        }
+    },
 });
 
 /* list of font icons to load by editor. The icons are displayed in the media editor and
@@ -1069,7 +1076,7 @@ var LinkDialog = Dialog.extend({
         return this.get_data()
             .then(function (url, new_window, label, classes) {
                 self.data.url = url;
-                self.data.newWindow = new_window;
+                self.data.isNewWindow = new_window;
                 self.data.text = label;
                 self.data.className = classes.replace(/\s+/gi, ' ').replace(/^\s+|\s+$/gi, '');
 

@@ -52,6 +52,7 @@ Dashboard for CRM will include:
         'security/crm_security.xml',
         'security/ir.model.access.csv',
 
+        'wizard/crm_activity_log_views.xml',
         'wizard/crm_lead_lost_view.xml',
         'wizard/crm_lead_to_opportunity_view.xml',
         'wizard/crm_merge_opportunities_view.xml',
@@ -76,9 +77,9 @@ Dashboard for CRM will include:
         'views/crm.xml',
         'web_planner_data.xml',
         'sales_team_dashboard.xml',
+        'crm_mail_template_data.xml'
     ],
     'demo': [
-        'data/crm_stage_demo.xml',
         'crm_demo.xml',
         'crm_lead_demo.xml',
         'data/crm_action_demo.xml',

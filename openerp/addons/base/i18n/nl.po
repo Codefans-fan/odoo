@@ -4,14 +4,16 @@
 # 
 # Translators:
 # Eric Geens <ericgeens@yahoo.com>, 2015
+# Eric Geens <eric.geens@vitabiz.be>, 2015
 # Eric Geens <ericgeens@yahoo.com>, 2015
+# Erwin van der Ploeg <erwin@bas-solutions.nl>, 2015
 # Yenthe Van Ginneken <yenthespam@gmail.com>, 2015
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo 9.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2015-10-09 09:18+0000\n"
-"PO-Revision-Date: 2015-10-20 09:42+0000\n"
+"PO-Revision-Date: 2015-12-02 13:28+0000\n"
 "Last-Translator: Yenthe Van Ginneken <yenthespam@gmail.com>\n"
 "Language-Team: Dutch (http://www.transifex.com/odoo/odoo-9/language/nl/)\n"
 "MIME-Version: 1.0\n"
@@ -287,7 +289,7 @@ msgid ""
 "\n"
 "        This module will be auto installed if account module and enterprise edition are present\n"
 "    "
-msgstr ""
+msgstr "\n        Aanpassen van de basismodule Boekhouding voor de Enterprise Edition.\n\n        Deze module wordt automatisch geïnstalleerd wanneer de boekhoudmodule en de Enterprise Edition aanwezig zijn\n    "
 
 #. module: base
 #: model:ir.module.module,summary:base.module_account_tax_python
@@ -801,7 +803,7 @@ msgid ""
 "* Cashback\n"
 "* Supported cards: Visa, MasterCard, American Express, Discover\n"
 "    "
-msgstr "\nMaak kassabetalingen met kredietkaarten mogelijk\n=============================================\n\nDe module geeft klanten de mogelijkheid om hun bestelling met een krediet-\nkaart te betalen. De transactie worden verwerkt via Mercury (ontworpen door \nWells Fargo Bank). Een Mercury merchant account is hiervoor vereist. \nHet volgende is mogelijk:\n\n* Snelle betaling met kredietkaart (blijf op het betaalscherm)\n* Combineren van contante betalingen en betalingen via kredietkaart\n* Terugbetalingen\n* Ondersteunde kaarten: Visa, MasterCard, American Express, Discover\n    "
+msgstr "\nMaak kassabetalingen met kredietkaarten mogelijk\n=============================================\n\nDe module geeft klanten de mogelijkheid om hun bestelling met een creditcart te betalen. De transactie worden verwerkt via Mercury (ontworpen door \nWells Fargo Bank). Een Mercury merchant account is hiervoor vereist. \nHet volgende is mogelijk:\n\n* Snelle betaling met creditcart (blijf op het betaalscherm)\n* Combineren van contante betalingen en betalingen via creditcart\n* Terugbetalingen\n* Ondersteunde kaarten: Visa, MasterCard, American Express, Discover\n    "
 
 #. module: base
 #: model:ir.module.module,description:base.module_auth_oauth
@@ -931,7 +933,7 @@ msgid ""
 "    - activates a number of regional currencies.\n"
 "    - sets up Australian taxes.\n"
 "    "
-msgstr ""
+msgstr "\nAustralische Boekhoudmodule\n============================\n\nAustralisch basisgrootboekschema en lokalisaties.\n\nMaar ook:\n    - activeert een aantal regionale valuta.\n    - installeert Australische belastingen.\n    "
 
 #. module: base
 #: model:ir.module.module,description:base.module_base_gengo
@@ -1451,7 +1453,7 @@ msgid ""
 "marketing campaigns performance to improve conversion rates. Design\n"
 "professional emails and reuse templates in a few clicks.\n"
 "    "
-msgstr "\nVerzend gemakkelijk massa mailings naar leads, opportuniteiten of klanten. Volg\nde performantie van je marketing campagnes om de conversie te verbeteren. Ontwerp\nprofessionele e-mails en hergebruik sjablonen in een paar klikken.\n    "
+msgstr "\nVerzend gemakkelijk massa mailings naar leads, prospects of klanten. Volg\nde performantie van je marketing campagnes om de conversie te verbeteren. Ontwerp\nprofessionele e-mails en hergebruik sjablonen in een paar klikken.\n    "
 
 #. module: base
 #: model:ir.module.module,description:base.module_utm
@@ -2608,7 +2610,7 @@ msgid ""
 "* Automatic creation of sales order and invoices\n"
 "\n"
 "  "
-msgstr "\nPubliceer uw producten op eBay\n==============================================================\n\nDe eBay integrator geeft u de opportuniteit om Odoo zijn producten te beheren op eBay.\n\nHoofd mogelijkheden\n------------\n* Publiceer producten op eBay\n* Herzie, her-lijst of beëindig items op eBay\n* Integratie met de stock mutaties\n* Automatische aanmaak van verkooporders en facturen"
+msgstr "\nPubliceer uw producten op eBay\n==============================================================\n\nDe eBay integrator geeft u de prospect om Odoo zijn producten te beheren op eBay.\n\nHoofd mogelijkheden\n------------\n* Publiceer producten op eBay\n* Herzie, her-lijst of beëindig items op eBay\n* Integratie met de stock mutaties\n* Automatische aanmaak van verkooporders en facturen"
 
 #. module: base
 #: model:ir.module.module,description:base.module_point_of_sale
@@ -3455,7 +3457,7 @@ msgid ""
 "We suggest you to install this module, if you installed both the sale and the crm\n"
 "modules.\n"
 "    "
-msgstr "\nDeze module voegt een snelkoppeling toe naar één of meerdere opportuniteit cases in de CRM.\n===========================================================================\n\nDeze snelkoppeling staat u toe om verkooporders te genereren op basis van de geselecteerde case.\nAls verschillende cases open zijn (een lijst, genereert het een verkooporder per case.\nDe case wordt vervolgens gesloten en gelinkt aan het gegenereerde verkooporder.\n\nWe raden u aan om deze module te installeren als u de modules sale en crm heeft geïnstalleerd."
+msgstr "\nDeze module voegt een snelkoppeling toe naar één of meerdere prospect cases in de CRM.\n===========================================================================\n\nDeze snelkoppeling staat u toe om verkooporders te genereren op basis van de geselecteerde case.\nAls verschillende cases open zijn (een lijst, genereert het een verkooporder per case.\nDe case wordt vervolgens gesloten en gelinkt aan het gegenereerde verkooporder.\n\nWe raden u aan om deze module te installeren als u de modules sale en crm heeft geïnstalleerd."
 
 #. module: base
 #: model:ir.module.module,description:base.module_portal_stock
@@ -4775,7 +4777,7 @@ msgstr "Toegang"
 #. module: base
 #: model:ir.ui.view,arch_db:base.ir_access_view_search
 msgid "Access Control"
-msgstr "Toegangscontrole"
+msgstr "Toegangsrechten"
 
 #. module: base
 #: model:ir.model.fields,field_description:base.field_res_groups_model_access
@@ -4790,7 +4792,7 @@ msgstr "Toegangsrechten"
 #: model:ir.actions.act_window,name:base.ir_access_act
 #: model:ir.ui.menu,name:base.menu_ir_access_act
 msgid "Access Controls List"
-msgstr "Overzicht toegangscontrole"
+msgstr "Overzicht toegangsrechten"
 
 #. module: base
 #: model:ir.model,name:base.model_res_groups
@@ -7370,7 +7372,7 @@ msgstr "Kredietlimiet"
 #. module: base
 #: model:ir.module.module,summary:base.module_pos_mercury
 msgid "Credit card support for Point Of Sale"
-msgstr "Kredietkaart ondersteuning voor kassa"
+msgstr "Creditcart ondersteuning voor kassa"
 
 #. module: base
 #: model:res.country,name:base.hr
@@ -7775,7 +7777,7 @@ msgstr "Definitie"
 #. module: base
 #: model:ir.model.fields,field_description:base.field_ir_model_access_perm_unlink
 msgid "Delete Access"
-msgstr "Toegang verwijderen"
+msgstr "Verwijderen"
 
 #. module: base
 #: model:ir.ui.view,arch_db:base.view_rule_search
@@ -8304,7 +8306,7 @@ msgstr "Eenvoudig beheer van meerdere bedrijven aanzetten"
 msgid ""
 "Enabling this feature will install the following paying application(s) : \n"
 "%s"
-msgstr ""
+msgstr "Indien u deze optie aanvinkt, worden volgende betalende module(s) geïnstalleerd: \n%s"
 
 #. module: base
 #: selection:base.language.install,lang:0
@@ -9195,7 +9197,7 @@ msgstr "Gibraltar"
 #: model:ir.ui.view,arch_db:base.ir_access_view_search
 #: model:ir.ui.view,arch_db:base.view_rule_search
 msgid "Global"
-msgstr "Algemeen"
+msgstr "Voor iedereen"
 
 #. module: base
 #: model:ir.ui.view,arch_db:base.view_rule_form
@@ -9844,7 +9846,7 @@ msgstr "Indien geactiveerd wordt de volledige van SMTP sessies geschreven naar h
 #. module: base
 #: model:ir.model.fields,help:base.field_ir_rule_global
 msgid "If no group is specified the rule is global and applied to everyone"
-msgstr "Als geen groep is opgegeven is de regel globaal en toegepast op iedereen"
+msgstr "Als geen groep is opgegeven is de regel voor iedereen van toepassing"
 
 #. module: base
 #: model:ir.model.fields,help:base.field_ir_property_res_id
@@ -11027,12 +11029,12 @@ msgstr "Lead naar issue"
 #. module: base
 #: model:ir.ui.menu,name:base.menu_crm_config_lead
 msgid "Leads & Opportunities"
-msgstr "Leads & opportuniteiten"
+msgstr "Leads & prospects"
 
 #. module: base
 #: model:ir.module.module,summary:base.module_crm
 msgid "Leads, Opportunities, Activities"
-msgstr "Leads, opportuniteiten, activiteiten"
+msgstr "Leads, prospects, activiteiten"
 
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_hr_holidays
@@ -12352,7 +12354,7 @@ msgid ""
 "Odoo helps you easily track all activities related to\n"
 "                a customer: discussions, history of business opportunities,\n"
 "                documents, etc."
-msgstr "Odoo helpt u gemakkelijk alle activiteiten te volgen gerelateerd met\neen klant: discussies, geschiedenis van opportuniteiten,\ndocumenten, etc."
+msgstr "Odoo helpt u gemakkelijk alle activiteiten te volgen gerelateerd met\neen klant: discussies, geschiedenis van prospects,\ndocumenten, etc."
 
 #. module: base
 #: model:ir.actions.act_window,help:base.action_partner_form
@@ -12360,7 +12362,7 @@ msgid ""
 "Odoo helps you easily track all activities related to\n"
 "                a customer; discussions, history of business opportunities,\n"
 "                documents, etc."
-msgstr "Odoo helpt u gemakkelijk alle activiteiten te volgen gerelateerd met\neen klant; discussies, geschiedenis van opportuniteiten,\ndocumenten, etc."
+msgstr "Odoo helpt u gemakkelijk alle activiteiten te volgen gerelateerd met\neen klant; discussies, geschiedenis van prospects,\ndocumenten, etc."
 
 #. module: base
 #: model:ir.actions.act_window,help:base.action_partner_supplier_form
@@ -12517,12 +12519,12 @@ msgstr "Odoo webdiagram"
 #. module: base
 #: model:ir.ui.menu,name:base.menu_crm_config_opportunity
 msgid "Opportunities"
-msgstr "Opportuniteiten"
+msgstr "prospects"
 
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_sale_crm
 msgid "Opportunity to Quotation"
-msgstr "Opportuniteit naar offerte"
+msgstr "Prospect naar offerte"
 
 #. module: base
 #: model:ir.model.fields,help:base.field_ir_act_window_domain
@@ -13536,7 +13538,7 @@ msgstr "Wisselkoersen"
 #: model:ir.model.fields,field_description:base.field_ir_model_access_perm_read
 #: model:ir.ui.view,arch_db:base.ir_access_view_search
 msgid "Read Access"
-msgstr "Leesrechten"
+msgstr "Lezen"
 
 #. module: base
 #: model:ir.ui.view,arch_db:base.view_rule_search
@@ -17340,14 +17342,14 @@ msgstr "Taken"
 
 #. module: base
 #: model:ir.module.module,shortdesc:base.module_payment_sips
-msgid "Worldline SIPS Payment Acquiring  for online payments"
-msgstr "Wordline SIPS betaalverwerver voor online betalingen"
+msgid "Worldline SIPS"
+msgstr "Worldline SIPS"
 
 #. module: base
 #: model:ir.model.fields,field_description:base.field_ir_model_access_perm_write
 #: model:ir.ui.view,arch_db:base.ir_access_view_search
 msgid "Write Access"
-msgstr "Schrijfrechten"
+msgstr "Schrijven"
 
 #. module: base
 #: model:ir.ui.view,arch_db:base.view_rule_search

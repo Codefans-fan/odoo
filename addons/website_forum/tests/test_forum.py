@@ -28,13 +28,13 @@ class TestForum(TestForumCommon):
             })
 
         # Portal user asks a question with tags: ok if enough karma
-        self.user_portal.karma = KARMA['ask']
+        self.user_portal.karma = KARMA['tag_create']
         Post.sudo(self.user_portal).create({
             'name': " Q0",
             'forum_id': self.forum.id,
             'tag_ids': [(0, 0, {'name': 'Tag1', 'forum_id': self.forum.id})]
         })
-        self.assertEqual(self.user_portal.karma, KARMA['ask'], 'website_forum: wrong karma generation when asking question')
+        self.assertEqual(self.user_portal.karma, KARMA['tag_create'], 'website_forum: wrong karma generation when asking question')
 
         self.user_portal.karma = KARMA['post']
         Post.sudo(self.user_portal).create({
@@ -210,7 +210,7 @@ class TestForum(TestForumCommon):
         init_karma = post.create_uid.karma
         post.sudo(self.user_portal).mark_as_offensive(12)
         self.assertEqual(post.state, 'offensive', 'website_forum: wrong state when marking a post as offensive')
-        self.assertEqual(post.create_uid.karma, init_karma + 5 * KARMA['gen_que_dwv'], 'website_forum: wrong karma when marking a post as offensive')
+        self.assertEqual(post.create_uid.karma, init_karma + KARMA['gen_ans_flag'], 'website_forum: wrong karma when marking a post as offensive')
 
     def test_convert_answer_to_comment_crash(self):
         Post = self.env['forum.post']

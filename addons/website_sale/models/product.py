@@ -4,6 +4,7 @@
 import openerp
 from openerp import tools
 from openerp.osv import osv, fields
+from openerp.tools.translate import html_translate
 
 class product_style(osv.Model):
     _name = "product.style"
@@ -105,7 +106,7 @@ class product_template(osv.Model):
             ],
             string='Website Comments',
         ),
-        'website_description': fields.html('Description for the website', sanitize=False, translate=True),
+        'website_description': fields.html('Description for the website', sanitize=False, translate=html_translate),
         'alternative_product_ids': fields.many2many('product.template','product_alternative_rel','src_id','dest_id', string='Suggested Products', help='Appear on the product page'),
         'accessory_product_ids': fields.many2many('product.product','product_accessory_rel','src_id','dest_id', string='Accessory Products', help='Appear on the shopping cart'),
         'website_size_x': fields.integer('Size X'),
@@ -192,3 +193,10 @@ class product_attribute_value(osv.Model):
             "specific HTML color index (e.g. #ff0000) to display the color on the website if the "
             "attibute type is 'Color'."),
     }
+
+    # TODO in master: remove this function and change 'color' field name
+    def write(self, cr, uid, ids, vals, context=None):
+        # ignore write coming from many2many_tags color system
+        if vals.keys() == ['color'] and isinstance(vals['color'], (int, long)):
+            vals = {}
+        return super(product_attribute_value, self).write(cr, uid, ids, vals, context=context)

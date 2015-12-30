@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: Odoo 9.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2015-10-09 09:17+0000\n"
-"PO-Revision-Date: 2015-10-18 14:31+0000\n"
+"PO-Revision-Date: 2015-12-09 13:06+0000\n"
 "Last-Translator: Bogdan\n"
 "Language-Team: Ukrainian (http://www.transifex.com/odoo/odoo-9/language/uk/)\n"
 "MIME-Version: 1.0\n"
@@ -46,7 +46,7 @@ msgstr "%s (копія)"
 #: code:addons/project/static/src/xml/project.xml:8
 #, python-format
 msgid "&times;"
-msgstr ""
+msgstr "&разів;"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.edit_project
@@ -95,7 +95,7 @@ msgstr ""
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
 msgid "<span class=\"fa fa-arrow-circle-o-down\"/> Install now"
-msgstr ""
+msgstr "<span class=\"fa fa-arrow-circle-o-down\"/> Встановити зараз"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -105,7 +105,7 @@ msgstr ""
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
 msgid "<span class=\"fa fa-comment-o\"/> Website Live Chat on"
-msgstr ""
+msgstr "<span class=\"fa fa-comment-o\"/> Онлайн-чат увімкнено"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -380,7 +380,7 @@ msgstr ""
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
 msgid "<strong>Contact us now:</strong><br/>"
-msgstr ""
+msgstr "<strong>Зв'яжіться з нами зараз:</strong><br/>"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -526,7 +526,7 @@ msgstr ""
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
 msgid "<strong>Recommended actions:</strong>"
-msgstr ""
+msgstr "<strong>Рекомендовані дії:</strong>"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -652,7 +652,7 @@ msgstr ""
 #. module: project
 #: model:ir.ui.view,arch_db:project.edit_project
 msgid "Accept Emails From"
-msgstr ""
+msgstr "Приймати листи від"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -693,7 +693,7 @@ msgstr "Активний"
 #. module: project
 #: model:ir.ui.view,arch_db:project.task_type_edit
 msgid "Add a description..."
-msgstr ""
+msgstr "Додати опис..."
 
 #. module: project
 #. openerp-web
@@ -705,7 +705,7 @@ msgstr ""
 #. module: project
 #: model:project.task.type,name:project.project_stage_data_2
 msgid "Advanced"
-msgstr ""
+msgstr "Розширений"
 
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_project_alias_id
@@ -1022,7 +1022,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:project.field_project_tags_color
 #: model:ir.model.fields,field_description:project.field_project_task_color
 msgid "Color Index"
-msgstr ""
+msgstr "Індекс кольору"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -1070,7 +1070,7 @@ msgstr ""
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
 msgid "Congratulations, you're done !"
-msgstr ""
+msgstr "Вітаємо, ви закінчили!"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -1104,7 +1104,7 @@ msgstr ""
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_task_create_date
 msgid "Create Date"
-msgstr ""
+msgstr "Дата створення"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -1437,7 +1437,7 @@ msgstr ""
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
 msgid "Don't hesitate to"
-msgstr ""
+msgstr "Не вагайтесь"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -1881,7 +1881,7 @@ msgstr ""
 #: model:ir.ui.view,arch_db:project.view_task_kanban
 #: model:ir.ui.view,arch_db:project.view_task_search_form
 msgid "Important Messages"
-msgstr ""
+msgstr "Важливі повідомлення"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -1898,7 +1898,7 @@ msgstr ""
 #: model:project.task.type,name:project.project_stage_1
 #: selection:report.project.task.user,state:0
 msgid "In Progress"
-msgstr ""
+msgstr "В процесі"
 
 #. module: project
 #. openerp-web
@@ -2948,7 +2948,7 @@ msgstr "Статус"
 #. module: project
 #: sql_constraint:project.tags:0
 msgid "Tag name already exists !"
-msgstr ""
+msgstr "Такий тег вже існує!"
 
 #. module: project
 #: model:ir.actions.act_window,name:project.project_tags_action
@@ -3436,7 +3436,7 @@ msgstr "Користувач"
 #. module: project
 #: model:ir.model.fields,field_description:project.field_project_task_user_email
 msgid "User Email"
-msgstr ""
+msgstr "Ел. пошта користувача"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -3526,7 +3526,7 @@ msgstr "Історія бесіди на веб-сайті"
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
 msgid "Welcome"
-msgstr ""
+msgstr "Ласкаво просимо"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -3640,7 +3640,7 @@ msgstr ""
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
 msgid "Your Objectives"
-msgstr ""
+msgstr "Ваші завдання"
 
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
@@ -3685,7 +3685,7 @@ msgstr ""
 #. module: project
 #: model:ir.ui.view,arch_db:project.project_planner
 msgid "send us an email"
-msgstr ""
+msgstr "напишіть нам"
 
 #. module: project
 #: code:addons/project/project.py:569

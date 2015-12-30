@@ -372,14 +372,26 @@ class BaseModel(object):
         """
         if context is None:
             context = {}
-        cr.execute("SELECT id FROM ir_model WHERE model=%s", (self._name,))
+        params = {
+            'model': self._name,
+            'name': self._description,
+            'info': next(cls.__doc__ for cls in type(self).mro() if cls.__doc__),
+            'state': 'manual' if self._custom else 'base',
+            'transient': self._transient,
+        }
+        cr.execute("""
+            UPDATE ir_model
+               SET name=%(name)s, info=%(info)s, transient=%(transient)s
+             WHERE model=%(model)s
+         RETURNING id
+        """, params)
         if not cr.rowcount:
-            cr.execute('SELECT nextval(%s)', ('ir_model_id_seq',))
-            model_id = cr.fetchone()[0]
-            cr.execute("INSERT INTO ir_model (id, model, name, info, state, transient) VALUES (%s, %s, %s, %s, %s, %s)",
-                       (model_id, self._name, self._description, self.__doc__, 'base', self._transient))
-        else:
-            model_id = cr.fetchone()[0]
+            cr.execute("""
+                INSERT INTO ir_model (model, name, info, state, transient)
+                VALUES (%(model)s, %(name)s, %(info)s, %(state)s, %(transient)s)
+                RETURNING id
+            """, params)
+        model_id = cr.fetchone()[0]
         if 'module' in context:
             name_id = 'model_'+self._name.replace('.', '_')
             cr.execute('select * from ir_model_data where name=%s and module=%s', (name_id, context['module']))
@@ -407,6 +419,7 @@ class BaseModel(object):
                 'ttype': f.type,
                 'relation': f.comodel_name or None,
                 'index': bool(f.index),
+                'store': bool(f.store),
                 'copy': bool(f.copy),
                 'related': f.related and ".".join(f.related),
                 'readonly': bool(f.readonly),
@@ -691,6 +704,7 @@ class BaseModel(object):
                 'related': field['related'],
                 'required': bool(field['required']),
                 'readonly': bool(field['readonly']),
+                'store': bool(field['store']),
             }
             # FIXME: ignore field['serialization_field_id']
             if field['ttype'] in ('char', 'text', 'html'):
@@ -1607,14 +1621,14 @@ class BaseModel(object):
             'context': context,
         }
 
-    def get_access_action(self, cr, uid, id, context=None):
+    def get_access_action(self, cr, uid, ids, context=None):
         """ Return an action to open the document. This method is meant to be
         overridden in addons that want to give specific access to the document.
         By default it opens the formview of the document.
 
         :param int id: id of the document to open
         """
-        return self.get_formview_action(cr, uid, id, context=context)
+        return self.get_formview_action(cr, uid, ids[0], context=context)
 
     def _view_look_dom_arch(self, cr, uid, node, view_id, context=None):
         return self.pool['ir.ui.view'].postprocess_and_fields(
@@ -1631,7 +1645,9 @@ class BaseModel(object):
             return len(res)
         return res
 
-    @api.returns('self')
+    @api.returns('self',
+        upgrade=lambda self, value, args, offset=0, limit=None, order=None, count=False: value if count else self.browse(value),
+        downgrade=lambda self, value, args, offset=0, limit=None, order=None, count=False: value if count else value.ids)
     def search(self, cr, user, args, offset=0, limit=None, order=None, context=None, count=False):
         """ search(args[, offset=0][, limit=None][, order=None][, count=False])
 
@@ -2403,7 +2419,6 @@ class BaseModel(object):
 
     def _auto_init(self, cr, context=None):
         """
-
         Call _field_create and, unless _auto is False:
 
         - create the corresponding table in database for the model,
@@ -2418,7 +2433,12 @@ class BaseModel(object):
         - save in self._foreign_keys a list a foreign keys to create (see
           _auto_end).
 
+        Note: you should not override this method. Instead, you can modify the
+        model's database schema by overriding method :meth:`~.init`, which is
+        called right after this one.
         """
+        assert 'todo' in (context or {}), "Context not passed correctly to method _auto_init()."
+
         self._foreign_keys = set()
         raise_on_invalid_object_name(self._name)
 
@@ -2434,7 +2454,7 @@ class BaseModel(object):
 
         store_compute = False
         stored_fields = []              # new-style stored fields with compute
-        todo_end = []
+        todo_end = context['todo']
         update_custom_fields = context.get('update_custom_fields', False)
         self._field_create(cr, context=context)
         create = not self._table_exist(cr)
@@ -2695,8 +2715,6 @@ class BaseModel(object):
 
             todo_end.append((1000, func, ()))
 
-        return todo_end
-
     def _auto_end(self, cr, context=None):
         """ Create the foreign keys recorded by _auto_init. """
         for t, k, r, d in self._foreign_keys:
@@ -2705,6 +2723,11 @@ class BaseModel(object):
         cr.commit()
         del self._foreign_keys
 
+    def init(self, cr):
+        """ This method is called after :meth:`~._auto_init`, and may be
+            overridden to create or modify a model's database schema.
+        """
+        pass
 
     def _table_exist(self, cr):
         cr.execute("SELECT relname FROM pg_class WHERE relkind IN ('r','v') AND relname=%s", (self._table,))
@@ -4918,6 +4941,8 @@ class BaseModel(object):
                     del record['id']
                     # remove source to avoid triggering _set_src
                     del record['source']
+                    # duplicated record is not linked to any module
+                    del record['module']
                     record.update({'res_id': target_id})
                     if user_lang and user_lang == record['lang']:
                         # 'source' to force the call to _set_src
@@ -5381,6 +5406,11 @@ class BaseModel(object):
         """ Returns a new version of this recordset attached to the provided
         environment
 
+        .. warning::
+            The new environment will not benefit from the current
+            environment's data cache, so later data access may incur extra
+            delays while re-fetching from the database.
+
         :type env: :class:`~openerp.api.Environment`
         """
         return self._browse(env, self._ids)
@@ -5390,6 +5420,25 @@ class BaseModel(object):
 
         Returns a new version of this recordset attached to the provided
         user.
+
+        By default this returns a `SUPERUSER` recordset, where access control
+        and record rules are bypassed.
+
+        .. note::
+            Using `sudo` could cause data access to cross the boundaries of
+            record rules, possibly mixing records that are meant to be
+            isolated (e.g. records from different companies in multi-company
+            environments).
+
+            It may lead to un-intuitive results in methods which select one
+            record among many - for example getting the default company, or
+            selecting a Bill of Materials.
+
+        .. note::
+            Because the record rules and access control will have to be
+            re-evaluated, the new recordset will not benefit from the current
+            environment's data cache, so later data access may incur extra
+            delays while re-fetching from the database.
         """
         return self.with_env(self.env(user=user))
 

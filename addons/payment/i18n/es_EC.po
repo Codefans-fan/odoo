@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Odoo 9.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2015-09-07 14:40+0000\n"
-"PO-Revision-Date: 2015-10-06 08:22+0000\n"
+"PO-Revision-Date: 2015-11-27 06:34+0000\n"
 "Last-Translator: Martin Trigaux\n"
 "Language-Team: Spanish (Ecuador) (http://www.transifex.com/odoo/odoo-9/language/es_EC/)\n"
 "MIME-Version: 1.0\n"
@@ -473,7 +473,7 @@ msgstr "Metodo de Pago"
 #: model:ir.ui.view,arch_db:payment.payment_method_tree_view
 #: model:ir.ui.view,arch_db:payment.payment_method_view_search
 msgid "Payment Methods"
-msgstr ""
+msgstr "Métodos de pago"
 
 #. module: payment
 #: model:ir.model,name:payment.model_payment_transaction
@@ -657,7 +657,7 @@ msgstr ""
 #. module: payment
 #: model:ir.ui.view,arch_db:payment.transaction_form
 msgid "ZIP"
-msgstr ""
+msgstr "Código Postal"
 
 #. module: payment
 #: model:ir.model.fields,field_description:payment.field_payment_transaction_partner_zip

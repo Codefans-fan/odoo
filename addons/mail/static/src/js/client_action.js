@@ -16,7 +16,6 @@ var Model = require('web.Model');
 var pyeval = require('web.pyeval');
 var SearchView = require('web.SearchView');
 var session = require('web.session');
-var Sidebar = require('web.Sidebar');
 var Widget = require('web.Widget');
 
 var QWeb = core.qweb;
@@ -53,8 +52,8 @@ var PartnerInviteDialog = Dialog.extend({
             width: '100%',
             allowClear: true,
             multiple: true,
-            formatResult: function(item){
-                var css_class = "fa-circle" + (item.im_status === 'online' ? "" : "-o");
+            formatResult: function(item) {
+                var css_class = (item.im_status === 'away' ? "fa-clock-o" : "fa-circle" + (item.im_status === 'online' ? "" : "-o"));
                 return $('<span class="fa">').addClass(css_class).text(item.text);
             },
             query: function (query) {
@@ -77,7 +76,7 @@ var PartnerInviteDialog = Dialog.extend({
             var ChannelModel = new Model('mail.channel');
             return ChannelModel.call('channel_invite', [], {ids : [this.channel_id], partner_ids: _.pluck(data, 'id')})
                 .then(function(){
-                    var names = _.pluck(data, 'text').join(', ');
+                    var names = _.escape(_.pluck(data, 'text').join(', '));
                     var notification = _.str.sprintf(_t('You added <b>%s</b> to the conversation.'), names);
                     self.do_notify(_t('New people'), notification);
                 });
@@ -110,21 +109,48 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             var channel_id = $(event.target).data("channel-id");
             this.unsubscribe_from_channel(chat_manager.get_channel(channel_id));
         },
+        "click .o_snackbar_undo": function (event) {
+            event.preventDefault();
+            var channel = this.channel;
+            this.$snackbar.remove();
+            this.clear_needactions_def.then(function (msgs_ids) {
+                chat_manager.undo_mark_as_read(msgs_ids, channel);
+            });
+        },
+        "click .o_mail_open_channels": function () {
+            this.do_action({
+                name: _t('Public Channels'),
+                type: 'ir.actions.act_window',
+                res_model: "mail.channel",
+                views: [[false, 'kanban'], [false, 'form']],
+                domain: [['public', '!=', 'private']],
+            }, {
+                on_reverse_breadcrumb: this.on_reverse_breadcrumb,
+            });
+        },
     },
 
     on_attach_callback: function () {
-        this.thread.scroll_to({offset: this.channels_scrolltop[this.channel.id]});
+        if (this.channel) {
+            this.thread.scroll_to({offset: this.channels_scrolltop[this.channel.id]});
+        }
     },
     on_detach_callback: function () {
         this.channels_scrolltop[this.channel.id] = this.thread.get_scrolltop();
     },
 
-    init: function(parent, action) {
+    init: function(parent, action, options) {
         this._super.apply(this, arguments);
         this.action_manager = parent;
         this.domain = [];
         this.action = action;
+        this.options = options || {};
         this.channels_scrolltop = {};
+        this.throttled_render_sidebar = _.throttle(this.render_sidebar.bind(this), 100, { leading: false });
+    },
+
+    willStart: function () {
+        return chat_manager.is_ready;
     },
 
     start: function() {
@@ -138,63 +164,60 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
         };
         var dataset = new data.DataSetSearch(this, 'mail.message');
         var view_id = (this.action && this.action.search_view_id && this.action.search_view_id[0]) || false;
-        var default_channel_id = this.action.context.active_id ||
+        var default_channel_id = this.options.active_id ||
+                                 this.action.context.active_id ||
                                  this.action.params.default_active_id ||
                                  'channel_inbox';
+        var default_channel = chat_manager.get_channel(default_channel_id) ||
+                              chat_manager.get_channel('channel_inbox');
+
         this.searchview = new SearchView(this, dataset, view_id, {}, options);
         this.searchview.on('search_data', this, this.on_search);
 
-        this.sidebar = new Sidebar(this, {
-            sections: [
-                {name: 'action', label: _t('Action')},
-            ],
-            items: {
-                action: [
-                    {label: _t('Unsubscribe'), classname: 'o_mail_chat_button_unsubscribe', callback: this.on_click_button_unsubscribe},
-                    {label: _t('Settings'), classname: 'o_mail_chat_button_settings', callback: this.on_click_button_settings},
-                ],
-            },
-        });
-
-        this.composer = new ChatComposer(this, {
-            get_channel_info: function () {
-                return { channel_id: self.channel.id };
-            },
-        });
+        this.composer = new ChatComposer(this);
         this.thread = new ChatThread(this, {
-            no_content_helper: this.action.help,
+            display_help: true,
+            shorten_messages: false,
         });
 
         this.$buttons = $(QWeb.render("mail.chat.ControlButtons", {}));
         this.$buttons.find('button').css({display:"inline-block"});
         this.$buttons.on('click', '.o_mail_chat_button_invite', this.on_click_button_invite);
         this.$buttons.on('click', '.o_mail_chat_button_detach', this.on_click_button_detach);
+        this.$buttons.on('click', '.o_mail_chat_button_unsubscribe', this.on_click_button_unsubscribe);
+        this.$buttons.on('click', '.o_mail_chat_button_settings', this.on_click_button_settings);
         this.$buttons.on('click', '.o_mail_toggle_channels', function () {
             self.$('.o_mail_chat_sidebar').slideToggle(200);
         });
+        this.$buttons.on('click', '.o_mail_chat_button_mark_read', function () {
+            chat_manager.mark_all_as_read();
+        });
+        this.$buttons.on('click', '.o_mail_chat_button_unstar_all', chat_manager.unstar_all);
 
-        this.thread.on('redirect', this, this.on_redirect);
+        this.thread.on('redirect', this, function (res_model, res_id) {
+            chat_manager.redirect(res_model, res_id, this.set_channel.bind(this));
+        });
         this.thread.on('redirect_to_channel', this, function (channel_id) {
-            this.set_channel(chat_manager.get_channel(channel_id));
+            chat_manager.join_channel(channel_id).then(this.set_channel.bind(this));
         });
         this.thread.on('load_more_messages', this, this.load_more_messages);
         this.thread.on('mark_as_read', this, function (message_id) {
-            chat_manager.mark_as_read(message_id);
+            chat_manager.mark_as_read([message_id]);
         });
         this.thread.on('toggle_star_status', this, function (message_id) {
             chat_manager.toggle_star_status(message_id);
         });
         this.composer.on('post_message', this, this.on_post_message);
+        this.composer.on('input_focused', this, this.on_composer_input_focused);
 
         var def1 = this.thread.prependTo(this.$('.o_mail_chat_content'));
         var def2 = this.composer.appendTo(this.$('.o_mail_chat_content'));
         var def3 = this.searchview.appendTo($("<div>"));
-        var def4 = this.sidebar.appendTo($("<div>"));
 
         this.render_sidebar();
 
-        return $.when(def1, def2, def3, def4)
-            .then(this.set_channel.bind(this, chat_manager.get_channel(default_channel_id)))
+        return $.when(def1, def2, def3)
+            .then(this.set_channel.bind(this, default_channel))
             .then(function () {
                 chat_manager.bus.on('new_message', self, self.on_new_message);
                 chat_manager.bus.on('update_message', self, self.on_update_message);
@@ -202,24 +225,28 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
                 chat_manager.bus.on('anyone_listening', self, function (channel, query) {
                     query.is_displayed = query.is_displayed || channel.id === self.channel.id;
                 });
-                chat_manager.bus.on('update_needaction', self, self.on_update_needaction);
+                chat_manager.bus.on('unsubscribe_from_channel', self, self.render_sidebar);
+                chat_manager.bus.on('update_needaction', self, self.throttled_render_sidebar);
+                chat_manager.bus.on('update_channel_unread_counter', self, self.throttled_render_sidebar);
+                chat_manager.bus.on('update_dm_presence', self, self.throttled_render_sidebar);
             });
     },
 
     render_sidebar: function () {
         var self = this;
-        var $sidebar = QWeb.render("mail.chat.Sidebar", {
+        var $sidebar = $(QWeb.render("mail.chat.Sidebar", {
+            active_channel_id: this.channel ? this.channel.id: undefined,
             channels: chat_manager.get_channels(),
-            needaction_counter: chat_manager.get_needaction_counter()
-        });
-        this.$(".o_mail_chat_sidebar").replaceWith($sidebar);
+            needaction_counter: chat_manager.get_needaction_counter(),
+        }));
+        this.$(".o_mail_chat_sidebar").html($sidebar.contents());
 
         this.$('.o_mail_add_channel[data-type=public]').find("input").autocomplete({
             source: function(request, response) {
                 self.last_search_val = _.escape(request.term);
                 self.do_search_channel(self.last_search_val).done(function(result){
                     result.push({
-                        'label':  _.str.sprintf('<strong>'+_t("Create %s")+'</strong>', '<em>"'+self.last_search_val+'"</em>'),
+                        'label':  _.str.sprintf('<strong>'+_t("Create %s")+'</strong>', '<em>"#'+self.last_search_val+'"</em>'),
                         'value': '_create',
                     });
                     response(result);
@@ -265,14 +292,25 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
         });
     },
 
+    render_snackbar: function (nb_needactions) {
+        this.$snackbar = $(QWeb.render('mail.chat.UndoSnackbar', {
+            nb_needactions: nb_needactions,
+        }));
+        this.$('.o_mail_chat_content').append(this.$snackbar);
+        // Hide snackbar after 20s
+        var $snackbar = this.$snackbar;
+        setTimeout(function() { $snackbar.fadeOut(); }, 20000);
+    },
+
     do_search_channel: function(search_val){
         var Channel = new Model("mail.channel");
         return Channel.call('channel_search_to_join', [search_val]).then(function(result){
             var values = [];
             _.each(result, function(channel){
+                var escaped_name = _.escape(channel.name);
                 values.push(_.extend(channel, {
-                    'value': channel.name,
-                    'label': channel.name,
+                    'value': escaped_name,
+                    'label': escaped_name,
                 }));
             });
             return values;
@@ -284,9 +322,10 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
         return Partner.call('im_search', [search_val, 20]).then(function(result){
             var values = [];
             _.each(result, function(user){
+                var escaped_name = _.escape(user.name);
                 values.push(_.extend(user, {
-                    'value': user.name,
-                    'label': user.name,
+                    'value': escaped_name,
+                    'label': escaped_name,
                 }));
             });
             return values;
@@ -300,30 +339,64 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             this.channels_scrolltop[this.channel.id] = this.thread.get_scrolltop();
         }
         var new_channel_scrolltop = this.channels_scrolltop[channel.id];
-        this.channel = channel;
-        this.set("title", channel.name);
-        this.$buttons
-            .find('.o_mail_chat_button_detach')
-            .toggle(channel.type !== "static");
-        this.$buttons
-            .find('.o_mail_chat_button_invite')
-            .toggle(channel.type !== "dm" && channel.type !== 'static');
 
-        this.update_cp();
+        this.channel = channel;
+        this.messages_separator_position = undefined; // reset value on channel change
+        this.unread_counter = this.channel.unread_counter;
+        this.last_seen_message_id = this.channel.last_seen_message_id;
+        this.clear_needactions_def = $.Deferred();
+        if (this.$snackbar) {
+            this.$snackbar.remove();
+        }
+
         this.action.context.active_id = channel.id;
         this.action.context.active_ids = [channel.id];
 
-        this.$('.o_mail_chat_channel_item')
-            .removeClass('o_active')
-            .filter('[data-channel-id=' + channel.id + ']')
-            .removeClass('o_unread_message')
-            .addClass('o_active');
-
-        this.$('.o_chat_composer').toggle(channel.type !== 'static');
-        this.sidebar.$el.toggle(channel.type !== 'static');
-
         return this.fetch_and_render_thread().then(function () {
-            self.thread.scroll_to({offset: new_channel_scrolltop});
+            // Mark channel's messages as read and clear needactions
+            if (channel.type !== 'static') {
+                // Display snackbar if needactions have been cleared
+                if (channel.needaction_counter > 0) {
+                    self.render_snackbar(channel.needaction_counter);
+                }
+                chat_manager.mark_channel_as_seen(channel);
+                self.clear_needactions_def = chat_manager.mark_all_as_read(channel);
+            }
+
+            // Update control panel
+            self.set("title", '#' + channel.name);
+            // Hide 'detach' button in static channels
+            self.$buttons
+                .find('.o_mail_chat_button_detach')
+                .toggle(channel.type !== "static");
+            // Hide 'invite', 'unsubscribe' and 'settings' buttons in static channels and DM
+            self.$buttons
+                .find('.o_mail_chat_button_invite, .o_mail_chat_button_unsubscribe, .o_mail_chat_button_settings')
+                .toggle(channel.type !== "dm" && channel.type !== 'static');
+            self.$buttons
+                .find('.o_mail_chat_button_mark_read')
+                .toggle(channel.id === "channel_inbox");
+            self.$buttons
+                .find('.o_mail_chat_button_unstar_all')
+                .toggle(channel.id === "channel_starred");
+
+            self.$('.o_chat_composer').toggle(channel.type !== 'static');
+
+            self.$('.o_mail_chat_channel_item')
+                .removeClass('o_active')
+                .filter('[data-channel-id=' + channel.id + ']')
+                .removeClass('o_unread_message')
+                .addClass('o_active');
+
+            var $new_messages_separator = self.$('.o_thread_new_messages_separator');
+            if ($new_messages_separator.length) {
+                self.thread.$el.scrollTo($new_messages_separator);
+            } else {
+                self.thread.scroll_to({offset: new_channel_scrolltop});
+            }
+
+            // Update control panel before focusing the composer, otherwise focus is on the searchview
+            self.update_cp();
             if (!config.device.touch) {
                 self.composer.focus();
             }
@@ -352,19 +425,50 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             });
     },
 
-    get_thread_rendering_options: function () {
+    get_thread_rendering_options: function (messages) {
+        // Compute position of the 'New messages' separator, only once when joining
+        // a channel to keep it in the thread when new messages arrive
+        if (_.isUndefined(this.messages_separator_position)) {
+            var msg_id = this.last_seen_message_id;
+            if (!this.unread_counter) {
+                this.messages_separator_position = false; // no unread message -> don't display separator
+            } else if ((msg_id === false) || !_.findWhere(messages, {id: msg_id})) {
+                this.messages_separator_position = 'top'; // all displayed messages are unread
+            } else {
+                this.messages_separator_position = msg_id; // last read message is msg_id
+            }
+        }
         return {
+            channel_id: this.channel.id,
             display_load_more: !chat_manager.all_history_loaded(this.channel, this.domain),
             display_needactions: this.channel.display_needactions,
-            channel_id: this.channel.id,
+            messages_separator_position: this.messages_separator_position,
+            squash_close_messages: this.channel.type !== 'static',
+            display_empty_channel: !messages.length && !this.domain.length,
+            display_no_match: !messages.length && this.domain.length,
+            display_subject: this.channel.mass_mailing || this.channel.id === "channel_inbox",
         };
     },
 
     fetch_and_render_thread: function () {
         var self = this;
         return chat_manager.get_messages({channel_id: this.channel.id, domain: this.domain}).then(function(result) {
-            self.thread.render(result, self.get_thread_rendering_options());
+            self.thread.render(result, self.get_thread_rendering_options(result));
+            self.update_button_status(result.length === 0);
         });
+    },
+
+    update_button_status: function (disabled) {
+        if (this.channel.id === "channel_inbox") {
+            this.$buttons
+                .find('.o_mail_chat_button_mark_read')
+                .toggleClass('disabled', disabled);
+        }
+        if (this.channel.id === "channel_starred") {
+            this.$buttons
+                .find('.o_mail_chat_button_unstar_all')
+                .toggleClass('disabled', disabled);
+        }
     },
 
     load_more_messages: function () {
@@ -373,9 +477,12 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
         var oldest_msg_selector = '.o_thread_message[data-message-id="' + oldest_msg_id + '"]';
         var offset = -framework.getPosition(document.querySelector(oldest_msg_selector)).top;
         return chat_manager
-            .fetch_more(this.channel, this.domain)
+            .get_messages({channel_id: this.channel.id, domain: this.domain, load_more: true})
             .then(function(result) {
-                self.thread.render(result, self.get_thread_rendering_options());
+                if (self.messages_separator_position === 'top') {
+                    self.messages_separator_position = undefined; // reset value to re-compute separator position
+                }
+                self.thread.render(result, self.get_thread_rendering_options(result));
                 offset += framework.getPosition(document.querySelector(oldest_msg_selector)).top;
                 self.thread.scroll_to({offset: offset});
             });
@@ -388,9 +495,17 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
                 $buttons: this.$buttons,
                 $searchview: this.searchview.$el,
                 $searchview_buttons: this.searchview.$buttons.contents(),
-                $sidebar: this.sidebar.$el,
             },
             searchview: this.searchview,
+        });
+    },
+
+    do_show: function () {
+        this._super.apply(this, arguments);
+        this.update_cp();
+        this.action_manager.do_push_state({
+            action: this.action.id,
+            active_id: this.channel.id,
         });
     },
 
@@ -403,60 +518,10 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
         this.fetch_and_render_thread();
     },
 
-    /**
-     * Callback performed on o_mail_redirect element clicked
-     *
-     * If the model is res.partner, and there is a user associated with this
-     * partner which isn't the current user, open the DM with this user.
-     * Otherwhise, open the record's form view.
-     */
-    on_redirect: function (res_model, res_id) {
-        var self = this;
-        var redirect_to_document = function (res_model, res_id) {
-            self.action_manager.do_push_state({
-                model: res_model,
-                id: res_id,
-            });
-            self.do_action({
-                type:'ir.actions.act_window',
-                view_type: 'form',
-                view_mode: 'form',
-                res_model: res_model,
-                views: [[false, 'form']],
-                res_id: res_id,
-            }, {
-                on_reverse_breadcrumb: self.on_reverse_breadcrumb,
-            });
-        };
-
-        if (res_model === "res.partner") {
-            var domain = [["partner_id", "=", res_id]];
-            new Model('res.users').call("search", [domain]).then(function (user_ids) {
-                if (user_ids.length && user_ids[0] !== session.uid) {
-                    chat_manager.create_channel(res_id, 'dm').then(function (channel) {
-                        if (!self.channel || self.channel.id !== channel.id) {
-                            self.set_channel(channel);
-                        }
-                    });
-                } else {
-                    redirect_to_document(res_model, res_id);
-                }
-            });
-        } else {
-            redirect_to_document(res_model, res_id);
-        }
-    },
-    on_reverse_breadcrumb: function () {
-        this.update_cp(); // do not reload the client action, just display it, but a refresh of the control panel is needed.
-        this.action_manager.do_push_state({
-            action: this.action.id,
-            active_id: this.channel.id,
-        });
-    },
     on_post_message: function (message) {
-        message.channel_id = this.channel.id;
+        var options = {channel_id: this.channel.id};
         chat_manager
-            .post_message(message)
+            .post_message(message, options)
             .fail(function () {
                 // todo: display notification
             });
@@ -464,16 +529,15 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
     on_new_message: function (message) {
         var self = this;
         if (_.contains(message.channel_ids, this.channel.id)) {
+            if (this.channel.type !== 'static') {
+                chat_manager.mark_channel_as_seen(this.channel);
+            }
             this.fetch_and_render_thread().then(function () {
                 self.thread.scroll_to({id: message.id});
             });
         }
-        // Indicate in the sidebar that there is a new message in the corresponding channels
-        _.each(_.without(message.channel_ids, this.channel.id), function (channel_id) {
-                self.$('.o_mail_chat_channel_item')
-                    .filter('[data-channel-id=' + channel_id + ']')
-                    .addClass('o_unread_message');
-        });
+        // Re-render sidebar to indicate that there is a new message in the corresponding channels
+        this.render_sidebar();
         // Dump scroll position of channels in which the new message arrived
         this.channels_scrolltop = _.omit(this.channels_scrolltop, message.channel_ids);
     },
@@ -482,9 +546,11 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
         var current_channel_id = this.channel.id;
         if ((current_channel_id === "channel_starred" && !message.is_starred) ||
             (current_channel_id === "channel_inbox" && !message.is_needaction)) {
-            chat_manager.fetch(this.channel, this.domain).then(function (messages) {
-                var options = self.get_thread_rendering_options();
-                self.thread.remove_message_and_render(message.id, messages, options);
+            chat_manager.get_messages({channel_id: this.channel.id, domain: this.domain}).then(function (messages) {
+                var options = self.get_thread_rendering_options(messages);
+                self.thread.remove_message_and_render(message.id, messages, options).then(function () {
+                    self.update_button_status(messages.length === 0);
+                });
             });
         } else if (_.contains(message.channel_ids, current_channel_id)) {
             this.fetch_and_render_thread();
@@ -496,11 +562,9 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             this.set_channel(channel);
         }
     },
-    on_update_needaction: function () {
-        var $needaction_badge = QWeb.render("mail.chat.SidebarNeedaction", {
-            needaction_counter: chat_manager.get_needaction_counter()
-        });
-        this.$('.o_mail_sidebar_needaction').replaceWith($needaction_badge);
+    on_composer_input_focused: function () {
+        var suggestions = chat_manager.get_mention_partner_suggestions(this.channel);
+        this.composer.mention_set_prefetched_partners(suggestions);
     },
 
     on_click_button_invite: function () {
@@ -521,8 +585,6 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             res_id: this.channel.id,
             views: [[false, 'form']],
             target: 'current'
-        }, {
-            on_reverse_breadcrumb: this.on_reverse_breadcrumb,
         });
     },
 });

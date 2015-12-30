@@ -128,7 +128,7 @@ var abstractReconciliation = Widget.extend(ControlPanelMixin, {
                     relation: "account.tax",
                     string: _t("Tax"),
                     type: "many2one",
-                    domain: [['type_tax_use','=','purchase']],
+                    domain: [['type_tax_use','!=','none']],
                 },
             },
             amount: {
@@ -155,7 +155,7 @@ var abstractReconciliation = Widget.extend(ControlPanelMixin, {
                     relation: "account.analytic.account",
                     string: _t("Analytic Acc."),
                     type: "many2one",
-                    domain: [['type', '!=', 'view'], ['state', 'not in', ['close','cancelled']]],
+                    domain: [['account_type', '=', 'normal']],
                 },
             },
         };
@@ -1767,8 +1767,8 @@ var bankStatementReconciliationLine = abstractReconciliationLine.extend({
     /** Creating */
 
     initializeCreateForm: function() {
-        this.label_field.set("value", this.st_line.name);
         this._super();
+        this.label_field.set("value", this.st_line.name);
     },
 
 
@@ -1874,6 +1874,7 @@ var bankStatementReconciliationLine = abstractReconciliationLine.extend({
             var propose_partial = self.getCreatedLines().length === 0
                 && balance_type === "greater"
                 && Math.abs(self.get("balance")) < Math.abs(last_line.debit - last_line.credit)
+                && self.get("balance") * (last_line.debit - last_line.credit) < 0
                 && ! last_line.partial_reconcile
                 && ! last_line.already_paid;
             last_line.propose_partial_reconcile = propose_partial;

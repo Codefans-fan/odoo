@@ -20,7 +20,6 @@
                         <button name="action_invoice" string="Invoice" type="object" states="paid" attrs="{'readonly': [('partner_id','=',False)]}"/>
                         <button name="refund" string="Return Products" type="object" 
                             attrs="{'invisible':[('state','=','draft')]}"/>
-                        <button name="%(action_report_pos_receipt)d" string="Reprint" type="action" states="paid,done,invoiced"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,paid,done" statusbar_colors='{"cancel":"red"}'/>
                     </header>
                     <sheet>
@@ -80,7 +79,7 @@
                             <group string="General Information">
                                 <field name="company_id" groups="base.group_multi_company"/>
                                 <field name="location_id" widget="selection" groups="stock.group_locations"/>
-                                <field name="user_id" context="{'default_groups_ref': ['base.group_user', 'base.group_partner_manager', 'point_of_sale.group_pos_user']}"/>
+                                <field name="user_id"/>
                                 <field name="pricelist_id" groups="product.group_sale_pricelist" domain="[('type','=','sale')]"/>
                                 <field name="picking_id" readonly="1"/>
                                 <field name="pos_reference"/>
@@ -689,7 +688,6 @@
                                 <field name="iface_tax_included" />
                             </group>
                             <group>
-                                <field name="iface_fullscreen" />
                                 <field name="iface_big_scrollbars" />
                                 <field name="iface_print_auto" />
                                 <field name="iface_display_categ_images" />
@@ -699,7 +697,7 @@
                         </group>
                         <group string="Hardware Proxy / PosBox" >
                             <field name="proxy_ip" />
-                            <field name="iface_print_via_proxy" string="Receipt Printer"/>
+                            <field name="iface_print_via_proxy" string="Receipt Printer" on_change="onchange_iface_print_via_proxy(iface_print_via_proxy)"/>
                             <field name="iface_scan_via_proxy" string="Barcode Scanner"/>
                             <field name="iface_electronic_scale" />
                             <field name="iface_cashdrawer" />
@@ -836,7 +834,7 @@
                         <group>
                             <field name="cash_control" invisible="1" />
                             <group>
-                                <field name="user_id" context="{'default_groups_ref': ['base.group_user', 'base.group_partner_manager', 'point_of_sale.group_pos_manager', 'base.group_sale_manager']}"/>
+                                <field name="user_id"/>
                                 <field name="currency_id" invisible="1"/>
                                 <field name="config_id"/>
                             </group>
@@ -854,14 +852,6 @@
                                     <label for="cash_register_balance_end" attrs="{'invisible' : [('state', '=', 'opening_control')]}" string="= Theoretical Closing Balance" class="oe_force_bold oe_opening_total"/>
                                     <field name="cash_register_balance_end" nolabel="1" attrs="{'invisible' : [('state', '=', 'opening_control')]}" class="oe_bold oe_pos_total" widget="monetary" options="{'currency_field': 'currency_id'}"/>
                                 </group>
-                                <div class="oe_clear"/>
-                                <div attrs="{'invisible' : ['|', ('cash_journal_id', '=', False), ('state', '!=', 'opening_control')]}" class="oe_view_nocontent" groups="point_of_sale.group_pos_manager">
-                                    <p class="oe_view_nocontent_create">
-                                    You can define another list of available currencies on the
-                                    <i>Cash Registers</i> tab of the <b><field name="cash_journal_id" class="oe_inline"/></b>
-                                    payment method.
-                                    </p>
-                                </div>
                             </div>
                             <div>
                                 <group class="oe_subtotal_footer oe_right" attrs="{'invisible': ['|', ('cash_control', '=', False), ('state', '=', 'opening_control')]}">

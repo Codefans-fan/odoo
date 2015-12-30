@@ -215,7 +215,7 @@ class XMLTranslator(object):
         if (
             isinstance(node, SKIPPED_ELEMENT_TYPES) or
             node.tag in SKIPPED_ELEMENTS or
-            node.get("translation", "").strip() == "off" or
+            node.get("t-translation", "").strip() == "off" or
             node.tag == "attribute" and node.get("name") not in TRANSLATED_ATTRS
         ):
             # do not translate the contents of the node
@@ -271,10 +271,11 @@ def xml_translate(callback, value):
         trans.process(root)
         return trans.get_done()
     except etree.ParseError:
-        # fallback in case it is a translated term...
-        root = etree.fromstring("<div>%s</div>" % encode(value))
-        trans.process(root)
-        return trans.get_done()[5:-6]       # remove tags <div> and </div>
+        # fallback for translated terms: use an HTML parser and wrap the term
+        wrapped = "<div>%s</div>" % encode(value)
+        root = etree.fromstring(wrapped, etree.HTMLParser(encoding='utf-8'))
+        trans.process(root[0][0])               # html > body > div
+        return trans.get_done()[5:-6]           # remove tags <div> and </div>
 
 def html_translate(callback, value):
     """ Translate an HTML value (string), using `callback` for translating text
@@ -286,8 +287,7 @@ def html_translate(callback, value):
     trans = XMLTranslator(callback, 'html')
     wrapped = "<div>%s</div>" % encode(value)
     root = etree.fromstring(wrapped, etree.HTMLParser(encoding='utf-8'))
-    # html > body > div
-    trans.process(root[0][0])
+    trans.process(root[0][0])               # html > body > div
     return trans.get_done()[5:-6]           # remove tags <div> and </div>
 
 

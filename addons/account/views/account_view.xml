@@ -133,6 +133,20 @@
         <menuitem action="action_account_form" id="menu_action_account_form" parent="menu_finance_entries" sequence="20"/>
 
         <act_window
+            id="act_account_partner_ledger_payable"
+            name="Partner Ledger: Payable"
+            res_model="account.move.line"
+            context="{'search_default_partner_id':[active_id], 'search_default_unreconciled':1, 'search_default_payable':1}"
+            src_model="res.partner"/>
+
+        <act_window
+            id="act_account_partner_ledger_receivable"
+            name="Partner Ledger: Receivable"
+            res_model="account.move.line"
+            context="{'search_default_partner_id':[active_id], 'search_default_unreconciled':1, 'search_default_receivable':1}"
+            src_model="res.partner"/>
+
+        <act_window
             id="act_account_acount_move_line_open_unreconciled"
             name="Unreconciled Entries"
             res_model="account.move.line"
@@ -715,7 +729,7 @@
                                 <field name="account_id" domain="[('company_id', '=', company_id)]"/>
                                 <field name="amount_type"/>
                                 <field name="tax_id" domain="[('company_id', '=', company_id)]" widget="selection" />
-                                <field name="analytic_account_id" groups="analytic.group_analytic_accounting" domain="[('company_id', '=', company_id)]"/>
+                                <field name="analytic_account_id" groups="analytic.group_analytic_accounting" domain="[('account_type', '=', 'normal'), ('company_id', '=', company_id)]"/>
                                 <field name="company_id" groups="base.group_multi_company"/>
                             </group>
                             <group>
@@ -737,7 +751,7 @@
                                 <field name="second_account_id" domain="[('company_id', '=', company_id)]"/>
                                 <field name="second_amount_type"/>
                                 <field name="second_tax_id" domain="[('company_id', '=', company_id)]" widget="selection"/>
-                                <field name="second_analytic_account_id" groups="analytic.group_analytic_accounting" domain="[('company_id', '=', company_id)]"/>
+                                <field name="second_analytic_account_id" groups="analytic.group_analytic_accounting" domain="[('account_type', '=', 'normal'), ('company_id', '=', company_id)]"/>
                             </group>
                             <group>
                                 <field name="second_label"/>
@@ -998,8 +1012,8 @@
                                         <field name="date_maturity"/>
                                     </group>
                                     <group string="Taxes">
-                                        <field name="tax_line_id"/>
-                                        <field name="tax_ids" widget="many2many_tags"/>
+                                        <field name="tax_line_id" readonly="1"/>
+                                        <field name="tax_ids" widget="many2many_tags" readonly="1"/>
                                     </group>
                                     <group string="Currency" groups="base.group_multi_currency">
                                         <field name="currency_id" invisible="1"/>
@@ -1012,7 +1026,7 @@
                                         <field name="blocked"/>
                                     </group>
                                     <group groups="analytic.group_analytic_accounting" string="Analytic">
-                                        <field name="analytic_account_id" domain="[('type','in',('normal','contract'))]"/>
+                                        <field name="analytic_account_id" domain="[('account_type','=','normal)]"/>
                                     </group>
                                 </group>
                                 <field name="narration" colspan="4" nolabel="1" placeholder="Add an internal note..."/>
@@ -1055,8 +1069,8 @@
                                 <field name="date"/>
                                 <field name="blocked"/>
                                 <newline/>
-                                <field name="tax_ids"/>
-                                <field name="tax_line_id"/>
+                                <field name="tax_ids" readonly="1"/>
+                                <field name="tax_line_id" readonly="1"/>
                                 <field name="analytic_account_id" groups="analytic.group_analytic_accounting"/>
                                 <separator colspan="4" string="Status"/>
                                 <newline/>
@@ -1130,6 +1144,9 @@
                     <filter name="posted" string="Posted" domain="[('move_id.state','=','posted')]" help="Posted Journal Items"/>
                     <separator/>
                     <filter string="Unreconciled" domain="[('reconciled','=',False), ('account_id.reconcile','=',True)]" help="Unreconciled Journal Items" name="unreconciled"/>
+                    <separator/>
+                    <filter string="Payable" domain="[('account_id.internal_type', '=', 'payable')]" help="From Payable accounts" name="payable"/>
+                    <filter string="Receivable" domain="[('account_id.internal_type', '=', 'receivable')]" help="From Receivable accounts" name="receivable"/>
                     <separator/>
                     <field name="move_id" string="Number (Move)"/>
                     <field name="account_id"/>
@@ -1245,7 +1262,7 @@
                                 <tree editable="bottom" string="Journal Items">
                                     <field name="account_id" domain="[('company_id', '=', parent.company_id)]"/>
                                     <field name="name"/>
-                                    <field name="analytic_account_id" groups="analytic.group_analytic_accounting"/>
+                                    <field name="analytic_account_id" groups="analytic.group_analytic_accounting" domain="[('account_type', '=', 'normal')]"/>
                                     <field name="amount_currency" groups="base.group_multi_currency"/>
                                     <field name="company_currency_id" invisible="1"/>
                                     <field name="currency_id" options="{'no_create': True}" groups="base.group_multi_currency"/>

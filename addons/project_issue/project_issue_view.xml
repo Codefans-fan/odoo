@@ -25,8 +25,7 @@
                     </div>
                     <group>
                         <group>
-                            <field name="user_id"
-                                context="{'default_groups_ref': ['base.group_user', 'base.group_partner_manager', 'project.group_project_user']}"/>
+                            <field name="user_id"/>
                             <field name="priority" groups="base.group_user" widget="priority"/>
                             <field name="tag_ids" widget="many2many_tags"/>
                         </group>
@@ -263,6 +262,9 @@
             <field name="model">project.project</field>
             <field name="inherit_id" ref="project.edit_project"/>
             <field name="arch" type="xml">
+                <xpath expr='//field[@name="use_tasks"]' position='attributes'>
+                    <attribute name="on_change">on_change_use_tasks_or_issues(use_tasks, use_issues)</attribute>
+                </xpath>
                 <xpath expr='//div[@name="options_active"]' position="attributes">
                     <attribute name="invisible">0</attribute>
                 </xpath>

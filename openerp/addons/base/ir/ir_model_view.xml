@@ -41,7 +41,7 @@
                     </group>
                     <notebook>
                         <page string="Fields">
-                            <field context="{'manual':True}" name="field_id">
+                            <field name="field_id">
                                 <tree string="Fields Description">
                                     <field name="name"/>
                                     <field name="field_description"/>
@@ -59,49 +59,52 @@
                                         <field name="ttype"/>
                                     </group>
                                     <notebook>
-                                        <page name="base" string="Base Properties">
-                                            <group>
-                                                <field name="translate"
-                                                    attrs="{'readonly': [('ttype','not in',['char','text'])],
-                                                            'invisible': [('ttype','not in',['char','text'])]}"/>
-                                                <field name="selection"
-                                                    attrs="{'required': [('ttype','in',['selection','reference'])],
-                                                            'readonly': [('ttype','not in',['selection','reference'])],
-                                                            'invisible': [('ttype','not in',['selection','reference'])]}"/>
-                                                <field name="size"
-                                                    attrs="{'readonly': [('ttype','not in',['char','reference'])],
-                                                            'invisible': [('ttype','not in',['char','reference'])]}"/>
-                                                <field name="relation"
-                                                    attrs="{'required': [('ttype','in',['many2one','one2many','many2many'])],
-                                                            'readonly': [('ttype','not in',['many2one','one2many','many2many'])],
-                                                            'invisible': [('ttype','not in',['many2one','one2many','many2many'])]}"/>
-                                                <field name="on_delete"
-                                                    attrs="{'readonly': [('ttype','!=','many2one')],
-                                                            'invisible': [('ttype','!=','many2one')]}"/>
-                                                <field name="relation_field"
-                                                    attrs="{'required': [('ttype','=','one2many')],
-                                                            'readonly': [('ttype','!=','one2many')],
-                                                            'invisible': [('ttype','!=','one2many')]}"/>
-                                                <field name="relation_table"
-                                                    attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
-                                                            'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
-                                                <field name="column1"
-                                                    attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
-                                                            'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
-                                                <field name="column2"
-                                                    attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
-                                                            'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
-                                                <field name="domain"
-                                                    attrs="{'readonly': [('ttype','not in',['many2one','one2many','many2many'])],
-                                                            'invisible': [('ttype','not in',['many2one','one2many','many2many'])]}"/>
-                                                <field name="required"/>
-                                                <field name="readonly"/>
-                                                <field name="index"/>
-                                                <field name="copy"/>
+                                        <page name="base" string="Properties">
+                                            <group string="Base Properties">
+                                                <group>
+                                                    <field name="required"/>
+                                                    <field name="readonly"/>
+                                                    <field name="store"/>
+                                                    <field name="index"/>
+                                                    <field name="copy"/>
+                                                </group>
+                                                <group>
+                                                    <field name="translate"
+                                                        attrs="{'readonly': [('ttype','not in',['char','text'])],
+                                                                'invisible': [('ttype','not in',['char','text'])]}"/>
+                                                    <field name="selection"
+                                                        attrs="{'required': [('ttype','in',['selection','reference'])],
+                                                                'readonly': [('ttype','not in',['selection','reference'])],
+                                                                'invisible': [('ttype','not in',['selection','reference'])]}"/>
+                                                    <field name="size"
+                                                        attrs="{'readonly': [('ttype','not in',['char','reference'])],
+                                                                'invisible': [('ttype','not in',['char','reference'])]}"/>
+                                                    <field name="relation"
+                                                        attrs="{'required': [('ttype','in',['many2one','one2many','many2many'])],
+                                                                'readonly': [('ttype','not in',['many2one','one2many','many2many'])],
+                                                                'invisible': [('ttype','not in',['many2one','one2many','many2many'])]}"/>
+                                                    <field name="on_delete"
+                                                        attrs="{'readonly': [('ttype','!=','many2one')],
+                                                                'invisible': [('ttype','!=','many2one')]}"/>
+                                                    <field name="relation_field"
+                                                        attrs="{'required': [('ttype','=','one2many')],
+                                                                'readonly': [('ttype','!=','one2many')],
+                                                                'invisible': [('ttype','!=','one2many')]}"/>
+                                                    <field name="relation_table"
+                                                        attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
+                                                                'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
+                                                    <field name="column1"
+                                                        attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
+                                                                'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
+                                                    <field name="column2"
+                                                        attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
+                                                                'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
+                                                    <field name="domain"
+                                                        attrs="{'readonly': [('ttype','not in',['many2one','one2many','many2many'])],
+                                                                'invisible': [('ttype','not in',['many2one','one2many','many2many'])]}"/>
+                                                </group>
                                             </group>
-                                        </page>
-                                        <page name="advanced" string="Advanced Properties">
-                                            <group>
+                                            <group string="Advanced Properties">
                                                 <field name="serialization_field_id"
                                                     domain="[('ttype','=','serialized'), ('model_id', '=', model_id)]"
                                                     attrs="{'readonly': [('state','=','base')]}"/>
@@ -203,7 +206,7 @@
             <field name="name">Models</field>
             <field name="res_model">ir.model</field>
             <field name="view_type">form</field>
-            <field name="context">{'manual':True}</field>
+            <field name="context">{}</field>
             <field name="view_id" ref="view_model_tree"/>
         </record>
         <menuitem action="action_model_model" id="ir_model_model_menu" parent="next_id_9"/>
@@ -222,49 +225,52 @@
                             <field name="ttype"/>
                         </group>
                         <notebook>
-                            <page name="base" string="Base Properties">
-                                <group>
-                                    <field name="translate"
-                                        attrs="{'readonly': [('ttype','not in',['char','text'])],
-                                                'invisible': [('ttype','not in',['char','text'])]}"/>
-                                    <field name="selection"
-                                        attrs="{'required': [('ttype','in',['selection','reference'])],
-                                                'readonly': [('ttype','not in',['selection','reference'])],
-                                                'invisible': [('ttype','not in',['selection','reference'])]}"/>
-                                    <field name="size"
-                                        attrs="{'readonly': [('ttype','not in',['char','reference'])],
-                                                'invisible': [('ttype','not in',['char','reference'])]}"/>
-                                    <field name="relation"
-                                        attrs="{'required': [('ttype','in',['many2one','one2many','many2many'])],
-                                                'readonly': [('ttype','not in',['many2one','one2many','many2many'])],
-                                                'invisible': [('ttype','not in',['many2one','one2many','many2many'])]}"/>
-                                    <field name="on_delete"
-                                        attrs="{'readonly': [('ttype','!=','many2one')],
-                                                'invisible': [('ttype','!=','many2one')]}"/>
-                                    <field name="relation_field"
-                                        attrs="{'required': [('ttype','=','one2many')],
-                                                'readonly': [('ttype','!=','one2many')],
-                                                'invisible': [('ttype','!=','one2many')]}"/>
-                                    <field name="relation_table"
-                                        attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
-                                                'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
-                                    <field name="column1"
-                                        attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
-                                                'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
-                                    <field name="column2"
-                                        attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
-                                                'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
-                                    <field name="domain"
-                                        attrs="{'readonly': [('ttype','not in',['many2one','one2many','many2many'])],
-                                                'invisible': [('ttype','not in',['many2one','one2many','many2many'])]}"/>
-                                    <field name="required"/>
-                                    <field name="readonly"/>
-                                    <field name="index"/>
-                                    <field name="copy"/>
+                            <page name="base" string="Properties">
+                                <group string="Base Properties">
+                                    <group>
+                                        <field name="required"/>
+                                        <field name="readonly"/>
+                                        <field name="store"/>
+                                        <field name="index"/>
+                                        <field name="copy"/>
+                                    </group>
+                                    <group>
+                                        <field name="translate"
+                                            attrs="{'readonly': [('ttype','not in',['char','text'])],
+                                                    'invisible': [('ttype','not in',['char','text'])]}"/>
+                                        <field name="selection"
+                                            attrs="{'required': [('ttype','in',['selection','reference'])],
+                                                    'readonly': [('ttype','not in',['selection','reference'])],
+                                                    'invisible': [('ttype','not in',['selection','reference'])]}"/>
+                                        <field name="size"
+                                            attrs="{'readonly': [('ttype','not in',['char','reference'])],
+                                                    'invisible': [('ttype','not in',['char','reference'])]}"/>
+                                        <field name="relation"
+                                            attrs="{'required': [('ttype','in',['many2one','one2many','many2many'])],
+                                                    'readonly': [('ttype','not in',['many2one','one2many','many2many'])],
+                                                    'invisible': [('ttype','not in',['many2one','one2many','many2many'])]}"/>
+                                        <field name="on_delete"
+                                            attrs="{'readonly': [('ttype','!=','many2one')],
+                                                    'invisible': [('ttype','!=','many2one')]}"/>
+                                        <field name="relation_field"
+                                            attrs="{'required': [('ttype','=','one2many')],
+                                                    'readonly': [('ttype','!=','one2many')],
+                                                    'invisible': [('ttype','!=','one2many')]}"/>
+                                        <field name="relation_table"
+                                            attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
+                                                    'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
+                                        <field name="column1"
+                                            attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
+                                                    'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
+                                        <field name="column2"
+                                            attrs="{'readonly': ['|', ('ttype','!=','many2many'), ('state','!=','manual')],
+                                                    'invisible': ['|', ('ttype','!=','many2many'), ('state','!=','manual')]}"/>
+                                        <field name="domain"
+                                            attrs="{'readonly': [('ttype','not in',['many2one','one2many','many2many'])],
+                                                    'invisible': [('ttype','not in',['many2one','one2many','many2many'])]}"/>
+                                    </group>
                                 </group>
-                            </page>
-                            <page name="advanced" string="Advanced Properties">
-                                <group>
+                                <group string="Advanced Properties">
                                     <field name="serialization_field_id"
                                         domain="[('ttype','=','serialized'), ('model_id', '=', model_id)]"
                                         attrs="{'readonly': [('state','=','base')]}"/>
@@ -351,7 +357,7 @@
             <field name="name">Fields</field>
             <field name="res_model">ir.model.fields</field>
             <field name="view_type">form</field>
-            <field name="context">{'manual':True}</field>
+            <field name="context">{}</field>
             <field name="view_id" ref="view_model_fields_tree"/>
         </record>
         <menuitem action="action_model_fields" id="ir_model_model_fields" parent="base.next_id_9"/>

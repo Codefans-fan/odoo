@@ -140,7 +140,10 @@
                                         <span><t t-esc="record.employee_id.value"/> <t t-esc="record.date.value"/></span>
                                     </div>
                                     <div class="col-xs-6">
-                                        <span t-attf-class="pull-right text-right label #{['draft', 'submit'].indexOf(record.state.raw_value) > -1 ? 'label-default' : ['cancel'].indexOf(record.state.raw_value) > -1 ? 'label-danger' : ['post'].indexOf(record.state.raw_value) > -1 ? 'label-warning' : ['done'].indexOf(record.state.raw_value) > -1 ? 'label-success' : 'label-primary'}"><t t-esc="record.state.value"/></span>
+                                        <span class="pull-right text-right">
+                                            <field name="state" widget="kanban_label_selection" options="{'classes': {'draft': 'default', 'submit': 'default', 'cancel': 'danger', 'post': 'warning',
+                                            'done': 'success'}}"/>
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -199,7 +202,7 @@
                         <filter string="Department" domain="[]" context="{'group_by': 'department_id'}" groups="hr.group_multi_departments"/>
                         <filter string="Company" domain="[]" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
                         <filter string="Product" domain="[]" context="{'group_by': 'product_id'}"/>
-                        <filter domain="[]" context="{'group_by': 'analytic_account_id'}" groups="analytic.group_analytic_accounting"/>
+                        <filter string="Analytic Account" domain="[]" context="{'group_by': 'analytic_account_id'}" groups="analytic.group_analytic_accounting"/>
                         <filter string="Expenses Month" domain="[]" context="{'group_by': 'date'}" help="Expenses by Month"/>
                     </group>
                     <separator />
@@ -325,7 +328,7 @@
         </record>
 
         <record id="hr_expense_entry_action_server" model="ir.actions.server">
-            <field name="name">Generate Single Accounting Entry</field>
+            <field name="name">Generate Accounting Entries</field>
             <field name="type">ir.actions.server</field>
             <field name="model_id" ref="model_hr_expense"/>
             <field name="state">code</field>

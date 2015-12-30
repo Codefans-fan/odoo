@@ -2,13 +2,8 @@
 <openerp>
     <data>
         <!-- After installation of the module, open the related menu -->
-        <record id="action_client_warehouse_menu" model="ir.actions.client">
-            <field name="name">Open Warehouse Menu</field>
-            <field name="tag">reload</field>
-            <field name="params" eval="{'menu_id': ref('menu_stock_root')}"/>
-        </record>
         <record id="base.open_menu" model="ir.actions.todo">
-            <field name="action_id" ref="action_client_warehouse_menu"/>
+            <field name="action_id" ref="base.action_open_website"/>
             <field name="state">open</field>
         </record>
         <record id="view_stock_config_settings" model="ir.ui.view">
@@ -64,7 +59,7 @@
 
                         <label for="group_stock_adv_location"/>
                         <div>
-                            <field name="group_stock_adv_location" widget="radio"/>
+                            <field name="group_stock_adv_location" widget="radio" on_change="onchange_adv_location(group_stock_adv_location)"/>
                             <div attrs="{'invisible': [('group_stock_adv_location', '=', 0)]}">
                                 <label for="propagation_minimum_delta"/>
                                 <field name="propagation_minimum_delta" class="oe_inline"/>

@@ -3,13 +3,16 @@
 # * auth_signup
 # 
 # Translators:
+# David <info@coreser.com>, 2015
+# Henry Mineehen <info@mineehen.de>, 2015
+# Magdalena Zimprich <magdalena.zimprich@camadeus.at>, 2015
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo 9.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2015-09-14 10:27+0000\n"
-"PO-Revision-Date: 2015-10-19 13:33+0000\n"
-"Last-Translator: Martin Trigaux\n"
+"PO-Revision-Date: 2015-12-11 18:44+0000\n"
+"Last-Translator: Henry Mineehen <info@mineehen.de>\n"
 "Language-Team: German (http://www.transifex.com/odoo/odoo-9/language/de/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -56,7 +59,7 @@ msgid ""
 "<p>You may change your password by following <a href=\"${object.signup_url}\">this link</a>, which will remain valid during 24 hours.</p>\n"
 "\n"
 "<p>Note: If you do not expect this, you can safely ignore this email.</p>"
-msgstr ""
+msgstr "\n<p>Eine Aufforderung zur Kennwortwiederherstellung zu dem Odoo Konto verknüpft mit dieser E-mail-Adresse wurde  gesendet. </p>\n\n<p>Das Kennwort kann mit folgendem <a href=\"${object.signup_url}\">Link</a>, welcher 24 Stunden gültig ist, geändert werden.</p>\n\n<p>Hinweis: Falls keine Anfrage gestartet wurde, kann diese E-mail ignoriert werden. </p>"
 
 #. module: auth_signup
 #: model:mail.template,subject:auth_signup.set_password_email
@@ -68,14 +71,14 @@ msgstr "${object.company_id.name} Einladung zur Verbindung mit Odoo"
 msgid ""
 "<strong>A password reset has been requested for this user. An email "
 "containing the following link has been sent:</strong>"
-msgstr ""
+msgstr "Für diesen Benutzer wurde eine Passwortzurücksetzung beantragt. Eine E-Mail mit dem folgenden Link wurde gesendet:"
 
 #. module: auth_signup
 #: model:ir.ui.view,arch_db:auth_signup.res_users_form_view
 msgid ""
 "<strong>An invitation email containing the following subscription link has "
 "been sent:</strong>"
-msgstr ""
+msgstr "Eine Einladungs-E-Mail mit dem folgenden Bestätigungslink wurde versendet:"
 
 #. module: auth_signup
 #: model:ir.model.fields,field_description:auth_signup.field_base_config_settings_auth_signup_uninvited
@@ -92,7 +95,7 @@ msgstr "Es wurde eine E-Mail mit Zugangsdaten zur Änderung Ihres Passworts gese
 #: code:addons/auth_signup/controllers/main.py:108
 #, python-format
 msgid "Authentication Failed."
-msgstr ""
+msgstr "Authentifizierung fehlgeschlagen"
 
 #. module: auth_signup
 #: model:ir.ui.view,arch_db:auth_signup.reset_password
@@ -104,7 +107,7 @@ msgstr "Zurück zur Anmeldung"
 #: code:addons/auth_signup/res_users.py:277
 #, python-format
 msgid "Cannot send email: user %s has no email address."
-msgstr ""
+msgstr "E-Mail kann nicht verschickt werden: Benutzer %s hat keine E-Mail Adresse"
 
 #. module: auth_signup
 #: model:ir.ui.view,arch_db:auth_signup.reset_password
@@ -119,7 +122,7 @@ msgstr "Passwort bestätigen"
 #. module: auth_signup
 #: selection:res.users,state:0
 msgid "Connected"
-msgstr ""
+msgstr "Verbunden"
 
 #. module: auth_signup
 #: code:addons/auth_signup/controllers/main.py:62
@@ -166,7 +169,7 @@ msgstr "Passwort zurücksetzen"
 #. module: auth_signup
 #: model:ir.model.fields,field_description:auth_signup.field_res_users_website_private
 msgid "Private Profile"
-msgstr ""
+msgstr "Privates Profil"
 
 #. module: auth_signup
 #: model:ir.ui.view,arch_db:auth_signup.login
@@ -177,7 +180,7 @@ msgstr "Passwort zurücksetzen"
 #: code:addons/auth_signup/res_users.py:250
 #, python-format
 msgid "Reset password: invalid username or email"
-msgstr ""
+msgstr "Passwort zurücksetzen: Falscher Benutzername oder E-mail"
 
 #. module: auth_signup
 #: model:ir.ui.view,arch_db:auth_signup.res_users_form_view

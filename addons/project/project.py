@@ -9,6 +9,7 @@ from openerp import api
 from openerp import SUPERUSER_ID
 from openerp import tools
 from openerp.osv import fields, osv
+from openerp.tools.safe_eval import safe_eval as eval
 from openerp.tools.translate import _
 from openerp.exceptions import UserError
 
@@ -111,6 +112,14 @@ class project(osv.osv):
         for project in self.browse(cr, uid, ids, context=context):
             res[project.id] = len(project.task_ids)
         return res
+
+    def _task_needaction_count(self, cr, uid, ids, field_name, arg, context=None):
+        Task = self.pool['project.task']
+        res = dict.fromkeys(ids, 0)
+        projects = Task.read_group(cr, uid, [('project_id', 'in', ids), ('message_needaction', '=', True)], ['project_id'], ['project_id'], context=context)
+        res.update({project['project_id'][0]: int(project['project_id_count']) for project in projects})
+        return res
+
     def _get_alias_models(self, cr, uid, context=None):
         """ Overriden in project_issue to offer more options """
         return [('project.task', "Tasks")]
@@ -162,6 +171,7 @@ class project(osv.osv):
         'resource_calendar_id': fields.many2one('resource.calendar', 'Working Time', help="Timetable working hours to adjust the gantt diagram report", states={'close':[('readonly',True)]} ),
         'type_ids': fields.many2many('project.task.type', 'project_task_type_rel', 'project_id', 'type_id', 'Tasks Stages', states={'close':[('readonly',True)], 'cancelled':[('readonly',True)]}),
         'task_count': fields.function(_task_count, type='integer', string="Tasks",),
+        'task_needaction_count': fields.function(_task_needaction_count, type='integer', string="Tasks",),
         'task_ids': fields.one2many('project.task', 'project_id',
                                     domain=['|', ('stage_id.fold', '=', False), ('stage_id', '=', False)]),
         'color': fields.integer('Color Index'),
@@ -388,7 +398,7 @@ class task(osv.osv):
             project = self.pool.get('project.project').browse(cr, uid, project_id, context=context)
             if project and project.partner_id:
                 return {'value': {'partner_id': project.partner_id.id}}
-        return {'value': {'partner_id': False}}
+        return {}
 
     def onchange_user_id(self, cr, uid, ids, user_id, context=None):
         vals = {}
@@ -797,7 +807,7 @@ class task(osv.osv):
 
         res = super(task, self).message_new(cr, uid, msg, custom_values=defaults, context=context)
         email_list = self.email_split(cr, uid, [res], msg, context=context)
-        partner_ids = self._find_partner_from_emails(cr, uid, [res], email_list, force_create=True, context=context)
+        partner_ids = filter(None, self._find_partner_from_emails(cr, uid, [res], email_list, force_create=False, context=context))
         self.message_subscribe(cr, uid, [res], partner_ids, context=context)
         return res
 
@@ -821,7 +831,7 @@ class task(osv.osv):
                         pass
 
         email_list = self.email_split(cr, uid, ids, msg, context=context)
-        partner_ids = self._find_partner_from_emails(cr, uid, ids, email_list, force_create=True, context=context)
+        partner_ids = filter(None, self._find_partner_from_emails(cr, uid, ids, email_list, force_create=False, context=context))
         self.message_subscribe(cr, uid, ids, partner_ids, context=context)
         return super(task, self).message_update(cr, uid, ids, msg, update_vals=update_vals, context=context)
 
@@ -832,6 +842,24 @@ class task(osv.osv):
                 reason = _('Customer Email') if data.partner_id.email else _('Customer')
                 data._message_add_suggested_recipient(recipients, partner=data.partner_id, reason=reason)
         return recipients
+
+    def message_get_email_values(self, cr, uid, ids, notif_mail=None, context=None):
+        res = super(task, self).message_get_email_values(cr, uid, ids, notif_mail=notif_mail, context=context)
+        current_task = self.browse(cr, uid, ids[0], context=context)
+        headers = {}
+        if res.get('headers'):
+            try:
+                headers.update(eval(res['headers']))
+            except Exception:
+                pass
+        if current_task.project_id:
+            current_objects = filter(None, headers.get('X-Odoo-Objects', '').split(','))
+            current_objects.insert(0, 'project.project-%s, ' % current_task.project_id.id)
+            headers['X-Odoo-Objects'] = ','.join(current_objects)
+        if current_task.tag_ids:
+            headers['X-Odoo-Tags'] = ','.join([tag.name for tag in current_task.tag_ids])
+        res['headers'] = repr(headers)
+        return res
 
 
 class account_analytic_account(osv.osv):

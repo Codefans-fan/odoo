@@ -4,7 +4,6 @@ import base64
 import datetime
 import dateutil
 import email
-import json
 import lxml
 from lxml import etree
 import logging
@@ -96,8 +95,7 @@ class MailThread(models.AbstractModel):
         compute='_get_followers', search='_search_follower_channels')
     message_ids = fields.One2many(
         'mail.message', 'res_id', string='Messages',
-        domain=lambda self: [('model', '=', self._name)], auto_join=True,
-        help="Messages and communication history")
+        domain=lambda self: [('model', '=', self._name)], auto_join=True)
     message_last_post = fields.Datetime('Last Message Date', help='Date of the last message posted on the record.')
     message_unread = fields.Boolean(
         'Unread Messages', compute='_get_message_unread',
@@ -366,7 +364,7 @@ class MailThread(models.AbstractModel):
             doc = etree.XML(res['arch'])
             for node in doc.xpath("//field[@name='message_ids']"):
                 # the 'Log a note' button is employee only
-                options = json.loads(node.get('options', '{}'))
+                options = eval(node.get('options', '{}'))
                 is_employee = self.env.user.has_group('base.group_user')
                 options['display_log_button'] = is_employee
                 if is_employee:
@@ -379,7 +377,7 @@ class MailThread(models.AbstractModel):
                 # emoji list
                 options['emoji_list'] = self.env['mail.shortcode'].search([('shortcode_type', '=', 'image')]).read(['source', 'description', 'substitution'])
                 # save options on the node
-                node.set('options', json.dumps(options))
+                node.set('options', repr(options))
             res['arch'] = etree.tostring(doc)
         return res
 
@@ -730,8 +728,11 @@ class MailThread(models.AbstractModel):
         """ Get specific notification email values to store on the notification
         mail_mail. Void method, inherit it to add custom values. """
         self.ensure_one()
-        res = dict()
-        return res
+        database_uuid = self.env['ir.config_parameter'].get_param('database.uuid')
+        return {'headers': repr({
+            'X-Odoo-Objects': "%s-%s" % (self._model, self.id),
+            'X-Odoo-db-uuid': database_uuid
+        })}
 
     # ------------------------------------------------------
     # Mail gateway
@@ -869,7 +870,11 @@ class MailThread(models.AbstractModel):
                 obj = record_set[0]
             else:
                 obj = self.env[alias.alias_parent_model_id.model].browse(alias.alias_parent_thread_id)
-            if not author_id or author_id not in [fol.id for fol in obj.message_partner_ids]:
+            accepted_partner_ids = list(
+                set(partner.id for partner in obj.message_partner_ids) |
+                set(partner.id for channel in obj.message_channel_ids for partner in channel.channel_partner_ids)
+            )
+            if not author_id or author_id not in accepted_partner_ids:
                 _warn('alias %s restricted to internal followers, skipping' % alias.alias_name)
                 _create_bounce_email()
                 return False
@@ -1238,10 +1243,14 @@ class MailThread(models.AbstractModel):
         html_sanitize methods located in tools. """
         root = lxml.html.fromstring(body)
         postprocessed = False
+        to_remove = []
         for node in root.iter():
-            if 'o_mail_notification' in node.get('class', '') or 'o_mail_notification' in node.get('summary', ''):
+            if 'o_mail_notification' in (node.get('class') or '') or 'o_mail_notification' in (node.get('summary') or ''):
                 postprocessed = True
-                node.getparent().remove(node)
+                if node.getparent() is not None:
+                    to_remove.append(node)
+        for node in to_remove:
+            node.getparent().remove(node)
         if postprocessed:
             body = etree.tostring(root, pretty_print=False, encoding='UTF-8')
         return body, attachments
@@ -1468,6 +1477,7 @@ class MailThread(models.AbstractModel):
                 followers = record.message_partner_ids
 
         Partner = self.env['res.partner'].sudo()
+        Users = self.env['res.users'].sudo()
         partner_ids = []
 
         for contact in emails:
@@ -1488,10 +1498,10 @@ class MailThread(models.AbstractModel):
             email_brackets = "<%s>" % email_address
             if not partner_id:
                 # exact, case-insensitive match
-                partners = Partner.search([('email', '=ilike', email_address), ('user_ids', '!=', False)], limit=1)
+                partners = Users.search([('email', '=ilike', email_address)], limit=1).mapped('partner_id')
                 if not partners:
                     # if no match with addr-spec, attempt substring match within name-addr pair
-                    partners = Partner.search([('email', 'ilike', email_brackets), ('user_ids', '!=', False)], limit=1)
+                    partners = Users.search([('email', 'ilike', email_brackets)], limit=1).mapped('partner_id')
                 if partners:
                     partner_id = partners[0].id
             # third try: check in partners

@@ -73,7 +73,7 @@ class AccountMove(models.Model):
     ref = fields.Char(string='Reference', copy=False)
     date = fields.Date(required=True, states={'posted': [('readonly', True)]}, index=True, default=fields.Date.context_today)
     journal_id = fields.Many2one('account.journal', string='Journal', required=True, states={'posted': [('readonly', True)]}, default=_get_default_journal)
-    currency_id = fields.Many2one('res.currency', compute='_compute_currency', store=True)
+    currency_id = fields.Many2one('res.currency', compute='_compute_currency', store=True, string="Currency")
     rate_diff_partial_rec_id = fields.Many2one('account.partial.reconcile', string='Exchange Rate Entry of', help="Technical field used to keep track of the origin of journal entries created in case of fluctuation of the currency exchange rate. This is needed when cancelling the source: it will post the inverse journal entry to cancel that part too.")
     state = fields.Selection([('draft', 'Unposted'), ('posted', 'Posted')], string='Status',
       required=True, readonly=True, copy=False, default='draft',
@@ -219,7 +219,7 @@ class AccountMoveLine(models.Model):
     _description = "Journal Item"
     _order = "date desc, id desc"
 
-    @api.depends('debit', 'credit', 'amount_currency', 'currency_id', 'matched_debit_ids.amount', 'matched_credit_ids.amount', 'account_id.currency_id')
+    @api.depends('debit', 'credit', 'amount_currency', 'currency_id', 'matched_debit_ids.amount', 'matched_credit_ids.amount', 'account_id.currency_id', 'move_id.state')
     def _amount_residual(self):
         """ Computes the residual amount of a move line from a reconciliable account in the company currency and the line's currency.
             This amount will be 0 for fully reconciled lines or lines from a non-reconciliable account, the original line amount
@@ -352,8 +352,8 @@ class AccountMoveLine(models.Model):
         help="This field is used for payable and receivable journal entries. You can put the limit date for the payment of this line.")
     date = fields.Date(related='move_id.date', string='Date', required=True, index=True, default=fields.Date.context_today, store=True, copy=False)
     analytic_line_ids = fields.One2many('account.analytic.line', 'move_id', string='Analytic lines', oldname="analytic_lines")
-    tax_ids = fields.Many2many('account.tax', string='Taxes', readonly=True)
-    tax_line_id = fields.Many2one('account.tax', string='Originator tax', readonly=True)
+    tax_ids = fields.Many2many('account.tax', string='Taxes')
+    tax_line_id = fields.Many2one('account.tax', string='Originator tax')
     analytic_account_id = fields.Many2one('account.analytic.account', string='Analytic Account')
     company_id = fields.Many2one('res.company', related='account_id.company_id', string='Company', store=True)
     counterpart = fields.Char("Counterpart", compute='_get_counterpart', help="Compute the counter part accounts of this journal item for this journal entry. This can be needed in reports.")
@@ -374,7 +374,7 @@ class AccountMoveLine(models.Model):
         for line in self:
             if line.account_id.currency_id:
                 if not line.currency_id or line.currency_id.id != line.account_id.currency_id.id:
-                    raise UserError(_('The selected account of your Journal Entry forces to provide a secondary currency. You should remove the secondary currency on the account or select a multi-currency view on the journal.'))
+                    raise UserError(_('The selected account of your Journal Entry forces to provide a secondary currency. You should remove the secondary currency on the account.'))
 
     @api.multi
     @api.constrains('currency_id', 'amount_currency')
@@ -422,12 +422,17 @@ class AccountMoveLine(models.Model):
             # since postgresql doesn't implement empty list (so 'AND id in ()' is useless)
             return []
 
+        assert res_type in ('partner', 'account')
+        assert account_type in ('payable', 'receivable', None)
         is_partner = res_type == 'partner'
         res_alias = is_partner and 'p' or 'a'
-        self.env.cr.execute(
-            """ SELECT %s account_id, account_name, account_code, max_date, to_char(last_time_entries_checked, 'YYYY-MM-DD') AS last_time_entries_checked FROM (
-                    SELECT %s
-                        %s.last_time_entries_checked AS last_time_entries_checked,
+
+        query = ("""
+            SELECT {0} account_id, account_name, account_code, max_date,
+                   to_char(last_time_entries_checked, 'YYYY-MM-DD') AS last_time_entries_checked
+            FROM (
+                    SELECT {1}
+                        {res_alias}.last_time_entries_checked AS last_time_entries_checked,
                         a.id AS account_id,
                         a.name AS account_name,
                         a.code AS account_code,
@@ -436,44 +441,42 @@ class AccountMoveLine(models.Model):
                         account_move_line l
                         RIGHT JOIN account_account a ON (a.id = l.account_id)
                         RIGHT JOIN account_account_type at ON (at.id = a.user_type_id)
-                        %s
+                        {2}
                     WHERE
                         a.reconcile IS TRUE
-                        %s
-                        %s
-                        %s
+                        {3}
+                        {4}
+                        {5}
                         AND EXISTS (
                             SELECT NULL
                             FROM account_move_line l
                             WHERE l.account_id = a.id
-                            %s
+                            {6}
                             AND l.amount_residual > 0
                         )
                         AND EXISTS (
                             SELECT NULL
                             FROM account_move_line l
                             WHERE l.account_id = a.id
-                            %s
+                            {6}
                             AND l.amount_residual < 0
                         )
-                    GROUP BY %s a.id, a.name, a.code, %s.last_time_entries_checked
-                    ORDER BY %s.last_time_entries_checked
+                    GROUP BY {7} a.id, a.name, a.code, {res_alias}.last_time_entries_checked
+                    ORDER BY {res_alias}.last_time_entries_checked
                 ) as s
-                WHERE (last_time_entries_checked IS NULL OR max_date > last_time_entries_checked)
-            """ % (
+            WHERE (last_time_entries_checked IS NULL OR max_date > last_time_entries_checked)
+        """.format(
                 is_partner and 'partner_id, partner_name,' or ' ',
                 is_partner and 'p.id AS partner_id, p.name AS partner_name,' or ' ',
-                res_alias,
                 is_partner and 'RIGHT JOIN res_partner p ON (l.partner_id = p.id)' or ' ',
                 is_partner and ' ' or "AND at.type <> 'payable' AND at.type <> 'receivable'",
-                account_type and "AND at.type = '" + account_type + "'" or '',
-                res_ids and 'AND ' + res_alias + '.id in (' + ','.join(map(str, res_ids)) + ')' or '',
-                is_partner and 'AND l.partner_id = p.id' or ' ',
+                account_type and "AND at.type = %(account_type)s" or '',
+                res_ids and 'AND ' + res_alias + '.id in %(res_ids)s' or '',
                 is_partner and 'AND l.partner_id = p.id' or ' ',
                 is_partner and 'l.partner_id, p.id,' or ' ',
-                res_alias,
-                res_alias,
+                res_alias=res_alias
             ))
+        self.env.cr.execute(query, locals())
 
         # Apply ir_rules by filtering out
         rows = self.env.cr.dictfetchall()
@@ -498,17 +501,18 @@ class AccountMoveLine(models.Model):
         """ Returns two lines whose amount are opposite """
 
         # Get pairs
-        partner_id_condition = partner_id and 'AND a.partner_id = %d AND b.partner_id = %d' % (partner_id, partner_id) or ''
-        self.env.cr.execute(
-            """ SELECT a.id, b.id
+        partner_id_condition = partner_id and 'AND a.partner_id = %(partner_id)s AND b.partner_id = %(partner_id)s' or ''
+        query = """
+                SELECT a.id, b.id
                 FROM account_move_line a, account_move_line b
                 WHERE a.amount_residual = -b.amount_residual
                 AND NOT a.reconciled AND NOT b.reconciled
-                AND a.account_id = %d AND b.account_id = %d
-                %s
+                AND a.account_id = %(account_id)s AND b.account_id = %(account_id)s
+                {partner_id_condition}
                 ORDER BY a.date asc
                 LIMIT 10
-            """ % (account_id, account_id, partner_id_condition))
+            """.format(**locals())
+        self.env.cr.execute(query, locals())
         pairs = self.env.cr.fetchall()
 
         # Apply ir_rules by filtering out
@@ -672,9 +676,11 @@ class AccountMoveLine(models.Model):
                 self.process_reconciliation(cr, uid, datum['mv_line_ids'], datum['new_mv_line_dicts'], context=context)
 
             if datum['type'] == 'partner':
-                self.env['res.partner'].browse(datum['id']).mark_as_reconciled()
+                partners = self.pool['res.partner'].browse(cr, uid, datum['id'], context=context)
+                self.pool['res.partner'].mark_as_reconciled(cr, uid, partners.ids, context=context)
             if datum['type'] == 'account':
-                self.env['account.account'].browse(datum['id']).mark_as_reconciled()
+                accounts = self.pool['account.account'].browse(cr, uid, datum['id'], context=context)
+                self.pool['account.account'].mark_as_reconciled(cr, uid, accounts.ids, context=context)
 
     @api.v7
     def process_reconciliation(self, cr, uid, mv_line_ids, new_mv_line_dicts, context=None):

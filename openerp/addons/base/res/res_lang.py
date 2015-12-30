@@ -18,6 +18,7 @@ _logger = logging.getLogger(__name__)
 class lang(osv.osv):
     _name = "res.lang"
     _description = "Languages"
+    _order = "active desc,name"
 
     _disallowed_datetime_patterns = tools.DATETIME_FORMATS_MAP.keys()
     _disallowed_datetime_patterns.remove('%y') # this one is in fact allowed, just not good practice
@@ -41,6 +42,10 @@ class lang(osv.osv):
         default_value = ir_values_obj.get(cr, uid, 'default', False, ['res.partner'])
         if not default_value:
             ir_values_obj.set(cr, uid, 'default', False, 'lang', ['res.partner'], lang)
+            # set language of main company, created directly by db bootstrap SQL
+            user = self.pool['res.users'].browse(cr, uid, uid)
+            if not user.company_id.partner_id.lang:
+                user.company_id.partner_id.write({'lang': lang})
         return True
 
     def load_lang(self, cr, uid, lang, lang_name=None):
@@ -211,6 +216,11 @@ class lang(osv.osv):
     def write(self, cr, uid, ids, vals, context=None):
         if isinstance(ids, (int, long)):
              ids = [ids]
+
+        if 'code' in vals:
+            for rec in self.browse(cr, uid, ids, context):
+                if rec.code != vals['code']:
+                    raise UserError(_("Language code cannot be modified."))
 
         if vals.get('active') == False:
             users = self.pool.get('res.users')

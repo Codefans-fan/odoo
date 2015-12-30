@@ -121,10 +121,10 @@
             </t>
 
             <t t-call="web_planner.category">
-                <t t-set="menu_categorytitle">Your Pipeline</t>
+                <t t-set="menu_categorytitle">My Pipeline</t>
                 <t t-set="menu_categoryclasses" t-value="'fa-tag'"/>
                 <t t-call="web_planner.page">
-                    <t t-set="page_title">Your Pipeline</t>
+                    <t t-set="page_title">My Pipeline</t>
                     <p class="text-muted">
                         Systematic organization is what makes the difference
                         between good and great salespeople! Setup a pipeline
@@ -471,7 +471,7 @@
                         <span class="fa fa-lightbulb-o fa-lg"/>
                         <strong>Tip:</strong> For developers, you can
                         use our API to load data through scripts: read
-                        the <a href="https://www.odoo.com/documentation/8.0/api_integration.html" target="_blank">API documentation</a>
+                        the <a href="https://www.odoo.com/documentation/9.0/api_integration.html" target="_blank">API documentation</a>
                     </div>
                 </t>
 
@@ -528,7 +528,7 @@
                     <div class="alert alert-info info_icon" role="alert">
                         <span class="fa fa-lightbulb-o fa-lg"/>
                         <strong>Tip:</strong>
-                        You can also use our API to load data automatically through scripts: read this <a href="https://www.odoo.com/documentation/8.0/api_integration.html" target="_blank">technical documentation</a>.
+                        You can also use our API to load data automatically through scripts: read this <a href="https://www.odoo.com/documentation/9.0/api_integration.html" target="_blank">technical documentation</a>.
                     </div>
                 </t>
 
@@ -789,7 +789,7 @@
                         <strong>methodical organization</strong>, <strong>trainings</strong> and
                         <strong>good sales tools</strong>.
                         </p><p>
-                        If you followed the preceeding steps, you already setup
+                        If you followed the preceding steps, you already setup
                         the foundations to a strong process leading to
                         continuous improvements of your sales teams.
                     </p>

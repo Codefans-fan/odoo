@@ -208,7 +208,7 @@
                                 <tree string="Stock Moves">
                                     <field name="name"/>
                                     <field name="product_id"/>
-                                    <field name="qty" on_change="onchange_quantity(product_id, product_qty, product_uom)"/>
+                                    <field name="qty"/>
                                     <field name="location_id" groups="stock.group_locations"/>
                                 </tree>
                              </field>
@@ -637,7 +637,9 @@
                                         <strong><span><t t-esc="record.name.value"/></span></strong>
                                     </div>
                                     <div class="col-xs-6">
-                                        <strong><span t-attf-class="pull-right text-right label #{['draft', 'cancel'].indexOf(record.state.raw_value) > -1 ? 'label-default' : ['none'].indexOf(record.state.raw_value) > -1 ? 'label-danger' : ['waiting', 'confirmed', 'partially_available'].indexOf(record.state.raw_value) > -1 ? 'label-warning' : ['done'].indexOf(record.state.raw_value) > -1 ? 'label-success' : 'label-primary'}"><t t-esc="record.state.value"/></span></strong>
+                                        <strong><span class="pull-right text-right">
+                                            <field name="state" widget="kanban_label_selection" options="{'classes': {'draft': 'default', 'cancel': 'default', 'none': 'danger', 'waiting': 'warning', 'confirmed': 'warning', 'partially_available': 'warning', 'done': 'success'}}"/>
+                                        </span></strong>
                                     </div>
                                 </div>
                                 <div class="row text-muted">
@@ -988,7 +990,7 @@
               <p class="oe_view_nocontent_create">
                 Click here to create a new transfer.
               </p><p>
-                You can either do it immediatly or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
+                You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
         </record>
@@ -1013,7 +1015,7 @@
               <p class="oe_view_nocontent_create">
                 Click here to create a new transfer.
               </p><p>
-                You can either do it immediatly or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
+                You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
         </record>
@@ -1037,7 +1039,7 @@
               <p class="oe_view_nocontent_create">
                 Click here to create a new transfer.
               </p><p>
-                You can either do it immediatly or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
+                You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
         </record>
@@ -1061,7 +1063,7 @@
               <p class="oe_view_nocontent_create">
                 Click here to create a new transfer.
               </p><p>
-                You can either do it immediatly or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
+                You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
        </record>
@@ -1086,7 +1088,7 @@
               <p class="oe_view_nocontent_create">
                 Click here to create a new transfer.
               </p><p>
-                You can either do it immediatly or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
+                You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
         </record>
@@ -1110,7 +1112,7 @@
               <p class="oe_view_nocontent_create">
                 Click here to create a new transfer.
               </p><p>
-                You can either do it immediatly or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
+                You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
         </record>
@@ -1135,7 +1137,7 @@
               <p class="oe_view_nocontent_create">
                 Click here to create a new transfer.
               </p><p>
-                You can either do it immediatly or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
+                You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
         </record>
@@ -1160,7 +1162,7 @@
               <p class="oe_view_nocontent_create">
                 Click here to create a new transfer.
               </p><p>
-                You can either do it immediatly or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
+                You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
         </record>
@@ -1209,7 +1211,7 @@
               <p class="oe_view_nocontent_create">
                 Click here to create a new transfer.
               </p><p>
-                You can either do it immediatly or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
+                You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
         </record>
@@ -1338,6 +1340,7 @@
                         <group name="destination_grp" string="Destination" groups="stock.group_locations">
                             <field name="location_dest_id" />
                             <field name="partner_id" context="{'contact_display':'partner'}" />
+                            <field name="picking_partner_id" context="{'contact_display':'partner'}"/>
                             <field name="move_dest_id" groups="base.group_no_one" readonly="1"/>
                         </group>
                         <group name="quants_grp" string="Reserved Quants" colspan="2" groups="base.group_no_one" attrs="{'invisible': [('state', '=', 'done')]}">
@@ -1501,7 +1504,6 @@
                     <field name="picking_id" string="Reference" invisible="1"/>
                     <field name="sequence" invisible="1"/>
                     <field name="origin"/>
-                    <field name="partner_id" string="Vendor"/>
                     <field name="product_id"/>
                     <field name="product_uom_qty"/>
                     <field name="product_uom" options="{'no_open': True, 'no_create': True}" string="Unit of Measure" groups="product.group_uom"/>
@@ -1694,9 +1696,7 @@
               <p class="oe_view_nocontent_create">
                 Click to define a new transfer.
               </p><p>
-                    You can either do it immediatly or mark it as Todo for future processing.
-              </p><p>
-                    Use your scanner to validate the transferred quantity quicker.
+                    You can either do it immediately or mark it as Todo for future processing. Use your scanner to validate the transferred quantity quicker.
               </p>
             </field>
 
@@ -2042,8 +2042,8 @@
         </record>
 
         <!-- Procurements are located in Warehouse menu hierarchy, MRP users should come to Stock application to use it.  -->
-        <menuitem id="menu_stock_sched" name="Schedulers" parent="stock.menu_stock_root" sequence="50" groups="base.group_no_one"/>
-        <menuitem action="action_procurement_compute" id="menu_procurement_compute" parent="menu_stock_sched" groups="base.group_no_one" sequence="2"/>
+        <menuitem id="menu_stock_sched" name="Schedulers" parent="stock.menu_stock_root" groups="group_stock_manager" sequence="50"/>
+        <menuitem action="action_procurement_compute" id="menu_procurement_compute" parent="menu_stock_sched" sequence="2"/>
         <menuitem action="procurement.action_compute_schedulers" id="menu_stock_proc_schedulers" parent="menu_stock_sched" sequence="1" groups="stock.group_stock_manager"/>
         <menuitem id="menu_stock_procurement" name="Automatic Procurements" parent="stock.menu_stock_config_settings" sequence="5"/>
         <menuitem id="stock.menu_warehouse_report" name="Reports" sequence="99" parent="stock.menu_stock_root" groups="group_stock_manager"/>

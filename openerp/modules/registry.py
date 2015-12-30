@@ -182,9 +182,9 @@ class Registry(Mapping):
 
         # load custom models
         ir_model = self['ir.model']
-        cr.execute('select model, transient from ir_model where state=%s', ('manual',))
-        for (model_name, transient) in cr.fetchall():
-            ir_model.instanciate(cr, SUPERUSER_ID, model_name, transient, {})
+        cr.execute('SELECT * FROM ir_model WHERE state=%s', ('manual',))
+        for model_data in cr.dictfetchall():
+            ir_model._instanciate(cr, SUPERUSER_ID, model_data, {})
 
         # prepare the setup on all models
         for model in self.models.itervalues():
@@ -384,6 +384,7 @@ class RegistryManager(object):
                     # This should be a method on Registry
                     openerp.modules.load_modules(registry._db, force_demo, status, update_module)
                 except Exception:
+                    _logger.exception('Failed to load registry')
                     del cls.registries[db_name]
                     raise
 
