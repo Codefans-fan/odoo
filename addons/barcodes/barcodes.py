@@ -86,7 +86,7 @@ class barcode_nomenclature(osv.osv):
         return self.sanitize_ean('0'+upc)[1:]
 
     # Checks if barcode matches the pattern
-    # Additionnaly retrieves the optional numerical content in barcode
+    # Additionaly retrieves the optional numerical content in barcode
     # Returns an object containing:
     # - value: the numerical value encoded in the barcode (0 if no value encoded)
     # - base_code: the barcode in which numerical content is replaced by 0's
@@ -180,7 +180,7 @@ class barcode_rule(models.Model):
     @api.model
     def _encoding_selection_list(self):
         return [
-                ('any', 'Any'),
+                ('any', _('Any')),
                 ('ean13', 'EAN-13'),
                 ('ean8', 'EAN-8'),
                 ('upca', 'UPC-A'),
@@ -188,7 +188,7 @@ class barcode_rule(models.Model):
 
     @api.model
     def _get_type_selection(self):
-        return [('alias','Alias'),('product','Unit Product')]
+        return [('alias', _('Alias')), ('product', _('Unit Product'))]
 
     _columns = {
         'name':     fields.char('Rule Name', size=32, required=True, help='An internal identification for this barcode nomenclature rule'),

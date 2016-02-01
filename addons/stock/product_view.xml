@@ -9,7 +9,7 @@
             <field name="arch" type="xml">
                 <tree position="attributes">
                     <attribute name="decoration-danger">virtual_available&lt;0</attribute>
-                    <attribute name="decoration-info">virtual_available&gt;=0 and state in ('draft', 'end', 'obsolete')</attribute>
+                    <attribute name="decoration-info">virtual_available&gt;=0</attribute>
                 </tree>
                 <field name="price" position="after">
                     <field name="qty_available"/>
@@ -25,7 +25,7 @@
             <field name="arch" type="xml">
                 <tree position="attributes">
                     <attribute name="decoration-danger">virtual_available&lt;0</attribute>
-                    <attribute name="decoration-info">virtual_available&gt;=0 and state in ('draft', 'end', 'obsolete')</attribute>
+                    <attribute name="decoration-info">virtual_available&gt;=0</attribute>
                 </tree>
                 <field name="uom_id" position="after">
                     <field name="qty_available"/>
@@ -130,7 +130,6 @@
                 </field>
                 <ul position="inside">
                     <li t-if="record.type.raw_value == 'product'">On hand: <field name="qty_available"/> <field name="uom_id"/></li>
-                    <li t-if="record.type.raw_value == 'product'">Forecasted: <field name="virtual_available"/> <field name="uom_id"/></li>
                 </ul>
             </field>
         </record>

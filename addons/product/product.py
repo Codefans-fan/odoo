@@ -457,7 +457,7 @@ class product_template(osv.osv):
         return [x['product_tmpl_id'][0] for x in r]
 
     def _get_product_template_type(self, cr, uid, context=None):
-        return [('consu', 'Consumable'), ('service', 'Service')]
+        return [('consu', _('Consumable')), ('service', _('Service'))]
     _get_product_template_type_wrapper = lambda self, *args, **kwargs: self._get_product_template_type(*args, **kwargs)
 
     _columns = {
@@ -490,17 +490,13 @@ class product_template(osv.osv):
             _name: (lambda s,c,u,i,t: i, ['product_variant_ids'], 10),
             'product.product': (_get_template_id_from_product, ['product_tmpl_id', 'volume'], 10),
         }),
-        'weight': fields.function(_compute_product_template_field, fnct_inv=_set_product_template_field, multi='_compute_product_template_field', type='float', string='Gross Weight', digits_compute=dp.get_precision('Stock Weight'), help="The weight of the contents in Kg, not including any packaging, etc.", store={
+        'weight': fields.function(_compute_product_template_field, fnct_inv=_set_product_template_field, multi='_compute_product_template_field', type='float', string='Weight', digits_compute=dp.get_precision('Stock Weight'), help="The weight of the contents in Kg, not including any packaging, etc.", store={
             _name: (lambda s,c,u,i,t: i, ['product_variant_ids'], 10),
             'product.product': (_get_template_id_from_product, ['product_tmpl_id', 'weight'], 10),
         }),
         'warranty': fields.float('Warranty'),
         'sale_ok': fields.boolean('Can be Sold', help="Specify if the product can be selected in a sales order line."),
         'pricelist_id': fields.dummy(string='Pricelist', relation='product.pricelist', type='many2one'),
-        'state': fields.selection([('draft', 'In Development'),
-            ('sellable','Normal'),
-            ('end','End of Lifecycle'),
-            ('obsolete','Obsolete')], 'Status'),
         'uom_id': fields.many2one('product.uom', 'Unit of Measure', required=True, help="Default Unit of Measure used for all stock operation."),
         'uom_po_id': fields.many2one('product.uom', 'Purchase Unit of Measure', required=True, help="Default Unit of Measure used for purchase orders. It must be in the same category than the default unit of measure."),
         'company_id': fields.many2one('res.company', 'Company', select=1),
@@ -508,7 +504,7 @@ class product_template(osv.osv):
             'product.packaging', 'product_tmpl_id', 'Logistical Units',
             help="Gives the different ways to package the same product. This has no impact on "
                  "the picking order and is mainly used if you use the EDI module."),
-        'seller_ids': fields.one2many('product.supplierinfo', 'product_tmpl_id', 'Vendor'),
+        'seller_ids': fields.one2many('product.supplierinfo', 'product_tmpl_id', 'Vendors'),
 
         'active': fields.boolean('Active', help="If unchecked, it will allow you to hide the product without removing it."),
         'color': fields.integer('Color Index'),
@@ -571,7 +567,7 @@ class product_template(osv.osv):
             if ptype != 'standard_price':
                 res[product.id] = product[ptype] or 0.0
             else:
-                company_id = product.env.user.company_id.id
+                company_id = context.get('force_company') or product.env.user.company_id.id
                 product = product.with_context(force_company=company_id)
                 res[product.id] = res[product.id] = product.sudo()[ptype]
             if ptype == 'list_price':
@@ -714,7 +710,7 @@ class product_template(osv.osv):
             ctx.update(active_test=False)
             product_ids = []
             for product in self.browse(cr, uid, ids, context=ctx):
-                product_ids = map(int,product.product_variant_ids)
+                product_ids += map(int, product.product_variant_ids)
             self.pool.get("product.product").write(cr, uid, product_ids, {'active': vals.get('active')}, context=ctx)
         return res
 
@@ -986,7 +982,7 @@ class product_product(osv.osv):
                                                "Expressed in the default unit of measure of the product.",
                                           groups="base.group_user", string="Cost"),
         'volume': fields.float('Volume', help="The volume in m3."),
-        'weight': fields.float('Gross Weight', digits_compute=dp.get_precision('Stock Weight'), help="The weight of the contents in Kg, not including any packaging, etc."),
+        'weight': fields.float('Weight', digits_compute=dp.get_precision('Stock Weight'), help="The weight of the contents in Kg, not including any packaging, etc."),
     }
 
     _defaults = {

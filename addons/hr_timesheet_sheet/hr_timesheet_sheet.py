@@ -297,6 +297,8 @@ class account_analytic_line(osv.osv):
         sheet_obj = self.pool.get('hr_timesheet_sheet.sheet')
         res = {}.fromkeys(ids, False)
         for ts_line in self.browse(cursor, user, ids, context=context):
+            if not ts_line.is_timesheet:
+                continue
             sheet_ids = sheet_obj.search(cursor, user,
                 [('date_to', '>=', ts_line.date), ('date_from', '<=', ts_line.date),
                  ('employee_id.user_id', '=', ts_line.user_id.id),
@@ -621,8 +623,7 @@ class hr_timesheet_sheet_sheet_account(osv.osv):
 class res_company(osv.osv):
     _inherit = 'res.company'
     _columns = {
-        'timesheet_range': fields.selection(
-            [('day','Day'),('week','Week'),('month','Month')], 'Timesheet range',
+        'timesheet_range': fields.selection([('week','Week'),('month','Month')], 'Timesheet range',
             help="Periodicity on which you validate your timesheets."),
         'timesheet_max_difference': fields.float('Timesheet allowed difference(Hours)',
             help="Allowed difference in hours between the sign in/out and the timesheet " \

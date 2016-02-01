@@ -99,6 +99,8 @@ class AccountInvoice(models.Model):
         digits_rounding_precision = self.currency_id.rounding
         if float_is_zero(self.residual, digits_rounding_precision):
             self.reconciled = True
+        else:
+            self.reconciled = False
 
     @api.one
     def _get_outstanding_info_JSON(self):
@@ -487,7 +489,7 @@ class AccountInvoice(models.Model):
             self.date_due = self.date_due or self.date_invoice
         else:
             pterm = self.payment_term_id
-            pterm_list = pterm.compute(value=1, date_ref=date_invoice)[0]
+            pterm_list = pterm.with_context(currency_id=self.currency_id.id).compute(value=1, date_ref=date_invoice)[0]
             self.date_due = max(line[0] for line in pterm_list)
 
     @api.multi
@@ -539,8 +541,11 @@ class AccountInvoice(models.Model):
         return (line_to_reconcile + payment_line).reconcile(writeoff_acc_id, writeoff_journal_id)
 
     @api.v7
-    def assign_outstanding_credit(self, cr, uid, id, payment_id, context=None):
-        return self.browse(cr, uid, id, context).register_payment(self.pool.get('account.move.line').browse(cr, uid, payment_id, context))
+    def assign_outstanding_credit(self, cr, uid, id, credit_aml_id, context=None):
+        credit_aml = self.pool.get('account.move.line').browse(cr, uid, credit_aml_id, context=context)
+        if credit_aml.payment_id:
+            credit_aml.payment_id.write({'invoice_ids': [(4, id, None)]})
+        return self.browse(cr, uid, id, context=context).register_payment(credit_aml)
 
     @api.multi
     def action_date_assign(self):
@@ -691,7 +696,7 @@ class AccountInvoice(models.Model):
 
             name = inv.name or '/'
             if inv.payment_term_id:
-                totlines = inv.with_context(ctx).payment_term_id.compute(total, date_invoice)[0]
+                totlines = inv.with_context(ctx).payment_term_id.with_context(currency_id=inv.currency_id.id).compute(total, date_invoice)[0]
                 res_amount_currency = total_currency
                 ctx['date'] = date_invoice
                 for i, t in enumerate(totlines):
@@ -1159,7 +1164,7 @@ class AccountInvoiceLine(models.Model):
         if not self.product_id:
             fpos = self.invoice_id.fiscal_position_id
             self.invoice_line_tax_ids = fpos.map_tax(self.account_id.tax_ids).ids
-        else:
+        elif not self.price_unit:
             self._set_taxes()
 
     @api.onchange('uom_id')
@@ -1180,6 +1185,16 @@ class AccountInvoiceLine(models.Model):
             result['warning'] = warning
         return result
 
+    def _set_additional_fields(self, invoice):
+        """ Some modules, such as Purchase, provide a feature to add automatically pre-filled
+            invoice lines. However, these modules might not be aware of extra fields which are
+            added by extensions of the accounting module.
+            This method is intended to be overridden by these extensions, so that any new field can
+            easily be auto-filled as well.
+            :param invoice : account.invoice corresponding record
+            :rtype line : account.invoice.line record
+        """
+        pass
 
 class AccountInvoiceTax(models.Model):
     _name = "account.invoice.tax"
@@ -1227,7 +1242,11 @@ class AccountPaymentTerm(models.Model):
         date_ref = date_ref or fields.Date.today()
         amount = value
         result = []
-        prec = self.company_id.currency_id.decimal_places
+        if self.env.context.get('currency_id'):
+            currency = self.env['res.currency'].browse(self.env.context['currency_id'])
+        else:
+            currency = self.env.user.company_id.currency_id
+        prec = currency.decimal_places
         for line in self.line_ids:
             if line.value == 'fixed':
                 amt = round(line.value_amount, prec)

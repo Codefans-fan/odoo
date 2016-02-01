@@ -2,7 +2,7 @@ odoo.define('mail.Chatter', function (require) {
 "use strict";
 
 var chat_manager = require('mail.chat_manager');
-var ChatComposer = require('mail.ChatComposer');
+var composer = require('mail.composer');
 var ChatThread = require('mail.ChatThread');
 
 var ajax = require('web.ajax');
@@ -114,7 +114,7 @@ var Followers = form_common.AbstractField.extend({
         var follower_id = $currentTarget.data('oe-id');
         var is_channel = $currentTarget.data('oe-model') === 'mail.channel';
         self.dialog = new Dialog(this, {
-                        size: 'small',
+                        size: 'medium',
                         title: _t('Edit Subscription of ') + $currentTarget.siblings('a').text(),
                         buttons: [
                                 {
@@ -131,7 +131,7 @@ var Followers = form_common.AbstractField.extend({
                                 },
                             ],
                 }).open();
-        return self.fetch_subtypes($currentTarget.data('id'));
+        return self.fetch_subtypes($currentTarget.data('id'), $currentTarget.data('oe-model'));
     },
 
     on_invite_follower: function (channel_only) {
@@ -270,8 +270,10 @@ var Followers = form_common.AbstractField.extend({
 
     /** Fetch subtypes, only if current user is follower or if follower_id is given, i.e. if
      *  the current user is editing the subtypes of another follower
+     *  @param {int} [follower_id] the id of the follower
+     *  @param {string} [follower_model] 'res.partner' or 'mail.channel'
      */
-    fetch_subtypes: function (follower_id) {
+    fetch_subtypes: function (follower_id, follower_model) {
         var self = this;
         var dialog = false;
 
@@ -292,7 +294,7 @@ var Followers = form_common.AbstractField.extend({
                 res_id: this.view.datarecord.id,
                 follower_id: follower_id,
             }).then(function (data) {
-                self.display_subtypes(data, dialog);
+                self.display_subtypes(data, dialog, (follower_model === 'mail.channel'));
             });
         } else  {
             return $.Deferred().resolve();
@@ -300,11 +302,11 @@ var Followers = form_common.AbstractField.extend({
     },
 
     /** Display subtypes: {'name': default, followed} */
-    display_subtypes:function (data, dialog) {
+    display_subtypes:function (data, dialog, display_warning) {
         var old_parent_model;
         var $list;
         if (dialog) {
-            $list = this.dialog.$el;
+            $list = $('<ul>').appendTo(this.dialog.$el);
         } else {
             $list = this.$('.o_subtypes_list ul');
         }
@@ -324,9 +326,14 @@ var Followers = form_common.AbstractField.extend({
             old_parent_model = record.parent_model;
             record.followed = record.followed || undefined;
             $(qweb.render('mail.Followers.subtype', {'record': record,
-                                                     'dialog': dialog}))
+                                                     'dialog': dialog,
+                                                     'display_warning': display_warning && record.internal}))
             .appendTo($list);
         });
+
+        if (display_warning) {
+            $(qweb.render('mail.Followers.subtypes.warning')).appendTo(this.dialog.$el);
+        }
     },
 
     do_follow: function () {
@@ -432,7 +439,7 @@ var Followers = form_common.AbstractField.extend({
 // popup when suggested partner is selected without email, or other
 // informations), and the button to open the full composer wizard.
 // -----------------------------------------------------------------------------
-var ChatterComposer = ChatComposer.extend({
+var ChatterComposer = composer.BasicComposer.extend({
     template: 'mail.chatter.ChatComposer',
 
     init: function (parent, dataset, options) {
@@ -444,6 +451,7 @@ var ChatterComposer = ChatComposer.extend({
             record_name: false,
             is_log: false,
             internal_subtypes: [],
+            default_body: '',
         });
         if (this.options.is_log) {
             this.options.send_text = _('Log');
@@ -458,6 +466,17 @@ var ChatterComposer = ChatComposer.extend({
             return this._super.apply(this, arguments);
         }
         return $.when(this._super.apply(this, arguments), this.message_get_suggested_recipients());
+    },
+
+    start: function () {
+        var self = this;
+        return this._super().then(function () {
+            self.$input.val(self.options.default_body);
+        });
+    },
+
+    should_send: function () {
+        return false;
     },
 
     preprocess_message: function () {
@@ -549,7 +568,7 @@ var ChatterComposer = ChatComposer.extend({
     },
 
     /**
-     * Check the additionnal partners (not necessary registered partners), and open a popup form view
+     * Check the additional partners (not necessary registered partners), and open a popup form view
      * for the ones who informations is missing.
      * @param Array : list of 'recipient' partners to complete informations or validate
      * @returns Deferred resolved with the list of checked suggested partners (real partner)
@@ -855,6 +874,8 @@ var Chatter = form_common.AbstractField.extend({
         // destroy current composer, if any
         if (this.composer) {
             this.composer.destroy();
+            this.composer = undefined;
+            this.mute_new_message_button(false);
         }
 
         // fetch and render messages of current document
@@ -884,6 +905,7 @@ var Chatter = form_common.AbstractField.extend({
             internal_subtypes: this.options.internal_subtypes,
             is_log: options && options.is_log,
             record_name: this.record_name,
+            default_body: old_composer && old_composer.$input.val(),
         });
         this.composer.on('input_focused', this, function () {
             this.composer.mention_set_prefetched_partners(this.mention_suggestions || []);
@@ -899,11 +921,19 @@ var Chatter = form_common.AbstractField.extend({
             self.composer.on('post_message', self, self.on_post_message);
             self.composer.on('need_refresh', self, self.refresh_followers);
         });
-
+        this.mute_new_message_button(true);
     },
     close_composer: function () {
         if (this.composer.is_empty()) {
             this.composer.do_hide();
+            this.mute_new_message_button(false);
+        }
+    },
+    mute_new_message_button: function (mute) {
+        if (mute) {
+            this.$('.o_chatter_button_new_message').removeClass('btn-primary').addClass('btn-default');
+        } else if (!mute) {
+            this.$('.o_chatter_button_new_message').removeClass('btn-default').addClass('btn-primary');
         }
     },
 

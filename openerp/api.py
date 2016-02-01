@@ -35,6 +35,7 @@ __all__ = [
     'Environment',
     'Meta', 'guess', 'noguess',
     'model', 'multi', 'one',
+    'model_cr', 'model_cr_context',
     'cr', 'cr_context',
     'cr_uid', 'cr_uid_context',
     'cr_uid_id', 'cr_uid_id_context',
@@ -140,6 +141,12 @@ def constrains(*args):
 
     Should raise :class:`~openerp.exceptions.ValidationError` if the
     validation failed.
+
+    .. warning::
+
+        ``@constrains`` only supports simple field names, dotted names
+        (fields of relational fields e.g. ``partner_id.customer``) are not
+        supported and will be ignored
     """
     return lambda method: decorate(method, '_constrains', args)
 
@@ -165,6 +172,12 @@ def onchange(*args):
                 'warning': {'title': "Warning", 'message': "What is this?"},
             }
 
+
+        .. warning::
+
+            ``@onchange`` only supports simple field names, dotted names
+            (fields of relational fields e.g. ``partner_id.tz``) are not
+            supported and will be ignored
     """
     return lambda method: decorate(method, '_onchange', args)
 
@@ -417,6 +430,64 @@ def one(method):
         return aggregate(self, result)
 
     return make_wrapper(one, method, old_api, new_api)
+
+
+def model_cr(method):
+    """ Decorate a record-style method where ``self`` is a recordset, but its
+        contents is not relevant, only the model is. Such a method::
+
+            @api.model_cr
+            def method(self, args):
+                ...
+
+        may be called in both record and traditional styles, like::
+
+            # recs = model.browse(cr, uid, ids, context)
+            recs.method(args)
+
+            model.method(cr, args)
+
+        Notice that no ``uid``, ``ids``, ``context`` are passed to the method in
+        the traditional style.
+    """
+    downgrade = get_downgrade(method)
+
+    def old_api(self, cr, *args, **kwargs):
+        recs = self.browse(cr, SUPERUSER_ID, [], {})
+        result = method(recs, *args, **kwargs)
+        return downgrade(recs, result, *args, **kwargs)
+
+    return make_wrapper(model_cr, method, old_api, method)
+
+
+def model_cr_context(method):
+    """ Decorate a record-style method where ``self`` is a recordset, but its
+        contents is not relevant, only the model is. Such a method::
+
+            @api.model_cr_context
+            def method(self, args):
+                ...
+
+        may be called in both record and traditional styles, like::
+
+            # recs = model.browse(cr, uid, ids, context)
+            recs.method(args)
+
+            model.method(cr, args, context=context)
+
+        Notice that no ``uid``, ``ids`` are passed to the method in the
+        traditional style.
+    """
+    split = get_context_split(method)
+    downgrade = get_downgrade(method)
+
+    def old_api(self, cr, *args, **kwargs):
+        context, args, kwargs = split(args, kwargs)
+        recs = self.browse(cr, SUPERUSER_ID, [], context)
+        result = method(recs, *args, **kwargs)
+        return downgrade(recs, result, *args, **kwargs)
+
+    return make_wrapper(model_cr_context, method, old_api, method)
 
 
 def cr(method):

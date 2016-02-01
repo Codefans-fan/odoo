@@ -3,14 +3,15 @@
 # * website_sale
 # 
 # Translators:
-# Goutoudis Kostas <goutoudis@gmail.com>, 2015
+# Goutoudis Kostas <goutoudis@gmail.com>, 2015-2016
+# Martin Trigaux, 2016
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo 9.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2015-10-09 09:18+0000\n"
-"PO-Revision-Date: 2015-12-11 22:29+0000\n"
-"Last-Translator: Goutoudis Kostas <goutoudis@gmail.com>\n"
+"PO-Revision-Date: 2016-01-05 13:43+0000\n"
+"Last-Translator: Martin Trigaux\n"
 "Language-Team: Greek (http://www.transifex.com/odoo/odoo-9/language/el/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -312,7 +313,7 @@ msgstr "<strong>Επικοινωνήστε μαζί μας τώρα:</strong><br
 msgid ""
 "<strong>Customers review:</strong> what do the customers think of the "
 "product"
-msgstr "<strong>Κριτική πελατών:</ strong> τι σκέφτονται οι πελάτες για το προϊόν"
+msgstr "<strong>Κριτική πελατών:</strong> τι σκέφτονται οι πελάτες για το προϊόν"
 
 #. module: website_sale
 #: model:ir.ui.view,arch_db:website_sale.website_planner
@@ -670,7 +671,7 @@ msgstr ""
 #: code:addons/website_sale/static/src/js/website_sale_tour_shop.js:112
 #, python-format
 msgid "Close Tutorial"
-msgstr "Κλείσιμο Οδηγού"
+msgstr "Κλείσιμο Εκμάθησης"
 
 #. module: website_sale
 #: selection:product.attribute,type:0
@@ -1161,14 +1162,14 @@ msgstr ""
 #: model:ir.model.fields,field_description:website_sale.field_product_style_write_uid
 #: model:ir.model.fields,field_description:website_sale.field_website_pricelist_write_uid
 msgid "Last Updated by"
-msgstr "Τελευταία ενημέρωση από"
+msgstr "Τελευταία Ενημέρωση από"
 
 #. module: website_sale
 #: model:ir.model.fields,field_description:website_sale.field_product_public_category_write_date
 #: model:ir.model.fields,field_description:website_sale.field_product_style_write_date
 #: model:ir.model.fields,field_description:website_sale.field_website_pricelist_write_date
 msgid "Last Updated on"
-msgstr "Τελευταία ενημέρωση στις"
+msgstr "Τελευταία Ενημέρωση στις"
 
 #. module: website_sale
 #: model:ir.model.fields,field_description:website_sale.field_product_public_category_image_medium
@@ -1196,7 +1197,7 @@ msgstr ""
 #. module: website_sale
 #: model:ir.model.fields,field_description:website_sale.field_product_product_sale_line_warn_msg
 msgid "Message for Sales Order Line"
-msgstr ""
+msgstr "Μήνυμα για Γραμμή Παραγγελίας"
 
 #. module: website_sale
 #. openerp-web
@@ -1576,12 +1577,12 @@ msgstr ""
 #. module: website_sale
 #: model:ir.model,name:website_sale.model_sale_order
 msgid "Sales Order"
-msgstr "Εντολή Πώλησης"
+msgstr "Παραγγελία"
 
 #. module: website_sale
 #: model:ir.model.fields,field_description:website_sale.field_product_product_sale_line_warn
 msgid "Sales Order Line"
-msgstr "Γραμμή Εντολής Πώλησης"
+msgstr "Γραμμή Παραγγελίας"
 
 #. module: website_sale
 #: model:ir.model.fields,field_description:website_sale.field_website_config_settings_salesteam_id
@@ -1808,7 +1809,7 @@ msgstr ""
 #: code:addons/website_sale/static/src/js/website_sale_tour_shop.js:19
 #, python-format
 msgid "Start Tutorial"
-msgstr "Έναρξη Οδηγού"
+msgstr "Έναρξη Εκμάθησης"
 
 #. module: website_sale
 #: model:ir.ui.view,arch_db:website_sale.checkout
@@ -2018,7 +2019,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:website_sale.field_website_pricelist_website_id
 #: model:ir.ui.view,arch_db:website_sale.product_template_form_view
 msgid "Website"
-msgstr "Ιστοσελίδα"
+msgstr "Ιστότοπος"
 
 #. module: website_sale
 #: model:ir.ui.view,arch_db:website_sale.product_template_form_view
@@ -2029,7 +2030,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:website_sale.field_product_product_website_message_ids
 #: model:ir.model.fields,field_description:website_sale.field_product_template_website_message_ids
 msgid "Website Comments"
-msgstr "Σχόλια ιστοσελίδας"
+msgstr "Σχόλια σε Ιστότοπο"
 
 #. module: website_sale
 #: model:ir.model.fields,field_description:website_sale.field_res_country_group_website_pricelist_ids

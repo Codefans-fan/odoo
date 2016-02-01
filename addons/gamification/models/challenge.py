@@ -141,7 +141,7 @@ class gamification_challenge(osv.Model):
             help="List of goals that will be set",
             required=True, copy=True),
 
-        'reward_id': fields.many2one('gamification.badge', string="For Every Succeding User"),
+        'reward_id': fields.many2one('gamification.badge', string="For Every Succeeding User"),
         'reward_first_id': fields.many2one('gamification.badge', string="For 1st user"),
         'reward_second_id': fields.many2one('gamification.badge', string="For 2nd user"),
         'reward_third_id': fields.many2one('gamification.badge', string="For 3rd user"),
@@ -737,11 +737,11 @@ class gamification_challenge(osv.Model):
 
             if challenge_ended:
                 # open chatter message
-                message_body = _("The challenge %s is finished." % challenge.name)
+                message_body = _("The challenge %s is finished.") % challenge.name
 
                 if rewarded_users:
                     user_names = self.pool['res.users'].name_get(cr, uid, rewarded_users, context=context)
-                    message_body += _("<br/>Reward (badge %s) for every succeeding user was sent to %s." % (challenge.reward_id.name, ", ".join([name for (user_id, name) in user_names])))
+                    message_body += _("<br/>Reward (badge %s) for every succeeding user was sent to %s.") % (challenge.reward_id.name, ", ".join([name for (user_id, name) in user_names]))
                 else:
                     message_body += _("<br/>Nobody has succeeded to reach every goal, no badge is rewarded for this challenge.")
 

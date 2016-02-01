@@ -9,6 +9,7 @@ import datetime
 
 import openerp.addons.decimal_precision as dp
 from openerp import SUPERUSER_ID
+from openerp.tools import DEFAULT_SERVER_DATE_FORMAT
 from openerp.tools.translate import _
 
 
@@ -26,6 +27,7 @@ class sale_quote_template(osv.osv):
             (0, 'Not mandatory on website quote validation'),
             (1, 'Immediate after website order validation')
             ], 'Payment', help="Require immediate payment by the customer when validating the order from the website quote"),
+        'mail_template_id': fields.many2one('mail.template', 'Confirmation Mail', help="This e-mail template will be sent on confirmation. Leave empty to send nothing.")
     }
     def open_template(self, cr, uid, quote_id, context=None):
         return {
@@ -129,6 +131,16 @@ class sale_order_line(osv.osv):
         values = self._inject_quote_description(cr, uid, values, context)
         return super(sale_order_line, self).write(cr, uid, ids, values, context=context)
 
+    # The overrided onchange was written in new api, sorry
+    # Take the description on the order template if the product is present in it
+    @api.multi
+    @api.onchange('product_id')
+    def product_id_change(self):
+        domain = super(sale_order_line, self).product_id_change()
+        if self.order_id.template_id:
+            self.name = next((quote_line.name for quote_line in self.order_id.template_id.quote_line if quote_line.product_id.id == self.product_id.id), self.name) 
+        return domain
+
 
 class sale_order(osv.osv):
     _inherit = 'sale.order'
@@ -174,7 +186,7 @@ class sale_order(osv.osv):
 
         if partner:
             context = dict(context or {})
-            context['lang'] = self.pool['res.partner'].browse(cr, uid, partner, context).lang
+            context['lang'] = self.pool['res.partner'].browse(cr, uid, partner, context=context).lang
 
         pricelist_obj = self.pool['product.pricelist']
 
@@ -229,7 +241,7 @@ class sale_order(osv.osv):
             }))
         date = False
         if quote_template.number_of_days > 0:
-            date = (datetime.datetime.now() + datetime.timedelta(quote_template.number_of_days)).strftime("%Y-%m-%d")
+            date = (datetime.datetime.now() + datetime.timedelta(quote_template.number_of_days)).strftime(DEFAULT_SERVER_DATE_FORMAT)
         data = {
             'order_line': lines,
             'website_description': quote_template.website_description,
@@ -257,7 +269,7 @@ class sale_order(osv.osv):
             return super(sale_order, self).get_access_action(cr, uid, ids, context=context)
         return {
             'type': 'ir.actions.act_url',
-            'url': '/quote/%s' % quote.id,
+            'url': '/quote/%s/%s' % (quote.id, quote.access_token),
             'target': 'self',
             'res_id': quote.id,
         }
@@ -281,6 +293,13 @@ class sale_order(osv.osv):
             template_values = self.onchange_template_id(cr, uid, [], defaults.get('template_id'), partner=values.get('partner_id'), fiscal_position_id=values.get('fiscal_position'), context=context).get('value', {})
             values = dict(template_values, **values)
         return super(sale_order, self).create(cr, uid, values, context=context)
+
+    def action_confirm(self, cr, uid, ids, context=None):
+        res = super(sale_order, self).action_confirm(cr, uid, ids, context=context)
+        for order in self.browse(cr, uid, ids, context=context):
+            if order.template_id and order.template_id.mail_template_id:
+                self.pool['mail.template'].send_mail(cr, uid, order.template_id.mail_template_id.id, order.id, context=context)
+        return res
 
 
 class sale_quote_option(osv.osv):

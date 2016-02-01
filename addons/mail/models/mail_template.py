@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import base64
+import copy
 import datetime
 import dateutil.relativedelta as relativedelta
 import logging
@@ -25,6 +26,16 @@ def format_tz(pool, cr, uid, dt, tz=False, format=False, context=None):
 
     ts = openerp.osv.fields.datetime.context_timestamp(cr, uid, timestamp, context)
 
+    # Babel allows to format datetime in a specific language without change locale
+    # So month 1 = January in English, and janvier in French
+    # Be aware that the default value for format is 'medium', instead of 'short'
+    #     medium:  Jan 5, 2016, 10:20:31 PM |   5 janv. 2016 22:20:31
+    #     short:   1/5/16, 10:20 PM         |   5/01/16 22:20
+    if context.get('use_babel'):
+        # Formatting available here : http://babel.pocoo.org/en/latest/dates.html#date-fields
+        from babel.dates import format_datetime
+        return format_datetime(ts, format or 'medium', locale=context.get("lang") or 'en_US')
+
     if format:
         return ts.strftime(format)
     else:
@@ -38,7 +49,7 @@ def format_tz(pool, cr, uid, dt, tz=False, format=False, context=None):
         format_date = lang_params.get("date_format", '%B-%d-%Y')
         format_time = lang_params.get("time_format", '%I-%M %p')
 
-        fdate = ts.strftime(format_date)
+        fdate = ts.strftime(format_date).decode('utf-8')
         ftime = ts.strftime(format_time)
         return "%s %s%s" % (fdate, ftime, (' (%s)' % tz) if tz else '')
 
@@ -84,6 +95,8 @@ try:
         # is needed, apparently.
         'relativedelta': lambda *a, **kw : relativedelta.relativedelta(*a, **kw),
     })
+    mako_safe_template_env = copy.copy(mako_template_env)
+    mako_safe_template_env.autoescape = False
 except ImportError:
     _logger.warning("jinja2 not available, templating features will not work!")
 
@@ -131,7 +144,7 @@ class MailTemplate(models.Model):
     mail_server_id = fields.Many2one('ir.mail_server', 'Outgoing Mail Server', readonly=False,
                                      help="Optional preferred server for outgoing mails. If not set, the highest "
                                           "priority one will be used.")
-    body_html = fields.Html('Body', translate=True, sanitize=False, help="Rich-text/HTML version of the message (placeholders may be used here)")
+    body_html = fields.Html('Body', translate=True, sanitize=False)
     report_name = fields.Char('Report Filename', translate=True,
                               help="Name to use for the generated report file (may contain placeholders)\n"
                                    "The extension can be omitted and will then come from the report type.")
@@ -330,7 +343,8 @@ class MailTemplate(models.Model):
 
         # try to load the template
         try:
-            template = mako_template_env.from_string(tools.ustr(template_txt))
+            mako_env = mako_safe_template_env if self.env.context.get('safe') else mako_template_env
+            template = mako_env.from_string(tools.ustr(template_txt))
         except Exception:
             _logger.info("Failed to load template %r", template_txt, exc_info=True)
             return multi_mode and results or results[res_ids[0]]
@@ -451,6 +465,7 @@ class MailTemplate(models.Model):
             if template.lang:
                 Template = Template.with_context(lang=template._context.get('lang'))
             for field in fields:
+                Template = Template.with_context(safe=field in {'subject'})
                 generated_field_values = Template.render_template(
                     getattr(template, field), template.model, template_res_ids,
                     post_process=(field == 'body_html'))
@@ -479,7 +494,7 @@ class MailTemplate(models.Model):
                 )
 
             # Add report in attachments: generate once for all template_res_ids
-            if template.report_template:
+            if template.report_template and not 'report_template_in_attachment' in self.env.context:
                 for res_id in template_res_ids:
                     attachments = []
                     report_name = self.render_template(template.report_name, template.model, res_id)

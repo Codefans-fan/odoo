@@ -3,15 +3,17 @@
 # * account
 # 
 # Translators:
+# eino.makitalo <eino.makitalo@netitbe.fi>, 2016
+# Jarmo Kortetjärvi <jarmo.kortetjarvi@gmail.com>, 2016
 # Kari Lindgren <kari.lindgren@emsystems.fi>, 2015
 # Timo Koukkari <timo.koukkari@seamk.fi>, 2015
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo 9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2015-11-18 08:05+0000\n"
-"PO-Revision-Date: 2015-12-09 15:44+0000\n"
-"Last-Translator: Timo Koukkari <timo.koukkari@seamk.fi>\n"
+"POT-Creation-Date: 2015-12-17 14:09+0000\n"
+"PO-Revision-Date: 2016-01-20 12:33+0000\n"
+"Last-Translator: eino.makitalo <eino.makitalo@netitbe.fi>\n"
 "Language-Team: Finnish (http://www.transifex.com/odoo/odoo-9/language/fi/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -23,7 +25,7 @@ msgstr ""
 #: model:mail.template,body_html:account.email_template_edi_invoice
 msgid ""
 "\n"
-"<div style=\"font-family: 'Lucica Grande', Ubuntu, Arial, Verdana, sans-serif; font-size: 12px; color: rgb(34, 34, 34); background-color: #FFF; \">\n"
+"<div style=\"font-family: 'Lucida Grande', Ubuntu, Arial, Verdana, sans-serif; font-size: 12px; color: rgb(34, 34, 34); background-color: #FFF; \">\n"
 "    <p>Hello ${object.partner_id.name},</p>\n"
 "    <p>A new invoice is available for you: </p>\n"
 "    \n"
@@ -530,7 +532,7 @@ msgstr ""
 #. module: account
 #: model:ir.ui.view,arch_db:account.report_generalledger
 msgid "<strong>Journals:</strong>"
-msgstr ""
+msgstr "<strong>Päiväkirjat:</strong>"
 
 #. module: account
 #: model:ir.ui.view,arch_db:account.account_planner
@@ -727,7 +729,7 @@ msgstr ""
 #: code:addons/account/models/account.py:469
 #, python-format
 msgid "A bank account can anly belong to one journal."
-msgstr ""
+msgstr "Pankkitili voidaan liittää vain yhteen päiväkirjaan"
 
 #. module: account
 #: model:ir.actions.act_window,help:account.action_bank_statement_tree
@@ -1192,7 +1194,7 @@ msgstr "Tileihin kohdistus"
 #: model:ir.model.fields,field_description:account.field_account_bank_statement_message_needaction
 #: model:ir.model.fields,field_description:account.field_account_invoice_message_needaction
 msgid "Action Needed"
-msgstr "Huomiota vaadittu"
+msgstr "Vaatii toimia"
 
 #. module: account
 #: model:ir.ui.view,arch_db:account.account_planner
@@ -1449,6 +1451,7 @@ msgstr "Sallii analyyttisen tilien käytön."
 #: model:ir.model.fields,field_description:account.field_account_tax_template_amount
 #: model:ir.model.fields,field_description:account.field_cash_box_in_amount
 #: model:ir.model.fields,field_description:account.field_cash_box_out_amount
+#: model:ir.ui.view,arch_db:account.report_invoice_document
 #: model:ir.ui.view,arch_db:account.view_move_line_form
 #, python-format
 msgid "Amount"
@@ -1799,7 +1802,7 @@ msgstr ""
 #. module: account
 #: model:ir.model.fields,field_description:account.field_res_company_bank_journal_ids
 msgid "Bank Journals"
-msgstr ""
+msgstr "Pankkipäiväkirjat"
 
 #. module: account
 #: model:ir.ui.view,arch_db:account.view_account_move_filter
@@ -2091,7 +2094,7 @@ msgstr "Siirtoja ei voi luoda eri yrityksille."
 #: code:addons/account/models/account_move.py:192
 #, python-format
 msgid "Cannot create unbalanced journal entry."
-msgstr ""
+msgstr "Et voi luoda päiväkirjavientiä, joka ei ole tasapainossa."
 
 #. module: account
 #: code:addons/account/models/account_invoice.py:446
@@ -2194,18 +2197,8 @@ msgid "Cashbox Lines"
 msgstr ""
 
 #. module: account
-#: model:ir.model.fields,field_description:account.field_account_bank_statement_cashbox_end_id
-msgid "Cashbox end id"
-msgstr ""
-
-#. module: account
 #: model:ir.model.fields,field_description:account.field_account_cashbox_line_cashbox_id
-msgid "Cashbox id"
-msgstr ""
-
-#. module: account
-#: model:ir.model.fields,field_description:account.field_account_bank_statement_cashbox_start_id
-msgid "Cashbox start id"
+msgid "Cashbox"
 msgstr ""
 
 #. module: account
@@ -2916,7 +2909,9 @@ msgstr ""
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_abstract_payment_currency_id
+#: model:ir.model.fields,field_description:account.field_account_bank_statement_currency_id
 #: model:ir.model.fields,field_description:account.field_account_bank_statement_line_currency_id
+#: model:ir.model.fields,field_description:account.field_account_bank_statement_line_journal_currency_id
 #: model:ir.model.fields,field_description:account.field_account_chart_template_currency_id
 #: model:ir.model.fields,field_description:account.field_account_invoice_company_currency_id
 #: model:ir.model.fields,field_description:account.field_account_invoice_currency_id
@@ -2925,6 +2920,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:account.field_account_invoice_report_currency_id
 #: model:ir.model.fields,field_description:account.field_account_invoice_tax_currency_id
 #: model:ir.model.fields,field_description:account.field_account_journal_currency_id
+#: model:ir.model.fields,field_description:account.field_account_move_currency_id
 #: model:ir.model.fields,field_description:account.field_account_move_line_company_currency_id
 #: model:ir.model.fields,field_description:account.field_account_move_line_currency_id
 #: model:ir.model.fields,field_description:account.field_account_partial_reconcile_company_currency_id
@@ -2932,6 +2928,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:account.field_account_partial_reconcile_currency_id
 #: model:ir.model.fields,field_description:account.field_account_payment_currency_id
 #: model:ir.model.fields,field_description:account.field_account_register_payments_currency_id
+#: model:ir.model.fields,field_description:account.field_res_partner_currency_id
 #: model:ir.model.fields,field_description:account.field_wizard_multi_charts_accounts_currency_id
 #: model:ir.ui.view,arch_db:account.report_generalledger
 #: model:ir.ui.view,arch_db:account.view_account_payment_search
@@ -2950,18 +2947,10 @@ msgid "Currency as per company's country."
 msgstr ""
 
 #. module: account
-#: code:addons/account/models/account_move.py:1168
-#: code:addons/account/models/account_move.py:1176
+#: code:addons/account/models/account_move.py:1180
+#: code:addons/account/models/account_move.py:1188
 #, python-format
 msgid "Currency exchange rate difference"
-msgstr ""
-
-#. module: account
-#: model:ir.model.fields,field_description:account.field_account_bank_statement_currency_id
-#: model:ir.model.fields,field_description:account.field_account_bank_statement_line_journal_currency_id
-#: model:ir.model.fields,field_description:account.field_account_move_currency_id
-#: model:ir.model.fields,field_description:account.field_res_partner_currency_id
-msgid "Currency id"
 msgstr ""
 
 #. module: account
@@ -3580,6 +3569,11 @@ msgstr ""
 #: model:ir.model.fields,field_description:account.field_account_bank_statement_balance_end_real
 msgid "Ending Balance"
 msgstr "Loppusaldo"
+
+#. module: account
+#: model:ir.model.fields,field_description:account.field_account_bank_statement_cashbox_end_id
+msgid "Ending Cashbox"
+msgstr ""
 
 #. module: account
 #: model:ir.ui.view,arch_db:account.account_planner
@@ -4840,7 +4834,7 @@ msgstr "Tammikuu"
 #: model:ir.ui.view,arch_db:account.view_bank_statement_search
 #, python-format
 msgid "Journal"
-msgstr "Loki"
+msgstr "Päiväkirja"
 
 #. module: account
 #: selection:account.report.general.ledger,sortby:0
@@ -5458,12 +5452,6 @@ msgstr ""
 #: model:ir.model.fields,field_description:account.field_account_bank_statement_message_ids
 #: model:ir.model.fields,field_description:account.field_account_invoice_message_ids
 msgid "Messages"
-msgstr ""
-
-#. module: account
-#: model:ir.model.fields,help:account.field_account_bank_statement_message_ids
-#: model:ir.model.fields,help:account.field_account_invoice_message_ids
-msgid "Messages and communication history"
 msgstr ""
 
 #. module: account
@@ -6534,7 +6522,7 @@ msgstr ""
 #: model:ir.actions.act_window,name:account.action_validate_account_move
 #: model:ir.ui.view,arch_db:account.validate_account_move_view
 msgid "Post Journal Entries"
-msgstr ""
+msgstr "Kirjaa päiväkirjaviennit"
 
 #. module: account
 #: selection:account.move,state:0 selection:account.payment,state:0
@@ -6547,7 +6535,7 @@ msgstr ""
 #. module: account
 #: model:ir.ui.view,arch_db:account.view_account_move_filter
 msgid "Posted Journal Entries"
-msgstr ""
+msgstr "Kirjatut päiväkirjaviennit"
 
 #. module: account
 #: model:ir.ui.view,arch_db:account.view_account_move_line_filter
@@ -7474,6 +7462,11 @@ msgid "Starting Balance"
 msgstr ""
 
 #. module: account
+#: model:ir.model.fields,field_description:account.field_account_bank_statement_cashbox_start_id
+msgid "Starting Cashbox"
+msgstr ""
+
+#. module: account
 #: model:ir.ui.view,arch_db:account.view_account_payment_search
 msgid "State"
 msgstr ""
@@ -7589,6 +7582,7 @@ msgstr "Kohteen liikkeet"
 #: model:ir.model.fields,field_description:account.field_account_invoice_tax_tax_id
 #: model:ir.model.fields,field_description:account.field_account_operation_template_second_tax_id
 #: model:ir.model.fields,field_description:account.field_account_operation_template_tax_id
+#: model:ir.ui.view,arch_db:account.report_invoice_document
 #: model:ir.ui.view,arch_db:account.view_account_tax_search
 #, python-format
 msgid "Tax"
@@ -9635,6 +9629,11 @@ msgstr ""
 #. module: account
 #: model:ir.ui.view,arch_db:account.view_partner_property_form
 msgid "the parent company"
+msgstr ""
+
+#. module: account
+#: model:ir.ui.view,arch_db:account.account_planner
+msgid "the product list"
 msgstr ""
 
 #. module: account

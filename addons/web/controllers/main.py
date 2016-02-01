@@ -601,22 +601,6 @@ class WebClient(http.Controller):
 
 class Proxy(http.Controller):
 
-    @http.route('/web/proxy/load', type='json', auth="none")
-    def load(self, path):
-        """ Proxies an HTTP request through a JSON request.
-
-        It is strongly recommended to not request binary files through this,
-        as the result will be a binary data blob as well.
-
-        :param path: actual request path
-        :return: file content
-        """
-        from werkzeug.test import Client
-        from werkzeug.wrappers import BaseResponse
-
-        base_url = request.httprequest.base_url
-        return Client(request.httprequest.app, BaseResponse).get(path, base_url=base_url).data
-
     @http.route('/web/proxy/post/<path:path>', type='http', auth='user', methods=['GET'])
     def post(self, path):
         """Effectively execute a POST request that was hooked through user login"""
@@ -1067,7 +1051,7 @@ class Binary(http.Controller):
                 'id':  attachment_id
             }
         except Exception:
-            args = {'error': "Something horrible happened"}
+            args = {'error': _("Something horrible happened")}
             _logger.exception("Fail to upload attachment %s" % ufile.filename)
         return out % (json.dumps(callback), json.dumps(args))
 
@@ -1481,7 +1465,7 @@ class Reports(http.Controller):
         if 'name' not in action:
             reports = request.session.model('ir.actions.report.xml')
             res_id = reports.search([('report_name', '=', action['report_name']),],
-                                    0, False, False, context)
+                                    context=context)
             if len(res_id) > 0:
                 file_name = reports.read(res_id[0], ['name'], context)['name']
             else:

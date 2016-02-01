@@ -50,23 +50,22 @@ class project_task_type(osv.osv):
         'sequence': 1,
         'project_ids': _get_default_project_ids,
     }
-    _order = 'sequence'
 
 
 class project(osv.osv):
     _name = "project.project"
     _description = "Project"
-    _inherits = {'account.analytic.account': "analytic_account_id",
-                 "mail.alias": "alias_id"}
-    _inherit = ['mail.thread', 'ir.needaction_mixin']
+    _inherit = ['mail.alias.mixin', 'mail.thread', 'ir.needaction_mixin']
+    _inherits = {'account.analytic.account': "analytic_account_id"}
     _period_number = 5
 
-    def _auto_init(self, cr, context=None):
-        """ Installation hook: aliases, project.project """
-        # create aliases for all projects and avoid constraint errors
-        alias_context = dict(context, alias_model_name='project.task')
-        return self.pool.get('mail.alias').migrate_to_alias(cr, self._name, self._table, super(project, self)._auto_init,
-            'project.task', self._columns['alias_id'], 'id', alias_prefix='project+', alias_defaults={'project_id':'id'}, context=alias_context)
+    def get_alias_model_name(self, vals):
+        return vals.get('alias_model', 'project.task')
+
+    def get_alias_values(self):
+        values = super(project, self).get_alias_values()
+        values['alias_defaults'] = {'project_id': self.id}
+        return values
 
     def onchange_partner_id(self, cr, uid, ids, part=False, context=None):
         partner_obj = self.pool.get('res.partner')
@@ -80,18 +79,13 @@ class project(osv.osv):
         return {'value': val}
 
     def unlink(self, cr, uid, ids, context=None):
-        alias_ids = []
-        mail_alias = self.pool.get('mail.alias')
         analytic_account_to_delete = set()
         for proj in self.browse(cr, uid, ids, context=context):
             if proj.tasks:
                 raise UserError(_('You cannot delete a project containing tasks. You can either delete all the project\'s tasks and then delete the project or simply deactivate the project.'))
-            elif proj.alias_id:
-                alias_ids.append(proj.alias_id.id)
             if proj.analytic_account_id and not proj.analytic_account_id.line_ids:
                 analytic_account_to_delete.add(proj.analytic_account_id.id)
         res = super(project, self).unlink(cr, uid, ids, context=context)
-        mail_alias.unlink(cr, uid, alias_ids, context=context)
         self.pool['account.analytic.account'].unlink(cr, uid, list(analytic_account_to_delete), context=context)
         return res
 
@@ -306,22 +300,14 @@ class project(osv.osv):
         self.write({'active': value})
 
     def create(self, cr, uid, vals, context=None):
-        if context is None:
-            context = {}
-        # Prevent double project creation when 'use_tasks' is checked + alias management
-        create_context = dict(context, project_creation_in_progress=True,
-                              alias_model_name=vals.get('alias_model', 'project.task'),
-                              alias_parent_model_name=self._name,
-                              mail_create_nosubscribe=True)
-
         ir_values = self.pool.get('ir.values').get_default(cr, uid, 'project.config.settings', 'generate_project_alias')
         if ir_values:
             vals['alias_name'] = vals.get('alias_name') or vals.get('name')
-        project_id = super(project, self).create(cr, uid, vals, context=create_context)
-        project_rec = self.browse(cr, uid, project_id, context=context)
-        values = {'alias_parent_thread_id': project_id, 'alias_defaults': {'project_id': project_id}}
-        self.pool.get('mail.alias').write(cr, uid, [project_rec.alias_id.id], values, context=context)
-        return project_id
+        # Prevent double project creation when 'use_tasks' is checked
+        create_context = dict(context or {},
+                              project_creation_in_progress=True,
+                              mail_create_nosubscribe=True)
+        return super(project, self).create(cr, uid, vals, context=create_context)
 
     def write(self, cr, uid, ids, vals, context=None):
         # if alias_model has been changed, update alias_model_id accordingly
@@ -668,18 +654,12 @@ class task(osv.osv):
         # user_id change: update date_assign
         if vals.get('user_id'):
             vals['date_assign'] = fields.datetime.now()
+        # reset kanban state when changing stage
+        if 'stage_id' in vals:
+            if 'kanban_state' not in vals:
+                vals['kanban_state'] = 'normal'
 
-        # Overridden to reset the kanban_state to normal whenever
-        # the stage (stage_id) of the task changes.
-        if vals and not 'kanban_state' in vals and 'stage_id' in vals:
-            new_stage = vals.get('stage_id')
-            vals_reset_kstate = dict(vals, kanban_state='normal')
-            for t in self.browse(cr, uid, ids, context=context):
-                write_vals = vals_reset_kstate if t.stage_id.id != new_stage else vals
-                super(task, self).write(cr, uid, [t.id], write_vals, context=context)
-            result = True
-        else:
-            result = super(task, self).write(cr, uid, ids, vals, context=context)
+        result = super(task, self).write(cr, uid, ids, vals, context=context)
 
         if any(item in vals for item in ['stage_id', 'remaining_hours', 'user_id', 'kanban_state']):
             self._store_history(cr, uid, ids, context=context)
@@ -865,9 +845,18 @@ class task(osv.osv):
 class account_analytic_account(osv.osv):
     _inherit = 'account.analytic.account'
     _description = 'Analytic Account'
+
+    def _compute_project_count(self, cr, uid, ids, fieldnames, args, context=None):
+        result = dict.fromkeys(ids, 0)
+        for account in self.browse(cr, uid, ids, context=context):
+            result[account.id] = len(account.project_ids)
+        return result
+
     _columns = {
         'use_tasks': fields.boolean('Tasks', help="Check this box to manage internal activities through this project"),
         'company_uom_id': fields.related('company_id', 'project_time_mode_id', string="Company UOM", type='many2one', relation='product.uom'),
+        'project_ids': fields.one2many('project.project', 'analytic_account_id', 'Projects'),
+        'project_count': fields.function(_compute_project_count, 'Project Count', type='integer')
     }
 
     def on_change_template(self, cr, uid, ids, template_id, date_start=False, context=None):
@@ -936,6 +925,25 @@ class account_analytic_account(osv.osv):
             return self.name_get(cr, uid, project_ids, context=context)
 
         return super(account_analytic_account, self).name_search(cr, uid, name, args=args, operator=operator, context=context, limit=limit)
+
+    def projects_action(self, cr, uid, ids, context=None):
+        accounts = self.browse(cr, uid, ids, context=context)
+        project_ids = sum([account.project_ids.ids for account in accounts], [])
+        result = {
+            "type": "ir.actions.act_window",
+            "res_model": "project.project",
+            "views": [[False, "tree"], [False, "form"]],
+            "domain": [["id", "in", project_ids]],
+            "context": {"create": False},
+            "name": "Projects",
+        }
+        if len(project_ids) == 1:
+            result['views'] = [(False, "form")]
+            result['res_id'] = project_ids[0]
+        else:
+            result = {'type': 'ir.actions.act_window_close'}
+        return result
+
 
 
 class project_project(osv.osv):

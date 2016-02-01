@@ -23,6 +23,8 @@ EMPTY_DICT = frozendict()
 
 _logger = logging.getLogger(__name__)
 
+Default = object()                      # default value for __init__() methods
+
 class SpecialValue(object):
     """ Encapsulates a value in the cache in place of a normal value. """
     def __init__(self, value):
@@ -139,7 +141,8 @@ class Field(object):
             default ``False``)
 
         :param default: the default value for the field; this is either a static
-            value, or a function taking a recordset and returning a value
+            value, or a function taking a recordset and returning a value; use
+            ``default=None`` to discard default values for the field
 
         :param states: a dictionary mapping state values to lists of UI attribute-value
             pairs; possible attributes are: 'readonly', 'required', 'invisible'.
@@ -327,9 +330,9 @@ class Field(object):
         'related_field': None,          # corresponding related field
     }
 
-    def __init__(self, string=None, **kwargs):
+    def __init__(self, string=Default, **kwargs):
         kwargs['string'] = string
-        args = {key: val for key, val in kwargs.iteritems() if val is not None}
+        args = {key: val for key, val in kwargs.iteritems() if val is not Default}
         self.args = args or EMPTY_DICT
         self.setup_full_done = False
 
@@ -452,8 +455,9 @@ class Field(object):
                 if 'default' in field.args:
                     # take the value, and adapt it for model._defaults
                     value = field.args['default']
-                    self.default = default_new_to_new(self, value)
-                    model._defaults[name] = default_new_to_old(self, value)
+                    if value is not None:
+                        self.default = default_new_to_new(self, value)
+                        model._defaults[name] = default_new_to_old(self, value)
                     return
 
             defaults = klass.__dict__.get('_defaults') or {}
@@ -560,8 +564,11 @@ class Field(object):
         # when related_sudo, bypass access rights checks when reading values
         others = records.sudo() if self.related_sudo else records
         for record, other in zip(records, others):
-            # do not switch to another environment if record is a draft one
-            other, field = self.traverse_related(other if record.id else record)
+            if not record.id:
+                # draft records: copy record's cache to other's cache first
+                for name, value in record._cache.iteritems():
+                    other[name] = value
+            other, field = self.traverse_related(other)
             record[self.name] = other[field.name]
 
     def _inverse_related(self, records):
@@ -1065,7 +1072,7 @@ class Float(Field):
         'group_operator': None,         # operator for aggregating values
     }
 
-    def __init__(self, string=None, digits=None, **kwargs):
+    def __init__(self, string=Default, digits=Default, **kwargs):
         super(Float, self).__init__(string=string, _digits=digits, **kwargs)
 
     @property
@@ -1109,7 +1116,7 @@ class Monetary(Field):
         'group_operator': None,         # operator for aggregating values
     }
 
-    def __init__(self, string=None, currency_field=None, **kwargs):
+    def __init__(self, string=Default, currency_field=Default, **kwargs):
         super(Monetary, self).__init__(string=string, currency_field=currency_field, **kwargs)
 
     _related_currency_field = property(attrgetter('currency_field'))
@@ -1431,7 +1438,7 @@ class Selection(Field):
         'selection': None,              # [(value, string), ...], function or method name
     }
 
-    def __init__(self, selection=None, string=None, **kwargs):
+    def __init__(self, selection=Default, string=Default, **kwargs):
         if callable(selection):
             from openerp import api
             selection = api.expected(api.model, selection)
@@ -1630,7 +1637,7 @@ class Many2one(_Relational):
         'delegate': False,              # whether self implements delegation
     }
 
-    def __init__(self, comodel_name=None, string=None, **kwargs):
+    def __init__(self, comodel_name=Default, string=Default, **kwargs):
         super(Many2one, self).__init__(comodel_name=comodel_name, string=string, **kwargs)
 
     def _setup_attrs(self, model, name):
@@ -1831,7 +1838,7 @@ class One2many(_RelationalMulti):
         'copy': False,                  # o2m are not copied by default
     }
 
-    def __init__(self, comodel_name=None, inverse_name=None, string=None, **kwargs):
+    def __init__(self, comodel_name=Default, inverse_name=Default, string=Default, **kwargs):
         super(One2many, self).__init__(
             comodel_name=comodel_name,
             inverse_name=inverse_name,
@@ -1903,8 +1910,8 @@ class Many2many(_RelationalMulti):
         'limit': None,                  # optional limit to use upon read
     }
 
-    def __init__(self, comodel_name=None, relation=None, column1=None, column2=None,
-                 string=None, **kwargs):
+    def __init__(self, comodel_name=Default, relation=Default, column1=Default,
+                 column2=Default, string=Default, **kwargs):
         super(Many2many, self).__init__(
             comodel_name=comodel_name,
             relation=relation,

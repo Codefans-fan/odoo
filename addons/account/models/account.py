@@ -102,7 +102,7 @@ class AccountAccount(models.Model):
     deprecated = fields.Boolean(index=True, default=False)
     user_type_id = fields.Many2one('account.account.type', string='Type', required=True, oldname="user_type", 
         help="Account Type is used for information purpose, to generate country-specific legal reports, and set the rules to close a fiscal year and generate opening entries.")
-    internal_type = fields.Selection(related='user_type_id.type', store=True)
+    internal_type = fields.Selection(related='user_type_id.type', store=True, readonly=True)
     #has_unreconciled_entries = fields.Boolean(compute='_compute_has_unreconciled_entries',
     #    help="The account has at least one unreconciled debit and credit since last time the invoices & payments matching was performed.")
     last_time_entries_checked = fields.Datetime(string='Latest Invoices & Payments Matching Date', readonly=True, copy=False,
@@ -176,6 +176,16 @@ class AccountAccount(models.Model):
     @api.multi
     def mark_as_reconciled(self):
         return self.write({'last_time_entries_checked': time.strftime(DEFAULT_SERVER_DATETIME_FORMAT)})
+
+    @api.multi
+    def action_open_reconcile(self):
+        # Open reconciliation view for this account
+        action_context = {'show_mode_selector': False, 'account_ids': [self.id,]}
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'manual_reconciliation_view',
+            'context': action_context,
+        }
 
 
 class AccountJournal(models.Model):

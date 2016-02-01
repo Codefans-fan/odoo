@@ -4,12 +4,13 @@
 # 
 # Translators:
 # Aleksandar Vangelovski <aleksandarv@hbee.eu>, 2015
+# Martin Trigaux, 2015
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo 9.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2015-10-09 09:17+0000\n"
-"PO-Revision-Date: 2015-12-03 08:48+0000\n"
+"PO-Revision-Date: 2016-01-21 14:09+0000\n"
 "Last-Translator: Martin Trigaux\n"
 "Language-Team: Macedonian (http://www.transifex.com/odoo/odoo-9/language/mk/)\n"
 "MIME-Version: 1.0\n"
@@ -109,7 +110,7 @@ msgid ""
 "                        creating such templates can be a huge effort.\n"
 "                        We recommend to start with standard quotations\n"
 "                        and upgrade later."
-msgstr "<span class=\"fa fa-lightbulb-o fa-lg\"/>Забележи:\n <strong>\nСо користењето на урнеци можете да го подобрите квалитетот на \nвашите понуди и нивниот успех. Но, \nсоздавајќи такви урнеци претставува голем труд од ваша страна. \nВи предлагаме да започнете со стандардни понуди \nи да надградите подоцна."
+msgstr "<span class=\"fa fa-lightbulb-o fa-lg\"/>\n<strong>Забележи:</strong>\nСо користењето на урнеци можете да го подобрите квалитетот на \nвашите понуди и нивниот успех. Но, \nсоздавајќи такви урнеци претставува голем труд од ваша страна. \nВи предлагаме да започнете со стандардни понуди \nи да надградите подоцна."
 
 #. module: crm
 #: model:ir.ui.view,arch_db:crm.crm_planner
@@ -1860,13 +1861,6 @@ msgid "Import using the top left button in"
 msgstr ""
 
 #. module: crm
-#: model:ir.ui.view,arch_db:crm.crm_case_kanban_view_leads
-#: model:ir.ui.view,arch_db:crm.view_crm_case_leads_filter
-#: model:ir.ui.view,arch_db:crm.view_crm_case_opportunities_filter
-msgid "Important Messages"
-msgstr ""
-
-#. module: crm
 #: model:ir.ui.view,arch_db:crm.crm_planner
 msgid "Improve average revenue per salesperson"
 msgstr ""
@@ -3283,7 +3277,7 @@ msgstr "Прескокни ги овие контакти"
 #. module: crm
 #: model:ir.ui.view,arch_db:crm.crm_planner
 msgid "Slides"
-msgstr ""
+msgstr "Слајдови"
 
 #. module: crm
 #: model:ir.ui.view,arch_db:crm.crm_planner
@@ -3377,7 +3371,7 @@ msgstr "Улица"
 #: model:ir.ui.view,arch_db:crm.crm_case_form_view_leads
 #: model:ir.ui.view,arch_db:crm.crm_case_form_view_oppor
 msgid "Street 2..."
-msgstr ""
+msgstr "Улица 2..."
 
 #. module: crm
 #: model:ir.ui.view,arch_db:crm.crm_case_form_view_leads
@@ -3398,7 +3392,7 @@ msgstr "Поднеси"
 #. module: crm
 #: model:ir.ui.view,arch_db:crm.crm_planner
 msgid "Subscription Management"
-msgstr ""
+msgstr "Менаџирање со претплати"
 
 #. module: crm
 #: model:ir.ui.view,arch_db:crm.crm_planner
@@ -3685,6 +3679,9 @@ msgstr ""
 
 #. module: crm
 #: model:ir.model.fields,field_description:crm.field_crm_lead_message_unread
+#: model:ir.ui.view,arch_db:crm.crm_case_kanban_view_leads
+#: model:ir.ui.view,arch_db:crm.view_crm_case_leads_filter
+#: model:ir.ui.view,arch_db:crm.view_crm_case_opportunities_filter
 msgid "Unread Messages"
 msgstr "Непрочитани Пораки"
 

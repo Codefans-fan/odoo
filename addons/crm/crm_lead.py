@@ -117,11 +117,11 @@ class crm_lead(format_address, osv.osv):
         """ Very interesting kanban state color. This makes complete sense. Or
         not. """
         result = {}
-        today = datetime.now()
+        today = date.today()
         for lead in self.browse(cr, uid, ids, context=context):
-            result[lead.id] = 'normal'
+            result[lead.id] = 'grey'
             if lead.date_action:
-                lead_date = datetime.strptime(lead.date_action, tools.DEFAULT_SERVER_DATE_FORMAT)
+                lead_date = datetime.strptime(lead.date_action, tools.DEFAULT_SERVER_DATE_FORMAT).date()
                 if lead_date > today:
                     result[lead.id] = 'green'
                 elif lead_date < today:
@@ -1167,7 +1167,7 @@ class crm_lost_reason(osv.Model):
     _name = "crm.lost.reason"
     _description = 'Reason for loosing leads'
     _columns = {
-        'name': fields.char('Name', required=True),
+        'name': fields.char('Name', required=True, translate=True),
         'active': fields.boolean('Active'),
     }
     _defaults = {

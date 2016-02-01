@@ -36,9 +36,15 @@ class test_inherits(common.TransactionCase):
         # the field daughter.name must have required=False and "Baz" as default
         field = daughter._fields['name']
         self.assertFalse(field.required)
-        self.assertEqual(field.default(mother), "Baz")
+        self.assertEqual(field.default(daughter), "Baz")
         self.assertEqual(daughter._defaults.get('name'), "Baz")
         self.assertEqual(daughter.default_get(['name']), {'name': "Baz"})
+
+        # the field mother.state must have no default value
+        field = mother._fields['state']
+        self.assertFalse(field.default)
+        self.assertNotIn('state', mother._defaults)
+        self.assertEqual(mother.default_get(['state']), {})
 
         # the field daughter.template_id should have
         # comodel_name='test.inherit.mother', string='Template', required=True

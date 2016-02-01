@@ -64,6 +64,7 @@
                     <field name="is_company" invisible="1"/>
                     <field name="country_id" invisible="1"/>
                     <field name="parent_id" invisible="1"/>
+                    <field name="active" invisible="1"/>
                 </tree>
             </field>
         </record>
@@ -143,7 +144,7 @@
                 <form string="Partners">
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button name="toggle_active" type="object" groups="base.group_no_one"
+                        <button name="toggle_active" type="object"
                                 class="oe_stat_button" icon="fa-archive">
                             <field name="active" widget="boolean_button"
                                 options='{"terminology": "archive"}'/>
@@ -164,7 +165,7 @@
                                 placeholder="Company"
                                 domain="[('is_company', '=', True)]" context="{'default_is_company': True, 'default_supplier': supplier, 'default_customer': customer}"
                                 attrs="{'invisible': [('is_company','=', True),('parent_id', '=', False)]}"
-                                on_change="onchange_parent_id(parent_id)"/>
+                                on_change="onchange_parent_id(parent_id, type)"/>
                         </div>
                     </div>
 
@@ -559,7 +560,7 @@
                 </p>
                 <p>
                     Manage partner tags to better classify them for tracking and analysis purposes.
-                    A partner may have several categories and categories have a hierarchical structure: a partner with a categorie has also the parent categorie.
+                    A partner may have several categories and categories have a hierarchical structure: a partner with a category has also the parent category.
                 </p>
             </field>
         </record>

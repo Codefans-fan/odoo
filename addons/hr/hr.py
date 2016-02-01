@@ -272,7 +272,7 @@ class hr_employee(osv.osv):
 
 class hr_department(osv.osv):
     _name = "hr.department"
-    _description = "HR Department"
+    _description = "Department"
     _inherit = ['mail.thread', 'ir.needaction_mixin']
 
     def _dept_name_get_fnc(self, cr, uid, ids, prop, unknow_none, context=None):
@@ -319,7 +319,7 @@ class hr_department(osv.osv):
     def create(self, cr, uid, vals, context=None):
         if context is None:
             context = {}
-        context['mail_create_nosubscribe'] = True
+        context = dict(context, mail_create_nosubscribe=True)
         # TDE note: auto-subscription of manager done by hand, because currently
         # the tracking allows to track+subscribe fields linked to a res.user record
         # An update of the limited behavior should come, but not currently done.

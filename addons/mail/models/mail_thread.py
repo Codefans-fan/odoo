@@ -54,7 +54,7 @@ class MailThread(models.AbstractModel):
         Options:
             - _mail_flat_thread: if set to True, all messages without parent_id
                 are automatically attached to the first message posted on the
-                resource. If set to False, the display of Chatter is done using
+                ressource. If set to False, the display of Chatter is done using
                 threads, and no parent_id is automatically set.
 
     MailThread features can be somewhat controlled through context keys :
@@ -169,6 +169,7 @@ class MailThread(models.AbstractModel):
     @api.multi
     def _get_message_unread(self):
         res = dict((res_id, 0) for res_id in self.ids)
+        partner_id = self.env.user.partner_id.id
 
         # search for unread messages, directly in SQL to improve performances
         self._cr.execute(""" SELECT msg.res_id FROM mail_message msg
@@ -176,8 +177,8 @@ class MailThread(models.AbstractModel):
                              ON rel.mail_message_id = msg.id
                              RIGHT JOIN mail_channel_partner cp
                              ON (cp.channel_id = rel.mail_channel_id AND cp.partner_id = %s AND (cp.seen_message_id < msg.id))
-                             WHERE msg.model = %s AND msg.res_id in %s""",
-                         (self.env.user.partner_id.id, self._name, tuple(self.ids),))
+                             WHERE msg.model = %s AND msg.res_id in %s AND msg.author_id != %s""",
+                         (partner_id, self._name, tuple(self.ids), partner_id,))
         for result in self._cr.fetchall():
             res[result[0]] += 1
 
@@ -416,7 +417,20 @@ class MailThread(models.AbstractModel):
         return False
 
     @api.multi
+    def _message_track_get_changes(self, tracked_fields, initial_values):
+        """ Batch method of _message_track. """
+        result = dict()
+        for record in self:
+            result[record.id] = record._message_track(tracked_fields, initial_values[record.id])
+        return result
+
+    @api.multi
     def _message_track(self, tracked_fields, initial):
+        """ For a given record, fields to check (tuple column name, column info)
+        and initial values, return a structure that is a tuple containing :
+
+         - a set of updated column names
+         - a list of changes (initial value, new value, column name, column info) """
         self.ensure_one()
         changes = set()
         tracking_value_ids = []
@@ -437,11 +451,16 @@ class MailThread(models.AbstractModel):
 
     @api.multi
     def message_track(self, tracked_fields, initial_values):
+        """ Track updated values. Comparing the initial and current values of
+        the fields given in tracked_fields, it generates a message containing
+        the updated values. This message can be linked to a mail.message.subtype
+        given by the ``_track_subtype`` method. """
         if not tracked_fields:
             return True
 
+        tracking = self._message_track_get_changes(tracked_fields, initial_values)
         for record in self:
-            changes, tracking_value_ids = record._message_track(tracked_fields, initial_values[record.id])
+            changes, tracking_value_ids = tracking[record.id]
             if not changes:
                 continue
 
@@ -733,6 +752,17 @@ class MailThread(models.AbstractModel):
             'X-Odoo-Objects': "%s-%s" % (self._model, self.id),
             'X-Odoo-db-uuid': database_uuid
         })}
+
+    @api.multi
+    def message_get_recipient_values(self, notif_message=None, recipient_ids=None):
+        """ Get specific notification recipient values to store on the notification
+        mail_mail. Basic method just set the recipient partners as mail_mail
+        recipients. Inherit this method to add custom behavior like using
+        recipient email_to to bypass the recipint_ids heuristics in the
+        mail sending mechanism. """
+        return {
+            'recipient_ids': [(4, pid) for pid in recipient_ids]
+        }
 
     # ------------------------------------------------------
     # Mail gateway
@@ -1630,10 +1660,6 @@ class MailThread(models.AbstractModel):
         # 1: Handle content subtype: if plaintext, converto into HTML
         if content_subtype == 'plaintext':
             body = tools.plaintext2html(body)
-        # TMP: do not rewrite URLs in html because it creates errors. A fix is
-        # pending in 9, so this code is temporarily deactivated.
-        # else:
-        #     body = tools.html_keep_url(body)
 
         # 2: Private message: add recipients (recipients and author of parent message) - current author
         #   + legacy-code management (! we manage only 4 and 6 commands)
@@ -2001,3 +2027,13 @@ class MailThread(models.AbstractModel):
         msg_comment.write({"res_id": new_thread.id, "model": new_thread._name})
         msg_not_comment.write({"res_id": new_thread.id, "model": new_thread._name, "subtype_id": None})
         return True
+
+    # ------------------------------------------------------
+    # Mass mailing
+    # ------------------------------------------------------
+
+    def message_mass_mailing_enabled(self):
+        if self._mail_mass_mailing:
+            # TODO master properly translate
+            # the _mail_mass_mailing is evaluted at code start so not translated
+            return _(self._mail_mass_mailing)
