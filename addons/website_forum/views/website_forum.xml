@@ -720,6 +720,13 @@
 
 <!-- Specific Post Layout -->
 <template id="post_description_full" name="Question Navigation">
+    <t t-set="head">
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:site" t-attf-content="@#{res_company.name}" />
+        <meta name="twitter:title" t-att-content="question.name" />
+        <meta name="twitter:description" t-att-content="question.content" />
+        <meta name="twitter:image" t-attf-content="#{request.httprequest.url_root}forum/user/#{question.create_uid.id}/avatar"/>   
+    </t> 
     <t t-call="website_forum.header">
         <div class="alert alert-info text-center" role="alert" t-if="forum and question.state == 'pending' and user.karma>=forum.karma_moderate and question.active">
             <a t-attf-href="/forum/#{slug(forum)}/post/#{slug(question)}/validate" type="button" class="btn btn-success">Accept <i class="fa fa-check"/></a>
@@ -766,7 +773,7 @@
                     <i t-if="question.post_type == 'discussion'" t-attf-class="fa fa-comments-o" t-att-title="question.post_type.capitalize()" />
                     <i t-if="question.post_type == 'link'" t-attf-class="fa fa-link" t-att-title="question.post_type.capitalize()" />
                     <span>By </span>
-                    <a t-attf-href="/forum/#{ slug(forum) }/user/#{ question.create_uid.id }"
+                    <a t-att-href="(question.create_uid.id == request.session.uid or question.create_uid.sudo().website_published) and '/forum/%s/user/%s' % (slug(forum), question.create_uid.id) or '#'"
                         t-field="question.create_uid"
                         t-field-options='{"widget": "contact", "country_image": true, "fields": ["name", "country_id"]}'
                         style="display: inline-block;"/>
@@ -914,13 +921,17 @@
         </div>
         <div class="question-block">
             <div class="pull-right author-box">
+                <t t-set="user_profile_url" t-attf-value="#"/>
+                <t t-if="answer.create_uid.id == request.session.uid or answer.create_uid.sudo().website_published">
+                    <t t-set="user_profile_url" t-value="'/forum/%s/user/%s' % (slug(forum), answer.create_uid.id)"/>
+                </t>
                 <div class="o_forum_user_bio_expand" t-if="answer.can_display_biography">
                     <t t-call="website_forum.forum_user_tooltip"/>
                 </div>
-                <a t-attf-href="/forum/#{ slug(forum) }/user/#{ answer.create_uid.id }" class="o_forum_user_info">
+                <a t-att-href="user_profile_url" class="o_forum_user_info">
                     <img class="pull-left img img-rounded o_forum_avatar" t-attf-src="/forum/user/#{answer.create_uid.id}/avatar"/>
                 </a>
-                <a t-attf-href="/forum/#{ slug(forum) }/user/#{ answer.create_uid.id }"
+                <a t-att-href="user_profile_url"
                     t-field="answer.create_uid"
                     t-field-options='{"widget": "contact", "country_image": true, "fields": ["name", "country_id"]}'
                     style="display: inline-block;"/>
@@ -1004,11 +1015,11 @@
 <!-- Template for user tooltip  -->
 <template id="forum_user_tooltip">
     <div class="o_forum_user_bio text-left panel panel-body">
-        <a t-attf-href="/forum/#{ slug(forum) }/user/#{ answer.create_uid.id }">
+        <a t-att-href="user_profile_url">
             <img class="pull-left img img-rounded o_forum_avatar_big" t-attf-src="/forum/user/#{answer.create_uid.id}/avatar"/>
         </a>
         <div class="o_forum_tooltip_header">
-            <h4 class="o_forum_tooltip_heading"><a t-attf-href="/forum/#{ slug(forum) }/user/#{ answer.create_uid.id }"
+            <h4 class="o_forum_tooltip_heading"><a t-att-href="user_profile_url"
                 t-field="answer.create_uid"
                 t-field-options='{"widget": "contact", "country_image": true, "fields": ["name", "country_id"]}'
                 style="display: inline-block;"/>
@@ -1522,6 +1533,37 @@
     <xpath expr="//ul[@id='oe_systray']/li/ul[@class='dropdown-menu oe_content_menu']" position="inside">
         <li><a href="#" data-action="new_forum">New Forum</a></li>
     </xpath>
+</template>
+
+<!-- Chatter templates -->
+<template id="forum_post_template_new_answer">
+    <p>A new answer on <t t-esc="object.name"/> has been posted. Click here to access the post :</p>
+    <p style="margin-left: 30px; margin-top: 10 px; margin-bottom: 10px;">
+        <a t-attf-href="/forum/#{slug(object.forum_id)}/question/#{slug(object)}"
+            style="padding: 5px 10px; font-size: 12px; line-height: 18px; color: #FFFFFF; border-color:#a24689; text-decoration: none; display: inline-block; margin-bottom: 0px; font-weight: 400; text-align: center; vertical-align: middle; cursor: pointer; background-color: #a24689; border: 1px solid #a24689; border-radius:3px">
+            See post
+        </a>
+    </p>
+</template>
+
+<template id="forum_post_template_new_question">
+    <p>A new question <b t-esc="object.name" /> on <t t-esc="object.forum_id.name"/> has been posted. Click here to access the question :</p>
+    <p style="margin-left: 30px; margin-top: 10 px; margin-bottom: 10px;">
+        <a t-attf-href="/forum/#{slug(object.forum_id)}/question/#{slug(object)}"
+            style="padding: 5px 10px; font-size: 12px; line-height: 18px; color: #FFFFFF; border-color:#a24689; text-decoration: none; display: inline-block; margin-bottom: 0px; font-weight: 400; text-align: center; vertical-align: middle; cursor: pointer;background-color: #a24689; border: 1px solid #a24689; border-radius:3px">
+            See question
+        </a>
+    </p>
+</template>
+
+<template id="forum_post_template_validation">
+    <p>A new question <b t-esc="object.name" /> on <t t-esc="object.forum_id.name"/> has been posted and require your validation. Click here to access the question :</p>
+    <p style="margin-left: 30px; margin-top: 10 px; margin-bottom: 10px;">
+        <a t-attf-href="/forum/#{slug(object.forum_id)}/question/#{slug(object)}"
+            style="padding: 5px 10px; font-size: 12px; line-height: 18px; color: #FFFFFF; border-color:#a24689; text-decoration: none; display: inline-block; margin-bottom: 0px; font-weight: 400; text-align: center; vertical-align: middle; cursor: pointer;background-color: #a24689; border: 1px solid #a24689; border-radius:3px">
+            Validate question
+        </a>
+    </p>
 </template>
 
     </data>

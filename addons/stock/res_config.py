@@ -2,48 +2,12 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from openerp.osv import fields, osv
-from openerp.tools.translate import _
-
-class res_company(osv.osv):
-    _inherit = "res.company"
-    _columns = {
-        'propagation_minimum_delta': fields.integer('Minimum Delta for Propagation of a Date Change on moves linked together'),
-        'internal_transit_location_id': fields.many2one('stock.location', 'Internal Transit Location', help="Technical field used for resupply routes between warehouses that belong to this company", on_delete="restrict"),
-    }
-
-    def create_transit_location(self, cr, uid, company_id, company_name, context=None):
-        '''Create a transit location with company_id being the given company_id. This is needed
-           in case of resuply routes between warehouses belonging to the same company, because
-           we don't want to create accounting entries at that time.
-        '''
-        data_obj = self.pool.get('ir.model.data')
-        try:
-            parent_loc = data_obj.get_object_reference(cr, uid, 'stock', 'stock_location_locations')[1]
-        except:
-            parent_loc = False
-        location_vals = {
-            'name': _('%s: Transit Location') % company_name,
-            'usage': 'transit',
-            'company_id': company_id,
-            'location_id': parent_loc,
-        }
-        location_id = self.pool.get('stock.location').create(cr, uid, location_vals, context=context)
-        self.write(cr, uid, [company_id], {'internal_transit_location_id': location_id}, context=context)
-
-    def create(self, cr, uid, vals, context=None):
-        company_id = super(res_company, self).create(cr, uid, vals, context=context)
-        self.create_transit_location(cr, uid, company_id, vals['name'], context=context)
-        return company_id
-
-    _defaults = {
-        'propagation_minimum_delta': 1,
-    }
 
 class stock_config_settings(osv.osv_memory):
     _name = 'stock.config.settings'
     _inherit = 'res.config.settings'
 
-    def set_group_locations(self, cr, uid, ids, context=None):
+    def set_group_stock_multi_locations(self, cr, uid, ids, context=None):
         """
             If we are not in multiple locations,
             we can deactivate the internal picking types of the warehouses.
@@ -53,7 +17,7 @@ class stock_config_settings(osv.osv_memory):
             wh_obj = self.pool['stock.warehouse']
             whs = wh_obj.search(cr, uid, [], context=context)
             warehouses = wh_obj.browse(cr, uid, whs, context=context)
-            if obj.group_stock_multiple_locations:
+            if obj.group_stock_multi_locations:
                 # Check inactive picking types and of warehouses make them active (by warehouse)
                 inttypes = [x.int_type_id.id for x in warehouses if not x.int_type_id.active]
                 if inttypes:
@@ -64,6 +28,18 @@ class stock_config_settings(osv.osv_memory):
                 if inttypes:
                     self.pool['stock.picking.type'].write(cr, uid, inttypes, {'active': False}, context=context)
         return True
+
+    def default_get(self, cr, uid, fields, context=None):
+        res = super(stock_config_settings, self).default_get(cr, uid, fields, context=context)
+        if 'warehouse_and_location_usage_level' in fields or not fields:
+            res['warehouse_and_location_usage_level'] = int(res.get('group_stock_multi_locations', False)) + int(res.get('group_stock_multi_warehouses', False))
+        return res
+
+    def onchange_warehouse_and_location_usage_level(self, cr, uid, ids, level, context=None):
+        return {'value': {
+            'group_stock_multi_locations': level > 0,
+            'group_stock_multi_warehouses': level > 1,
+        }}
 
     _columns = {
         'group_product_variant': fields.selection([
@@ -87,7 +63,7 @@ class stock_config_settings(osv.osv_memory):
             help='Adds a Claim link to the delivery order.\n'
                  '-This installs the module claim_from_delivery.'),
         'module_product_expiry': fields.selection([
-            (0, 'Do not use Expiration Date'),
+            (0, 'Do not use Expiration Date on serial numbers'),
             (1, 'Define Expiration Date on serial numbers')
             ], "Expiration Dates",
             help="""Track different dates on products and serial numbers.
@@ -127,12 +103,6 @@ class stock_config_settings(osv.osv_memory):
             ], "Product Owners",
             implied_group='stock.group_tracking_owner',
             help="""This way you can receive products attributed to a certain owner. """),
-        'group_stock_multiple_locations': fields.selection([
-            (0, 'Do not record internal moves within a warehouse'),
-            (1, 'Manage several locations per warehouse')
-            ], "Multi Locations",
-            implied_group='stock.group_locations',
-            help="""This will show you the locations and allows you to define multiple picking types and warehouses."""),
         'group_stock_adv_location': fields.selection([
             (0, 'No automatic routing of products'),
             (1, 'Advanced routing of products using rules')
@@ -163,11 +133,21 @@ class stock_config_settings(osv.osv_memory):
         'module_delivery_temando': fields.boolean("Temando integration"),
         'module_delivery_ups': fields.boolean("UPS integration"),
         'module_delivery_usps': fields.boolean("USPS integration"),
+        # Warehouse and location usage_level : 
+        'warehouse_and_location_usage_level': fields.selection([
+            (0, 'Manage only 1 Warehouse with only 1 stock location'),
+            (1, 'Manage only 1 Warehouse, composed by several stock locations'),
+            (2, 'Manage several Warehouses, each one composed by several stock locations')
+            ], "Warehouses and Locations usage level"),
+        'group_stock_multi_locations': fields.boolean('Manage several stock locations',
+            implied_group='stock.group_stock_multi_locations'),
+        'group_stock_multi_warehouses': fields.boolean('Manage several warehouses',
+            implied_group='stock.group_stock_multi_warehouses'),
     }
 
     def onchange_adv_location(self, cr, uid, ids, group_stock_adv_location, context=None):
         if group_stock_adv_location:
-            return {'value': {'group_stock_multiple_locations': 1}}
+            return {'value': {'warehouse_and_location_usage_level': 1}}
         return {}
 
     def _default_company(self, cr, uid, context=None):

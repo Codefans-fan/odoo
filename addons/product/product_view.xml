@@ -107,7 +107,7 @@
                                         <field name="type" on_change="onchange_type(type, context)"/>
                                     </group>
                                     <group name="group_standard_price">
-                                        <field name="list_price"/>
+                                        <field name="list_price" widget='monetary' options="{'currency_field': 'currency_id'}"/>
                                         <label for="standard_price" groups="base.group_user"/>
                                         <div name="standard_price_uom" groups="base.group_user">
                                             <field name="standard_price" widget='monetary' options="{'currency_field': 'currency_id'}" class="oe_inline"/>
@@ -400,7 +400,7 @@
                 <p class="oe_view_nocontent_create">
                     Click to define a new product.
                 </p><p>
-                    You must define a product for everything you sell, whether it's a physical product, a consumable or a service you offer to  customers.               
+                    You must define a product for everything you sell, whether it's a physical product, a consumable or a service you offer to customers.
                 </p><p>
                     The product form contains information to simplify the sale process: price, notes in the quotation, accounting data, procurement methods, etc.
                 </p>
@@ -754,7 +754,7 @@
                             <field name="name"/>
                         </h1>
                         <group>
-                            <group>
+                            <group name="qty">
                                 <field name="qty"/>
                             </group>
                         </group>

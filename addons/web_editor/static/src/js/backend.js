@@ -73,7 +73,7 @@ var FieldTextHtmlSimple = widget.extend({
                     self.resize();
                 });
             } else {
-                this.$content = $('<div class="note-editable o_readonly"/>');
+                this.$content = $('<div class="o_readonly"/>');
                 this.$textarea.hide().after(this.$content);
             }
         } else {
@@ -90,7 +90,9 @@ var FieldTextHtmlSimple = widget.extend({
             setTimeout(reset, 0);
 
             this.$content = this.$('.note-editable:first');
-            transcoder.style_to_class(this.$content);
+            if (this.options['style-inline']) {
+                transcoder.style_to_class(this.$content);
+            }
         }
 
         $(".oe-view-manager-content").on("scroll", function () {

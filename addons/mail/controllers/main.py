@@ -143,6 +143,7 @@ class MailController(http.Controller):
             'id': res_id,
             'active_id': res_id,
             'view_id': record_sudo.get_formview_id(),
+            'action': record_action.get('id'),
         }
         url = '/web?%s#%s' % (url_encode(query), url_encode(url_params))
         return werkzeug.utils.redirect(url)
@@ -244,5 +245,6 @@ class MailController(http.Controller):
             'channel_slots': request.env['mail.channel'].channel_fetch_slot(),
             'mention_partner_suggestions': request.env['res.partner'].get_static_mention_suggestions(),
             'emoji': request.env['mail.shortcode'].sudo().search_read([('shortcode_type', '=', 'image')], ['source', 'substitution', 'description']),
+            'menu_id': request.env['ir.model.data'].xmlid_to_res_id('mail.mail_channel_menu_root_chat'),
         }
         return values

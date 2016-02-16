@@ -23,6 +23,14 @@
             <field name="arch" type="xml">
                 <form string="Carrier">
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive">
+                                <field name="active" widget="boolean_button" options='{"terminology": "archive"}'/>
+                            </button>
+                            <button name="toggle_prod_environment" type="object" class="oe_stat_button" icon="fa-check-square" attrs="{'invisible': ['|', ('delivery_type', '=', 'fixed'), ('delivery_type', '=', 'base_on_rule')]}">
+                                <field name="prod_environment" widget="boolean_button" options='{"terminology": "prod_environment"}'/>
+                            </button>
+                        </div>
                         <div class="oe_title" name="title">
                             <label for="name" string="Name" class="oe_edit_only"/>
                             <h1>
@@ -154,11 +162,10 @@
                         <field name="carrier_id"/>
                         <field name="delivery_type" attrs="{'invisible':True}"/>
                         <label for="carrier_tracking_ref"/>
-                        <div>
+                        <div name="tracking">
                             <field name="carrier_tracking_ref" class="oe_inline"/>
                             <button type='object' class="fa fa-arrow-right oe_link" name="cancel_shipment" string="Cancel" attrs="{'invisible':['|','|','|',('carrier_tracking_ref','=',False),('delivery_type','in', ['fixed', 'base_on_rule']),('delivery_type','=',False),('state','not in',('done'))]}"/>
                         </div>
-                        <field name="carrier_price"/>
                     </group>
                     <group>
                         <label for="weight" string="Weight"/>
@@ -166,6 +173,7 @@
                             <field name="weight" class="oe_inline"/>
                             <field name="weight_uom_id" nolabel="1" class="oe_inline"/>
                         </div>
+                        <field name="shipping_weight"/>
                         <field name="number_of_packages"/>
                     </group>
                 </group>
@@ -177,6 +185,9 @@
                 <xpath expr="/form/header/button[last()]" position="after">
                     <button name="send_to_shipper" string="Send to Shipper" type="object" attrs="{'invisible':['|','|','|',('carrier_tracking_ref','!=',False),('delivery_type','in', ['fixed', 'base_on_rule']),('delivery_type','=',False),('state','not in',('done'))]}"/>
                 </xpath>
+                <field name="result_package_id" position="before">
+                    <button name="manage_package_type" string="Manage Package Type" type="object" icon="fa-dropbox" groups="stock.group_tracking_lot" attrs="{'invisible': [('result_package_id','=', False)]}"/>
+                </field>
               </data>
             </field>
         </record>
@@ -199,9 +210,30 @@
             <field name="arch" type="xml">
                 <field name="company_id" position="before">
                     <field name="weight"/>
+                    <field name="shipping_weight"/>
                 </field>
             </field>
         </record>
+
+
+        <record id="view_quant_package_form_save" model="ir.ui.view">
+            <field name="name">stock.quant.package.form.save</field>
+            <field name="model">stock.quant.package</field>
+            <field eval="99" name="priority"/>
+            <field name="arch" type="xml">
+                <form string="Package">
+                    <group>
+                        <field name="packaging_id" domain="[('package_carrier_type', '=', context.get('current_package_carrier_type'))]"/>
+                        <field name="shipping_weight"/>
+                    </group>
+                    <footer>
+                        <button name="write" type="object" string="Save" class="btn btn-sm btn-primary"/>
+                        <button string="Discard" special="cancel" class="btn btn-sm btn-default"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
 
         <record id="view_move_withweight_form" model="ir.ui.view">
             <field name="name">stock.move.form.weight</field>
@@ -239,27 +271,10 @@
                           </div>
                       </div>
                   </xpath>
+                  <xpath expr="//field[@name='product_uom_qty']" position="after">
+                      <field name="product_qty" invisible="1"/>
+                  </xpath>
                 </data>
-            </field>
-        </record>
-
-        <record id="view_picking_withcarrier_out_form_shipping" model="ir.ui.view">
-            <field name="name">delivery.stock.picking_withcarrier.form.view.shipping</field>
-            <field name="model">stock.picking</field>
-            <field name="inherit_id" ref="delivery.view_picking_withcarrier_out_form"/>
-            <field name="arch" type="xml">
-                <xpath expr='//group[@name="carrier_data"]' position='replace'>
-                    <group name='carrier_data'>
-                      <field name="carrier_id"/>
-                      <field name="delivery_type" attrs="{'invisible':True}"/>
-                      <label for="carrier_tracking_ref"/>
-                      <div>
-                          <field name="carrier_tracking_ref" class="oe_inline"/>
-                          <button type='object' class="fa fa-arrow-right oe_link" name="cancel_shipment" string="Cancel" attrs="{'invisible':['|','|','|',('carrier_tracking_ref','=',False),('delivery_type','in', ['fixed', 'base_on_rule']),('delivery_type','=',False),('state','not in',('done'))]}"/>
-                      </div>
-                      <field name="carrier_price"/>
-                    </group>
-                </xpath>
             </field>
         </record>
 

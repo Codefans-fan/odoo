@@ -260,7 +260,7 @@
                         <div class="col-xs-6 o_kanban_primary_right">
                             <div class="row">
                                 <div class="col-xs-6">
-                                    <a type="object" name="open_action" context="{'search_default_draft': '1'}">
+                                    <a type="object" name="open_action" context="{'search_default_draft': '1', 'search_default_proforma': '1'}">
                                         <span t-if="journal_type == 'sale'" title="Invoices to validate"><t t-esc="dashboard.number_draft"/> Invoices to validate</span>
                                         <span t-if="journal_type == 'purchase'" title="Draft bills"><t t-esc="dashboard.number_draft"/> Draft bills</span>
                                     </a>
@@ -310,12 +310,4 @@
     </record>
 
     <menuitem id="menu_board_journal_1" name="Dashboard" action="open_account_journal_dashboard_kanban" parent="menu_finance" sequence="1"/>
-
-    <data noupdate="1">
-        <!-- After installation of the module, open the related menu -->
-        <record id="base.open_menu" model="ir.actions.todo">
-            <field name="action_id" ref="base.action_open_website"/>
-            <field name="state">open</field>
-        </record>
-    </data>
 </odoo>

@@ -265,11 +265,42 @@ class Post(models.Model):
     can_downvote = fields.Boolean('Can Downvote', compute='_get_post_karma_rights')
     can_comment = fields.Boolean('Can Comment', compute='_get_post_karma_rights')
     can_comment_convert = fields.Boolean('Can Convert to Comment', compute='_get_post_karma_rights')
-    can_view = fields.Boolean('Can View', compute='_get_post_karma_rights')
+    can_view = fields.Boolean('Can View', compute='_get_post_karma_rights', search='_search_can_view')
     can_display_biography = fields.Boolean("Is the author's biography visible from his post", compute='_get_post_karma_rights')
     can_post = fields.Boolean('Can Automatically be Validated', compute='_get_post_karma_rights')
     can_flag = fields.Boolean('Can Flag', compute='_get_post_karma_rights')
     can_moderate = fields.Boolean('Can Moderate', compute='_get_post_karma_rights')
+
+    def _search_can_view(self, operator, value):
+        if operator not in ('=', '!=', '<>'):
+            raise ValueError('Invalid operator: %s' % (operator,))
+
+        if not value:
+            operator = operator == "=" and '!=' or '='
+            value = True
+
+        if self._uid == SUPERUSER_ID:
+            return [(1, '=', 1)]
+
+        user = self.env['res.users'].browse(self._uid)
+        req = """
+            SELECT p.id
+            FROM forum_post p
+                   LEFT JOIN res_users u ON p.create_uid = u.id
+                   LEFT JOIN forum_forum f ON p.forum_id = f.id
+            WHERE
+                (p.create_uid = %s and f.karma_close_own <= %s)
+                or (p.create_uid != %s and f.karma_close_all <= %s)
+                or (
+                    u.karma > 0
+                    and (p.active or p.create_uid = %s)
+                )
+        """
+
+        op = operator == "=" and "inselect" or "not inselect"
+
+        # don't use param named because orm will add other param (test_active, ...)
+        return [('id', op, (req, (user.id, user.karma, user.id, user.karma, user.id)))]
 
     @api.one
     @api.depends('content')
@@ -362,7 +393,7 @@ class Post(models.Model):
             post.can_downvote = is_admin or user.karma >= post.forum_id.karma_downvote
             post.can_comment = is_admin or user.karma >= post.karma_comment
             post.can_comment_convert = is_admin or user.karma >= post.karma_comment_convert
-            post.can_view = is_admin or user.karma >= post.karma_close or post_sudo.create_uid.karma > 0
+            post.can_view = is_admin or user.karma >= post.karma_close or (post_sudo.create_uid.karma > 0 and (post_sudo.active or post_sudo.create_uid.id == user))
             post.can_display_biography = is_admin or post_sudo.create_uid.karma >= post.forum_id.karma_user_bio
             post.can_post = is_admin or user.karma >= post.forum_id.karma_post
             post.can_flag = is_admin or user.karma >= post.forum_id.karma_flag
@@ -473,49 +504,35 @@ class Post(models.Model):
 
     @api.multi
     def post_notification(self):
-        base_url = self.env['ir.config_parameter'].get_param('web.base.url')
         for post in self:
             tag_partners = post.tag_ids.mapped('message_partner_ids')
             tag_channels = post.tag_ids.mapped('message_channel_ids')
 
             if post.state == 'active' and post.parent_id:
-                body = """
-<p>%(intro)s</p>
-<p style="margin-left: 30px; margin-top: 10 px; margin-bottom: 10px;">
-<a href="%(url)s" style="padding: 5px 10px; font-size: 12px; line-height: 18px; color: #FFFFFF; border-color:#a24689; text-decoration: none; display: inline-block; margin-bottom: 0px; font-weight: 400; text-align: center; vertical-align: middle; cursor: pointer; white-space: nowrap; background-image: none; background-color: #a24689; border: 1px solid #a24689; border-radius:3px" class="o_default_snippet_text">
-    %(click)s
-</a>
-</p>""" % {'intro': _('A new answer on %s has been posted. Click here to access the post :') % self.parent_id.name,
-           'url': '%s/forum/%s/question/%s' % (base_url, slug(self.parent_id.forum_id), slug(self.parent_id)),
-           'click': _('See post')}
-                post.parent_id.message_post(subject=_('Re: %s') % post.parent_id.name, body=body, partner_ids=[(4, p.id) for p in tag_partners], channel_ids=[(4, c.id) for c in tag_channels], subtype='website_forum.mt_answer_new')
+                post.parent_id.message_post_with_view(
+                    'website_forum.forum_post_template_new_answer',
+                    subject=_('Re: %s') % post.parent_id.name,
+                    partner_ids=[(4, p.id) for p in tag_partners],
+                    channel_ids=[(4, c.id) for c in tag_channels],
+                    subtype_id=self.env['ir.model.data'].sudo().xmlid_to_res_id('website_forum.mt_answer_new'))
             elif post.state == 'active' and not post.parent_id:
-                body = """
-<p>%(intro)s</p>
-<p style="margin-left: 30px; margin-top: 10 px; margin-bottom: 10px;">
-    <a href="%(url)s" style="padding: 5px 10px; font-size: 12px; line-height: 18px; color: #FFFFFF; border-color:#a24689; text-decoration: none; display: inline-block; margin-bottom: 0px; font-weight: 400; text-align: center; vertical-align: middle; cursor: pointer; white-space: nowrap; background-image: none; background-color: #a24689; border: 1px solid #a24689; border-radius:3px" class="o_default_snippet_text">
-        %(click)s
-    </a>
-</p>""" % {'intro': _('A new question <b>%s</b> on %s has been posted. Click here to access the question :') % (self.name, self.forum_id.name),
-           'url': '%s/forum/%s/question/%s' % (base_url, slug(self.forum_id), slug(self)),
-           'click': _('See question')}
-                post.message_post(subject=post.name, body=body, partner_ids=[(4, p.id) for p in tag_partners], channel_ids=[(4, c.id) for c in tag_channels], subtype='website_forum.mt_question_new')
+                post.message_post_with_view(
+                    'website_forum.forum_post_template_new_question',
+                    subject=post.name,
+                    partner_ids=[(4, p.id) for p in tag_partners],
+                    channel_ids=[(4, c.id) for c in tag_channels],
+                    subtype_id=self.env['ir.model.data'].sudo().xmlid_to_res_id('website_forum.mt_question_new'))
             elif post.state == 'pending' and not post.parent_id:
                 # TDE FIXME: in master, you should probably use a subtype;
                 # however here we remove subtype but set partner_ids
                 partners = post.sudo().message_partner_ids | tag_partners
                 partners = partners.filtered(lambda partner: partner.user_ids and any(user.karma >= post.forum_id.karma_moderate for user in partner.user_ids))
-                note_subtype = self.sudo().env.ref('mail.mt_note')
-                body = """
-<p>%(intro)s</p>
-<p style="margin-left: 30px; margin-top: 10 px; margin-bottom: 10px;">
-    <a href="%(url)s" style="padding: 5px 10px; font-size: 12px; line-height: 18px; color: #FFFFFF; border-color:#a24689; text-decoration: none; display: inline-block; margin-bottom: 0px; font-weight: 400; text-align: center; vertical-align: middle; cursor: pointer; white-space: nowrap; background-image: none; background-color: #a24689; border: 1px solid #a24689; border-radius:3px" class="o_default_snippet_text">
-        %(click)s
-    </a>
-</p>""" % {'intro': _('A new question <b>%s</b> has been asked on %s and require your validation. Click here to access the question :') % (self.name, self.parent_id.name),
-           'url': '%s/forum/%s/question/%s' % (base_url, slug(self.forum_id), slug(self)),
-           'click': _('Validate question')}
-                post.message_post(subject=post.name, body=body, subtype_id=note_subtype.id, partner_ids=partners.ids)
+
+                post.message_post_with_view(
+                    'website_forum.forum_post_template_validation',
+                    subject=post.name,
+                    partner_ids=partners.ids,
+                    subtype_id=self.env['ir.model.data'].sudo().xmlid_to_res_id('mail.mt_note'))
         return True
 
     @api.multi

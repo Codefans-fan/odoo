@@ -12,6 +12,7 @@ import logging
 import pytz
 import xmlrpclib
 
+from openerp.sql_db import LazyCursor
 from openerp.tools import float_round, frozendict, html_sanitize, ustr, OrderedSet
 from openerp.tools import DEFAULT_SERVER_DATE_FORMAT as DATE_FORMAT
 from openerp.tools import DEFAULT_SERVER_DATETIME_FORMAT as DATETIME_FORMAT
@@ -42,6 +43,20 @@ class FailedValue(SpecialValue):
 def _check_value(value):
     """ Return ``value``, or call its getter if ``value`` is a :class:`SpecialValue`. """
     return value.get() if isinstance(value, SpecialValue) else value
+
+def copy_cache(records, env):
+    """ Recursively copy the cache of ``records`` to the environment ``env``. """
+    todo, done = set(records), set()
+    while todo:
+        record = todo.pop()
+        if record not in done:
+            done.add(record)
+            target = record.with_env(env)
+            for name, value in record._cache.iteritems():
+                if isinstance(value, BaseModel):
+                    todo.update(value)
+                    value = value.with_env(env)
+                target._cache[name] = value
 
 
 def resolve_mro(model, name, predicate):
@@ -292,6 +307,7 @@ class Field(object):
     _slots = {
         'args': EMPTY_DICT,             # the parameters given to __init__()
         '_attrs': EMPTY_DICT,           # the field's non-slot attributes
+        '_module': None,                # the field's module name
         'setup_full_done': False,       # whether the field has been fully setup
 
         'automatic': False,             # whether the field is automatically created ("magic" field)
@@ -407,8 +423,10 @@ class Field(object):
         """ Determine field parameter attributes. """
         # determine all inherited field attributes
         attrs = {}
-        for field in reversed(resolve_mro(model, name, self._can_setup_from)):
-            attrs.update(field.args)
+        if not (self.args.get('automatic') or self.args.get('manual')):
+            # magic and custom fields do not inherit from parent classes
+            for field in reversed(resolve_mro(model, name, self._can_setup_from)):
+                attrs.update(field.args)
         attrs.update(self.args)         # necessary in case self is not in class
 
         attrs['args'] = self.args
@@ -460,6 +478,9 @@ class Field(object):
                         model._defaults[name] = default_new_to_old(self, value)
                     return
 
+            # do not look up _defaults on model classes
+            if getattr(klass, 'pool', None):
+                continue
             defaults = klass.__dict__.get('_defaults') or {}
             if name in defaults:
                 # take the value from _defaults, and adapt it for self.default
@@ -564,10 +585,9 @@ class Field(object):
         # when related_sudo, bypass access rights checks when reading values
         others = records.sudo() if self.related_sudo else records
         for record, other in zip(records, others):
-            if not record.id:
+            if not record.id and record.env != other.env:
                 # draft records: copy record's cache to other's cache first
-                for name, value in record._cache.iteritems():
-                    other[name] = value
+                copy_cache(record, other.env)
             other, field = self.traverse_related(other)
             record[self.name] = other[field.name]
 
@@ -716,6 +736,7 @@ class Field(object):
         return self.column
 
     # properties used by to_column() to create a column instance
+    _column__module = property(attrgetter('_module'))
     _column_copy = property(attrgetter('copy'))
     _column_select = property(attrgetter('index'))
     _column_manual = property(attrgetter('manual'))
@@ -1078,7 +1099,7 @@ class Float(Field):
     @property
     def digits(self):
         if callable(self._digits):
-            with fields._get_cursor() as cr:
+            with LazyCursor() as cr:
                 return self._digits(cr)
         else:
             return self._digits
@@ -1095,6 +1116,8 @@ class Float(Field):
     def convert_to_cache(self, value, record, validate=True):
         # apply rounding here, otherwise value in cache may be wrong!
         value = float(value or 0.0)
+        if not validate:
+            return value
         digits = self.digits
         return float_round(value, precision_digits=digits[1]) if digits else value
 
@@ -1984,7 +2007,7 @@ class Id(Field):
         raise TypeError("field 'id' cannot be assigned")
 
 # imported here to avoid dependency cycle issues
-from openerp import SUPERUSER_ID, registry
+from openerp import SUPERUSER_ID
 from .exceptions import Warning, AccessError, MissingError
 from .models import check_pg_name, BaseModel, MAGIC_COLUMNS
 from .osv import fields

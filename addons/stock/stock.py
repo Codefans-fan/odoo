@@ -110,7 +110,8 @@ class stock_location(osv.osv):
                       """, select=True),
         'complete_name': fields.function(_complete_name, type='char', string="Full Location Name",
                             store={'stock.location': (_get_sublocations, ['name', 'location_id', 'active'], 10)}),
-        'location_id': fields.many2one('stock.location', 'Parent Location', select=True, ondelete='cascade'),
+        'location_id': fields.many2one('stock.location', 'Parent Location', select=True, ondelete='cascade',
+            help="The parent location that includes this location. Example : The 'Dispatch Zone' is the 'Gate 1' parent location."),
         'child_ids': fields.one2many('stock.location', 'location_id', 'Contains'),
 
         'partner_id': fields.many2one('res.partner', 'Owner', help="Owner of the location if not internal"),
@@ -2134,6 +2135,10 @@ class stock_move(osv.osv):
             propagated_changes_dict['product_uom_qty'] = vals['product_uom_qty']
         if vals.get('product_uom_id'):
             propagated_changes_dict['product_uom_id'] = vals['product_uom_id']
+        if vals.get('product_uos_qty'):
+            propagated_changes_dict['product_uos_qty'] = vals['product_uos_qty']
+        if vals.get('product_uos_id'):
+            propagated_changes_dict['product_uos_id'] = vals['product_uos_id']
         #propagation of expected date:
         propagated_date_field = False
         if vals.get('date_expected'):
@@ -3168,9 +3173,15 @@ class stock_inventory_line(osv.osv):
     }
 
     def create(self, cr, uid, values, context=None):
-        if context is None:
-            context = {}
         product_obj = self.pool.get('product.product')
+        dom = [('product_id', '=', values.get('product_id')), ('inventory_id.state', '=', 'confirm'),
+               ('location_id', '=', values.get('location_id')), ('partner_id', '=', values.get('partner_id')),
+               ('package_id', '=', values.get('package_id')), ('prod_lot_id', '=', values.get('prod_lot_id'))]
+        res = self.search(cr, uid, dom, context=context)
+        if res:
+            location = self.pool['stock.location'].browse(cr, uid, values.get('location_id'), context=context)
+            product = product_obj.browse(cr, uid, values.get('product_id'), context=context)
+            raise UserError(_("You cannot have two inventory adjustements in state 'in Progess' with the same product(%s), same location(%s), same package, same owner and same lot. Please first validate the first inventory adjustement with this product before creating another one.") % (product.name, location.name))
         if 'product_id' in values and not 'product_uom_id' in values:
             values['product_uom_id'] = product_obj.browse(cr, uid, values.get('product_id'), context=context).uom_id.id
         return super(stock_inventory_line, self).create(cr, uid, values, context=context)
@@ -3284,7 +3295,7 @@ class stock_warehouse(osv.osv):
 
     _columns = {
         'name': fields.char('Warehouse Name', required=True, select=True),
-        'company_id': fields.many2one('res.company', 'Company', required=True, readonly=True, select=True),
+        'company_id': fields.many2one('res.company', 'Company', required=True, readonly=True, select=True, help='The company is automatically set from your user preferences.'),
         'partner_id': fields.many2one('res.partner', 'Address'),
         'view_location_id': fields.many2one('stock.location', 'View Location', required=True, domain=[('usage', '=', 'view')]),
         'lot_stock_id': fields.many2one('stock.location', 'Location Stock', domain=[('usage', '=', 'internal')], required=True),
@@ -3693,7 +3704,7 @@ class stock_warehouse(osv.osv):
         max_sequence = self.pool.get('stock.picking.type').search_read(cr, uid, [], ['sequence'], order='sequence desc')
         max_sequence = max_sequence and max_sequence[0]['sequence'] or 0
         internal_active_false = (warehouse.reception_steps == 'one_step') and (warehouse.delivery_steps == 'ship_only')
-        internal_active_false = internal_active_false and not self.user_has_groups(cr, uid, 'stock.group_locations')
+        internal_active_false = internal_active_false and not self.user_has_groups(cr, uid, 'stock.group_stock_multi_locations')
 
         in_type_id = picking_type_obj.create(cr, uid, vals={
             'name': _('Receipts'),
@@ -3866,7 +3877,7 @@ class stock_warehouse(osv.osv):
             for pull in route.pull_ids:
                 pull_obj.write(cr, uid, pull.id, {'name': pull.name.replace(warehouse.name, name, 1)}, context=context)
             for push in route.push_ids:
-                push_obj.write(cr, uid, push.id, {'name': pull.name.replace(warehouse.name, name, 1)}, context=context)
+                push_obj.write(cr, uid, push.id, {'name': push.name.replace(warehouse.name, name, 1)}, context=context)
         #change the mto procurement rule name
         if warehouse.mto_pull_id.id:
             pull_obj.write(cr, uid, warehouse.mto_pull_id.id, {'name': warehouse.mto_pull_id.name.replace(warehouse.name, name, 1)}, context=context)
@@ -4188,7 +4199,7 @@ class stock_package(osv.osv):
         'complete_name': fields.function(_complete_name, type='char', string="Package Name",),
         'parent_left': fields.integer('Left Parent', select=1),
         'parent_right': fields.integer('Right Parent', select=1),
-        'packaging_id': fields.many2one('product.packaging', 'Packaging', help="This field should be completed only if everything inside the package share the same product, otherwise it doesn't really makes sense.", select=True),
+        'packaging_id': fields.many2one('product.packaging', 'Package Type', help="This field should be completed only if everything inside the package share the same product, otherwise it doesn't really makes sense.", select=True),
         'location_id': fields.function(_get_package_info, type='many2one', relation='stock.location', string='Location', multi="package",
                                     store={
                                        'stock.quant': (_get_packages, ['location_id'], 10),

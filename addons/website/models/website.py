@@ -187,7 +187,7 @@ class website(osv.osv):
         'company_id': lambda self,cr,uid,c: self.pool['ir.model.data'].xmlid_to_res_id(cr, openerp.SUPERUSER_ID,'base.main_company'),
         'compress_html': False,
         'cdn_activated': False,
-        'cdn_url': '//localhost:8069/',
+        'cdn_url': '',
         'cdn_filters': '\n'.join(DEFAULT_CDN_FILTERS),
         'language_ids': _active_languages,
         'default_lang_id': _default_language,
@@ -406,10 +406,13 @@ class website(osv.osv):
         return Access.check(cr, uid, 'ir.ui.menu', 'read', False, context=context)
 
     def get_template(self, cr, uid, ids, template, context=None):
-        if not isinstance(template, (int, long)) and '.' not in template:
-            template = 'website.%s' % template
         View = self.pool['ir.ui.view']
-        view_id = View.get_view_id(cr, uid, template, context=context)
+        if isinstance(template, (int, long)):
+            view_id = template
+        else:
+            if '.' not in template:
+                template = 'website.%s' % template
+            view_id = View.get_view_id(cr, uid, template, context=context)
         if not view_id:
             raise NotFound
         return View.browse(cr, uid, view_id, context=context)
@@ -478,7 +481,7 @@ class website(osv.osv):
         :rtype: bool
         """
         endpoint = rule.endpoint
-        methods = endpoint.routing.get('method') or ['GET']
+        methods = endpoint.routing.get('methods') or ['GET']
 
         converters = rule._converters.values()
         if not ('GET' in methods
@@ -713,7 +716,7 @@ class base_language_install(osv.osv_memory):
             }
         return action
 
-class website_seo_metadata(osv.Model):
+class website_seo_metadata(osv.AbstractModel):
     _name = 'website.seo.metadata'
     _description = 'SEO metadata'
 

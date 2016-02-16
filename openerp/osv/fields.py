@@ -25,21 +25,18 @@ import pytz
 import re
 import xmlrpclib
 from operator import itemgetter
-from contextlib import contextmanager
 from psycopg2 import Binary
 
 import openerp
 import openerp.tools as tools
+from openerp.sql_db import LazyCursor
 from openerp.tools.translate import _
 from openerp.tools import float_repr, float_round, frozendict, html_sanitize
 import json
-from openerp import SUPERUSER_ID, registry
+from openerp import SUPERUSER_ID
 
-@contextmanager
-def _get_cursor():
-    # yield a valid cursor from any environment or create a new one if none found
-    with registry().cursor() as cr:
-        yield cr
+# deprecated; kept for backward compatibility only
+_get_cursor = LazyCursor
 
 EMPTY_DICT = frozendict()
 
@@ -97,6 +94,7 @@ class _column(object):
         'deprecated',           # Optional deprecation warning
         '_args',
         '_prefetch',
+        '_module',              # the column's module name
     ]
 
     def __init__(self, string='unknown', required=False, readonly=False, domain=[], context={}, states=None, priority=0, change_default=False, size=None, ondelete=None, translate=False, select=False, manual=False, **args):
@@ -129,6 +127,7 @@ class _column(object):
         args['groups'] = args.get('groups', None)
         args['deprecated'] = args.get('deprecated', None)
         args['_prefetch'] = args.get('_prefetch', True)
+        args['_module'] = args.get('_module', None)
 
         self._args = EMPTY_DICT
         for key, val in args.iteritems():
@@ -181,9 +180,17 @@ class _column(object):
     def to_field_args(self):
         """ return a dictionary with all the arguments to pass to the field """
         base_items = [
-            ('copy', self.copy),
+            ('_module', self._module),
+            ('automatic', False),
+            ('inherited', False),
+            ('store', True),
             ('index', self.select),
             ('manual', self.manual),
+            ('copy', self.copy),
+            ('compute', None),
+            ('inverse', None),
+            ('search', None),
+            ('related', None),
             ('string', self.string),
             ('help', self.help),
             ('readonly', self.readonly),
@@ -378,7 +385,7 @@ class float(_column):
     @property
     def digits(self):
         if self._digits_compute:
-            with _get_cursor() as cr:
+            with LazyCursor() as cr:
                 return self._digits_compute(cr)
         else:
             return self._digits
@@ -1354,7 +1361,7 @@ class function(_column):
     @property
     def digits(self):
         if self._digits_compute:
-            with _get_cursor() as cr:
+            with LazyCursor() as cr:
                 return self._digits_compute(cr)
         else:
             return self._digits
