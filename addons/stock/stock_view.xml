@@ -563,7 +563,7 @@
                                         <field name="wh_pack_stock_loc_id" readonly="1"/>
                                         <field name="wh_output_stock_loc_id" readonly="1"/>
                                     </group>
-                                    <group string="Picking Types">
+                                    <group strinsg="Operation Types">
                                         <field name="in_type_id" readonly="1"/>
                                         <field name="int_type_id" readonly="1"/>
                                         <field name="pick_type_id" readonly="1"/>
@@ -1613,7 +1613,7 @@
             <field name="name">Picking types</field>
             <field name="model">stock.picking.type</field>
             <field name="arch" type="xml">
-                <tree string="Picking Types">
+                <tree string="Operation Types">
                     <field name="sequence" widget="handle"/>
                     <field name="name"/>
                     <field name="warehouse_id"/>
@@ -1622,10 +1622,10 @@
             </field>
         </record>
         <record model="ir.ui.view" id="view_picking_type_form">
-            <field name="name">Picking Types</field>
+            <field name="name">Operation Types</field>
             <field name="model">stock.picking.type</field>
             <field name="arch" type="xml">
-                <form string="Picking Types">
+                <form string="Operation Types">
                     <sheet>
                         <group>
                             <group>
@@ -1677,7 +1677,7 @@
             <field name="name">stock.picking.type.list</field>
             <field name="model">stock.picking.type</field>
             <field name="arch" type="xml">
-                <tree string="Picking Types">
+                <tree string="Operation Types">
                     <field name="name"/>
                     <field name="sequence_id"/>
                     <field name="warehouse_id"/>
@@ -1704,8 +1704,6 @@
             </field>
 
         </record>
-
-        <menuitem id="stock_picking_type_config" action="action_picking_type_list" name="Picking Types" parent="stock.menu_routes_config" sequence="2" groups="base.group_no_one"/>
 
         <menuitem
             action="stock_picking_type_action"
@@ -1916,7 +1914,7 @@
             <field name="model">stock.quant</field>
             <field eval="10" name="priority"/>
             <field name="arch" type="xml">
-                <search string="Quants">
+                <search string="Inventory Valuation">
                     <field name="product_id"/>
                     <field name="location_id"/>
                     <field name="package_id" groups="stock.group_tracking_lot"/>
@@ -1942,7 +1940,7 @@
         </record>
 
         <record model="ir.actions.act_window" id="quantsact">
-            <field name="name">Quants</field>
+            <field name="name">Inventory Valuation</field>
             <field name="res_model">stock.quant</field>
             <field name="view_type">form</field>
             <field name="view_mode">tree,form</field>
@@ -1955,7 +1953,7 @@
             <field name="model">stock.quant</field>
             <field eval="10" name="priority"/>
             <field name="arch" type="xml">
-                <form string="Quants" create="false" edit="false" delete="false">
+                <form string="Inventory Valuation" create="false" edit="false" delete="false">
                     <group>
                         <group>
                             <field name="product_id"/>
@@ -1996,7 +1994,7 @@
             <field name="model">stock.quant</field>
             <field eval="10" name="priority"/>
             <field name="arch" type="xml">
-                <tree string="Quants" create="0" delete="0">
+                <tree string="Inventory Valuation" create="0" delete="0">
                     <field name="product_id"/>
                     <field name="qty"/>
                     <field name="product_uom_id" groups="product.group_uom"/>
@@ -2019,7 +2017,7 @@
             <field name="model">stock.quant</field>
             <field eval="12" name="priority"/>
             <field name="arch" type="xml">
-                <graph string="Quants" type="pie">
+                <graph string="Inventory Valuation" type="pie">
                     <field name="product_id" type="row"/>
                     <field name="qty" type="measure"/>
                     <field name="inventory_value" type="measure"/>

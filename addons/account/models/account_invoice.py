@@ -452,8 +452,8 @@ class AccountInvoice(models.Model):
                     res_dom = [('res_id', '=', 'res.partner,%s' % partner_id)]
                     rec_prop = prop.search(rec_dom + res_dom) or prop.search(rec_dom)
                     pay_prop = prop.search(pay_dom + res_dom) or prop.search(pay_dom)
-                    rec_account = rec_prop.get_by_record(rec_prop)
-                    pay_account = pay_prop.get_by_record(pay_prop)
+                    rec_account = rec_prop.get_by_record()
+                    pay_account = pay_prop.get_by_record()
                     if not rec_account and not pay_account:
                         action = self.env.ref('account.action_account_config')
                         msg = _('Cannot find a chart of accounts for this company, You should configure it. \nPlease go to Account Configuration.')
@@ -623,16 +623,17 @@ class AccountInvoice(models.Model):
     def tax_line_move_line_get(self):
         res = []
         for tax_line in self.tax_line_ids:
-            res.append({
-                'tax_line_id': tax_line.tax_id.id,
-                'type': 'tax',
-                'name': tax_line.name,
-                'price_unit': tax_line.amount,
-                'quantity': 1,
-                'price': tax_line.amount,
-                'account_id': tax_line.account_id.id,
-                'account_analytic_id': tax_line.account_analytic_id.id,
-            })
+            if tax_line.amount:
+                res.append({
+                    'tax_line_id': tax_line.tax_id.id,
+                    'type': 'tax',
+                    'name': tax_line.name,
+                    'price_unit': tax_line.amount,
+                    'quantity': 1,
+                    'price': tax_line.amount,
+                    'account_id': tax_line.account_id.id,
+                    'account_analytic_id': tax_line.account_analytic_id.id,
+                })
         return res
 
     def inv_line_characteristic_hashcode(self, invoice_line):

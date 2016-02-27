@@ -9,7 +9,7 @@ from werkzeug import url_encode
 
 from openerp import SUPERUSER_ID
 from openerp import tools, api
-from openerp.addons.base.res.res_partner import format_address
+from openerp.addons.base.res.res_partner import FormatAddress
 from openerp.addons.crm import crm_stage
 from openerp.osv import fields, osv
 from openerp.tools.translate import _
@@ -51,7 +51,7 @@ CRM_LEAD_FIELDS_TO_MERGE = ['name',
     'partner_name']
 
 
-class crm_lead(format_address, osv.osv):
+class crm_lead(FormatAddress, osv.osv):
     """ CRM Lead Case """
     _name = "crm.lead"
     _description = "Lead/Opportunity"
@@ -856,7 +856,7 @@ class crm_lead(format_address, osv.osv):
             if alias_record and alias_record.alias_domain and alias_record.alias_name:
                 dynamic_help = '<p>%s</p>' % _("""All email incoming to %(link)s  will automatically create new opportunity.
 Update your business card, phone book, social media,... Send an email right now and see it here.""") % {
-                    'link': "<a href='mailto:%s'>%s</a>" % (alias_record.alias_name, alias_record.alias_domain)
+                    'link': "<a href='mailto:%(email)s'>%(email)s</a>" % {'email': '%s@%s' % (alias_record.alias_name, alias_record.alias_domain)}
                 }
                 return '<p class="oe_view_nocontent_create">%s</p>%s%s' % (
                     _('Click to add a new opportunity'),

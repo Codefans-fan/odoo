@@ -182,7 +182,7 @@ exports.PosModel = Backbone.Model.extend({
         }
     },{
         model:  'res.partner',
-        fields: ['name','street','city','state_id','country_id','vat','phone','zip','mobile','email','barcode','write_date'],
+        fields: ['name','street','city','state_id','country_id','vat','phone','zip','mobile','email','barcode','write_date','property_account_position_id'],
         domain: [['customer','=',true]], 
         loaded: function(self,partners){
             self.partners = partners;
@@ -1487,6 +1487,7 @@ var PaymentlineCollection = Backbone.Collection.extend({
 exports.Order = Backbone.Model.extend({
     initialize: function(attributes,options){
         Backbone.Model.prototype.initialize.apply(this, arguments);
+        var self = this;
         options  = options || {};
 
         this.init_locked    = true;
@@ -1509,7 +1510,10 @@ exports.Order = Backbone.Model.extend({
         } else {
             this.sequence_number = this.pos.pos_session.sequence_number++;
             this.uid  = this.generate_unique_id();
-            this.name = _t("Order ") + this.uid; 
+            this.name = _t("Order ") + this.uid;
+            this.fiscal_position = _.find(this.pos.fiscal_positions, function(fp) {
+                return fp.id === self.pos.config.default_fiscal_position_id[0];
+            });
         }
 
         this.on('change',              function(){ this.save_to_db("order:change"); }, this);

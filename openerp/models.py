@@ -1397,10 +1397,8 @@ class BaseModel(object):
         return res
 
     def _rec_name_fallback(self, cr, uid, context=None):
-        rec_name = self._rec_name
-        if rec_name not in self._columns:
-            rec_name = self._columns.keys()[0] if len(self._columns.keys()) > 0 else "id"
-        return rec_name
+        # if self._rec_name is set, it belongs to self._fields
+        return self._rec_name or 'id'
 
     #
     # Overload this method if you need a window title which depends on the context
@@ -3126,18 +3124,19 @@ class BaseModel(object):
         """ Setup recomputation triggers, and complete the model setup. """
         cls = type(self)
 
-        # set up field triggers
-        for field in cls._fields.itervalues():
-            field.setup_triggers(self.env)
+        if isinstance(self, Model):
+            # set up field triggers (on database-persisted models only)
+            for field in cls._fields.itervalues():
+                field.setup_triggers(self.env)
 
-        # add invalidation triggers on model dependencies
-        if cls._depends:
-            for model_name, field_names in cls._depends.iteritems():
-                model = self.env[model_name]
-                for field_name in field_names:
-                    field = model._fields[field_name]
-                    for dependent in cls._fields.itervalues():
-                        model._field_triggers.add(field, (dependent, None))
+            # add invalidation triggers on model dependencies
+            if cls._depends:
+                for model_name, field_names in cls._depends.iteritems():
+                    model = self.env[model_name]
+                    for field_name in field_names:
+                        field = model._fields[field_name]
+                        for dependent in cls._fields.itervalues():
+                            model._field_triggers.add(field, (dependent, None))
 
         # determine old-api structures about inherited fields
         cls._inherits_reload()
@@ -5965,28 +5964,33 @@ class BaseModel(object):
         """
         onchange = onchange.strip()
 
+        def process(res):
+            if not res:
+                return
+            if res.get('value'):
+                res['value'].pop('id', None)
+                self.update(self._convert_to_cache(res['value'], validate=False))
+            if res.get('domain'):
+                result.setdefault('domain', {}).update(res['domain'])
+            if res.get('warning'):
+                if result.get('warning'):
+                    # Concatenate multiple warnings
+                    warning = result['warning']
+                    warning['message'] = '\n\n'.join(filter(None, [
+                        warning.get('title'),
+                        warning.get('message'),
+                        res['warning'].get('title'),
+                        res['warning'].get('message'),
+                    ]))
+                    warning['title'] = _('Warnings')
+                else:
+                    result['warning'] = res['warning']
+
         # onchange V8
         if onchange in ("1", "true"):
             for method in self._onchange_methods.get(field_name, ()):
                 method_res = method(self)
-                if not method_res:
-                    continue
-                if 'domain' in method_res:
-                    result.setdefault('domain', {}).update(method_res['domain'])
-                if 'warning' in method_res:
-                    if result.get('warning'):
-                        if method_res['warning']:
-                            # Concatenate multiple warnings
-                            warning = result['warning']
-                            warning['message'] = '\n\n'.join(filter(None, [
-                                warning.get('title'),
-                                warning.get('message'),
-                                method_res['warning'].get('title'),
-                                method_res['warning'].get('message')
-                            ]))
-                            warning['title'] = _('Warnings')
-                    else:
-                        result['warning'] = method_res['warning']
+                process(method_res)
             return
 
         # onchange V7
@@ -6018,28 +6022,8 @@ class BaseModel(object):
                 method_res = getattr(self._model, method)(*args, context=self._context)
             except TypeError:
                 method_res = getattr(self._model, method)(*args)
+            process(method_res)
 
-            if not isinstance(method_res, dict):
-                return
-            if 'value' in method_res:
-                method_res['value'].pop('id', None)
-                self.update(self._convert_to_cache(method_res['value'], validate=False))
-            if 'domain' in method_res:
-                result.setdefault('domain', {}).update(method_res['domain'])
-            if 'warning' in method_res:
-                if result.get('warning'):
-                    if method_res['warning']:
-                        # Concatenate multiple warnings
-                        warning = result['warning']
-                        warning['message'] = '\n\n'.join(filter(None, [
-                            warning.get('title'),
-                            warning.get('message'),
-                            method_res['warning'].get('title'),
-                            method_res['warning'].get('message')
-                        ]))
-                        warning['title'] = _('Warnings')
-                else:
-                    result['warning'] = method_res['warning']
     @api.multi
     def onchange(self, values, field_name, field_onchange):
         """ Perform an onchange on the given field.
@@ -6236,7 +6220,7 @@ class Model(AbstractModel):
     _register = False           # not visible in ORM registry, meant to be python-inherited only
     _transient = False          # not transient
 
-class TransientModel(AbstractModel):
+class TransientModel(Model):
     """ Model super-class for transient records, meant to be temporarily
     persisted, and regularly vacuum-cleaned.
 
