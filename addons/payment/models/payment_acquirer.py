@@ -54,14 +54,14 @@ class PaymentAcquirer(osv.Model):
     _order = 'sequence'
 
     def _get_providers(self, cr, uid, context=None):
-        return []
+        return [('manual', 'Manual Configuration')]
 
     # indirection to ease inheritance
     _provider_selection = lambda self, *args, **kwargs: self._get_providers(*args, **kwargs)
 
     _columns = {
         'name': fields.char('Name', required=True, translate=True),
-        'provider': fields.selection(_provider_selection, string='Provider', required=True),
+        'provider': fields.selection(_provider_selection, string='Provider', required=True, default='manual'),
         'company_id': fields.many2one('res.company', 'Company', required=True),
         'pre_msg': fields.html('Help Message', translate=True,
                                help='Message displayed to explain and help the payment process.'),
@@ -72,7 +72,7 @@ class PaymentAcquirer(osv.Model):
                                                          help="Template for method registration"),
         'environment': fields.selection(
             [('test', 'Test'), ('prod', 'Production')],
-            string='Environment', oldname='env'),
+            string='Environment', required=True, oldname='env'),
         'website_published': fields.boolean(
             'Visible in Portal / Website', copy=False,
             help="Make this payment acquirer available (Customer invoices, etc.)"),
@@ -92,6 +92,9 @@ class PaymentAcquirer(osv.Model):
         'fees_int_fixed': fields.float('Fixed international fees'),
         'fees_int_var': fields.float('Variable international fees (in percents)'),
         'sequence': fields.integer('Sequence', help="Determine the display order"),
+        'module_id': fields.many2one('ir.module.module', string='Corresponding Module'),
+        'module_state': fields.related('module_id', 'state', type='char', string='Installation State'),
+        'description': fields.html('Description'),
     }
 
     image = openerp.fields.Binary("Image", attachment=True,
@@ -123,7 +126,7 @@ class PaymentAcquirer(osv.Model):
 
     _defaults = {
         'company_id': lambda self, cr, uid, obj, ctx=None: self.pool['res.users'].browse(cr, uid, uid).company_id.id,
-        'environment': 'prod',
+        'environment': 'test',
         'website_published': False,
         'auto_confirm': 'at_pay_confirm',
         'pending_msg': '<i>Pending,</i> Your online payment has been successfully processed. But your order is not validated yet.',
@@ -307,6 +310,27 @@ class PaymentAcquirer(osv.Model):
             method = getattr(self, cust_method_name)
             return method(cr, uid, id, data, context=context)
         return True
+
+    def toggle_enviroment_value(self, cr, uid, ids, context=None):
+        acquirers = self.browse(cr, uid, ids, context=context)
+        prod_ids = [acquirer.id for acquirer in acquirers if acquirer.environment == 'prod']
+        test_ids = [acquirer.id for acquirer in acquirers if acquirer.environment == 'test']
+        self.write(cr, uid, prod_ids, {'environment': 'test'}, context=context)
+        self.write(cr, uid, test_ids, {'environment': 'prod'}, context=context)
+
+    def button_immediate_install(self, cr, uid, ids, context=None):
+        acquirer_id = self.browse(cr, uid, ids, context=context)
+        if acquirer_id.module_id and acquirer_id.module_state != 'installed':
+            acquirer_id.module_id.button_immediate_install()
+            context['active_id'] = ids[0]
+            return {
+                'view_type': 'form',
+                'view_mode': 'form',
+                'res_model': 'payment.acquirer',
+                'type': 'ir.actions.act_window',
+                'res_id': ids[0],
+                'context': context,
+            }
 
 
 class PaymentTransaction(osv.Model):

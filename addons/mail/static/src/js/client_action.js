@@ -4,11 +4,13 @@ odoo.define('mail.chat_client_action', function (require) {
 var chat_manager = require('mail.chat_manager');
 var composer = require('mail.composer');
 var ChatThread = require('mail.ChatThread');
+var utils = require('mail.utils');
 
 var config = require('web.config');
 var ControlPanelMixin = require('web.ControlPanelMixin');
 var core = require('web.core');
 var data = require('web.data');
+var data_manager = require('web.data_manager');
 var Dialog = require('web.Dialog');
 var framework = require('web.framework');
 var Model = require('web.Model');
@@ -42,10 +44,8 @@ var PartnerInviteDialog = Dialog.extend({
                 click: _.bind(this.on_click_add, this),
             }],
         });
-        this.PartnersModel = new Model('res.partner');
     },
     start: function(){
-        var self = this;
         this.$input = this.$('.o_mail_chat_partner_invite_input');
         this.$input.select2({
             width: '100%',
@@ -56,7 +56,7 @@ var PartnerInviteDialog = Dialog.extend({
                 return $('<span>').text(item.text).prepend(status);
             },
             query: function (query) {
-                self.PartnersModel.call('im_search', [query.term, 20]).then(function(result){
+                chat_manager.search_partner(query.term, 20).then(function(result){
                     var data = [];
                     _.each(result, function(partner){
                         partner.text = partner.name;
@@ -125,7 +125,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             var def = window.Notification.requestPermission();
             if (def) {
                 def.then(function () {
-                    chat_manager.send_native_notification('Permission granted', 'Odoo has now the permission to send you native notifications on this device.');
+                    utils.send_native_notification('Permission granted', 'Odoo has now the permission to send you native notifications on this device.');
                 });
             }
         },
@@ -161,6 +161,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
     init: function(parent, action, options) {
         this._super.apply(this, arguments);
         this.action_manager = parent;
+        this.dataset = new data.DataSetSearch(this, 'mail.message');
         this.domain = [];
         this.action = action;
         this.options = options || {};
@@ -171,7 +172,14 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
     },
 
     willStart: function () {
-        return chat_manager.is_ready;
+        var self = this;
+        var view_id = this.action && this.action.search_view_id && this.action.search_view_id[0];
+        var def = data_manager
+            .load_fields_view(this.dataset, view_id, 'search', false)
+            .then(function (fields_view) {
+                self.fields_view = fields_view;
+            });
+        return $.when(this._super(), chat_manager.is_ready, def);
     },
 
     start: function() {
@@ -183,8 +191,6 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             action: this.action,
             disable_groupby: true,
         };
-        var dataset = new data.DataSetSearch(this, 'mail.message');
-        var view_id = (this.action && this.action.search_view_id && this.action.search_view_id[0]) || false;
         var default_channel_id = this.options.active_id ||
                                  this.action.context.active_id ||
                                  this.action.params.default_active_id ||
@@ -192,14 +198,13 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
         var default_channel = chat_manager.get_channel(default_channel_id) ||
                               chat_manager.get_channel('channel_inbox');
 
-        this.searchview = new SearchView(this, dataset, view_id, {}, options);
+        this.searchview = new SearchView(this, this.dataset, this.fields_view, options);
         this.searchview.on('search_data', this, this.on_search);
 
         this.basic_composer = new composer.BasicComposer(this, {mention_partners_restricted: true});
         this.extended_composer = new composer.ExtendedComposer(this, {mention_partners_restricted: true});
         this.thread = new ChatThread(this, {
             display_help: true,
-            shorten_messages: false,
         });
 
         this.$buttons = $(QWeb.render("mail.chat.ControlButtons", {}));

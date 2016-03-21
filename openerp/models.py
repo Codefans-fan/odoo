@@ -231,16 +231,7 @@ class MetaModel(api.Meta):
             return
 
         if not hasattr(self, '_module'):
-            # The (OpenERP) module name can be in the ``openerp.addons`` namespace
-            # or not.  For instance, module ``sale`` can be imported as
-            # ``openerp.addons.sale`` (the right way) or ``sale`` (for backward
-            # compatibility).
-            module_parts = self.__module__.split('.')
-            if len(module_parts) > 2 and module_parts[:2] == ['openerp', 'addons']:
-                module_name = self.__module__.split('.')[2]
-            else:
-                module_name = self.__module__.split('.')[0]
-            self._module = module_name
+            self._module = self._get_addon_name(self.__module__)
 
         # Remember which models to instanciate for this module.
         if not self._custom:
@@ -259,6 +250,18 @@ class MetaModel(api.Meta):
                 _logger.warning("In class %s, field %r overriding an existing value", self, name)
             column._module = self._module
             setattr(self, name, column.to_field())
+
+    def _get_addon_name(self, full_name):
+        # The (OpenERP) module name can be in the ``openerp.addons`` namespace
+        # or not. For instance, module ``sale`` can be imported as
+        # ``openerp.addons.sale`` (the right way) or ``sale`` (for backward
+        # compatibility).
+        module_parts = full_name.split('.')
+        if len(module_parts) > 2 and module_parts[:2] == ['openerp', 'addons']:
+            addon_name = full_name.split('.')[2]
+        else:
+            addon_name = full_name.split('.')[0]
+        return addon_name
 
 
 class NewId(object):
@@ -1528,6 +1531,38 @@ class BaseModel(object):
                 raise UserError(_("Insufficient fields to generate a Calendar View for %s, missing a date_stop or a date_delay") % self._name)
 
         return view
+
+    def load_views(self, cr, uid, views, options=None, context=None):
+        """ Returns the fields_views of given views, and optionally filters and fields.
+
+        :param views: list of [view_id, view_type]
+        :param options.toolbar: true to include contextual actions when loading fields_views
+        :param options.load_filters: true to return the model's filters
+        :param options.action_id: id of the action to get the filters
+        :param options.load_fields: true to load the model's fields
+        :return: dictionary with fields_views, filters and fields
+        """
+        if options is None:
+            options = {}
+        if context is None:
+            context = {}
+        result = {}
+
+        toolbar = options.get('toolbar')
+        result['fields_views'] = {
+            v_type: self.fields_view_get(cr, uid, v_id, v_type if v_type != 'list' else 'tree',
+                                         toolbar=toolbar if v_type != 'search' else False,
+                                         context=context)
+            for [v_id, v_type] in views
+        }
+
+        if options.get('load_filters'):
+            result['filters'] = self.pool['ir.filters'].get_filters(cr, uid, self._name, options.get('action_id'), context=context)
+
+        if options.get('load_fields'):
+            result['fields'] = self.fields_get(cr, uid, context=context)
+
+        return result
 
     def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):
         """ fields_view_get([view_id | view_type='form'])

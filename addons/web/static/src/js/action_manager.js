@@ -5,6 +5,7 @@ var ControlPanel = require('web.ControlPanel');
 var core = require('web.core');
 var crash_manager = require('web.crash_manager');
 var data = require('web.data');
+var data_manager = require('web.data_manager');
 var Dialog = require('web.Dialog');
 var framework = require('web.framework');
 var pyeval = require('web.pyeval');
@@ -485,7 +486,11 @@ var ActionManager = Widget.extend({
                     if (warm) {
                         this.null_action();
                     }
-                    action_loaded = this.do_action(state.action, { additional_context: add_context, state: state });
+                    action_loaded = this.do_action(state.action, {
+                        additional_context: add_context,
+                        res_id: state.id,
+                        view_type: state.view_type,
+                    });
                     $.when(action_loaded || null).done(function() {
                         self.webclient.menu.is_bound.done(function() {
                             if (self.inner_action && self.inner_action.get_action_descr().id) {
@@ -528,7 +533,7 @@ var ActionManager = Widget.extend({
     /**
      * Execute an OpenERP action
      *
-     * @param {Number|String|Object} Can be either an action id, a client action or an action descriptor.
+     * @param {Number|String|String|Object} Can be either an action id, an action XML id, a client action tag or an action descriptor.
      * @param {Object} [options]
      * @param {Boolean} [options.clear_breadcrumbs=false] Clear the breadcrumbs history list
      * @param {Boolean} [options.replace_breadcrumb=false] Replace the current breadcrumb with the action
@@ -560,7 +565,7 @@ var ActionManager = Widget.extend({
                 active_ids : options.additional_context.active_ids,
                 active_model : options.additional_context.active_model
             };
-            return self.rpc("/web/action/load", { action_id: action, additional_context : additional_context }).then(function(result) {
+            return data_manager.load_action(action, additional_context).then(function(result) {
                 return self.do_action(result, options);
             });
         }
@@ -588,6 +593,7 @@ var ActionManager = Widget.extend({
 
         var type = action.type.replace(/\./g,'_');
         action.menu_id = options.action_menu_id;
+        action.res_id = options.res_id || action.res_id;
         action.context.params = _.extend({ 'action' : action.id }, action.context.params);
         if (!(type in this)) {
             console.error("Action manager can't handle action of type " + action.type, action);
@@ -703,9 +709,23 @@ var ActionManager = Widget.extend({
     },
     ir_actions_act_window: function (action, options) {
         var self = this;
+
+        var flags = action.flags || {};
+        if (!('auto_search' in flags)) {
+            flags.auto_search = action.auto_search !== false;
+        }
+        options.action = action;
+        options.action_manager = this;
+        var dataset = new data.DataSetSearch(this, action.res_model, action.context, action.domain);
+        if (action.res_id) {
+            dataset.ids.push(action.res_id);
+            dataset.index = 0;
+        }
+        var views = action.views;
+
         return this.ir_actions_common({
             widget: function () {
-                return new ViewManager(self, null, null, null, action, options);
+                return new ViewManager(self, dataset, views, flags, options);
             },
             action: action,
             klass: 'o_act_window',

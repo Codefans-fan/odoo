@@ -49,7 +49,7 @@ class Message(models.Model):
     # content
     subject = fields.Char('Subject')
     date = fields.Datetime('Date', default=fields.Datetime.now)
-    body = fields.Html('Contents', default='')
+    body = fields.Html('Contents', default='', strip_classes=True)
     attachment_ids = fields.Many2many(
         'ir.attachment', 'message_attachment_rel',
         'message_id', 'attachment_id',
@@ -331,9 +331,6 @@ class Message(models.Model):
                 'attachment_ids': attachment_ids,
                 'tracking_value_ids': tracking_value_ids,
             })
-            body_short = tools.html_email_clean(message_dict['body'], shorten=True, remove=True)
-            message_dict['body'] = tools.html_email_clean(message_dict['body'], shorten=False, remove=False)
-            message_dict['body_short'] = body_short != message_dict['body'] and body_short or False
 
         return True
 

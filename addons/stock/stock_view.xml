@@ -12,7 +12,7 @@
 
         <menuitem id="menu_stock_warehouse_mgmt" name="Operations" parent="menu_stock_root" sequence="2" groups="base.group_no_one"/>
         <menuitem id="menu_stock_config_settings" name="Configuration" parent="menu_stock_root"
-            sequence="100" groups="group_stock_manager,base.group_configuration"/>
+            sequence="100" groups="group_stock_manager"/>
         <menuitem id="menu_warehouse_config" name="Warehouse Management" parent="menu_stock_config_settings" groups="stock.group_stock_manager" sequence="1"/>
         <menuitem id="menu_routes_config" name="Routes" parent="menu_stock_config_settings" sequence="2" groups="stock.group_adv_location"/>
         <menuitem id="menu_packages_config" name="Packages" parent="menu_stock_config_settings" sequence="3" groups="product.group_stock_packaging"/>
@@ -25,9 +25,27 @@
 
 
         <menuitem id="menu_stock_inventory_control" name="Inventory Control" parent="menu_stock_root" sequence="4"/>
+
+        <record id="product_template_action_product" model="ir.actions.act_window">
+            <field name="name">Products</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">product.template</field>
+            <field name="view_mode">kanban,tree,form</field>
+            <field name="view_type">form</field>
+            <field name="context">{"search_default_products": 1, 'default_type': 'product'}</field>
+            <field name="help" type="html">
+                <p class="oe_view_nocontent_create">
+                    Click to define a new product.
+                </p>
+            </field>
+        </record>
+
         <menuitem
-            action="product.product_template_action_product" id="menu_product_variant_config_stock" name="Products"
+            action="product_template_action_product" id="menu_product_variant_config_stock" name="Products"
             parent="stock.menu_stock_inventory_control" sequence="1"/>
+
+        <menuitem id="product_product_menu" name="Product Variants" action="product.product_normal_action"
+            parent="menu_stock_inventory_control" sequence="2" groups="product.group_product_variant"/>
 
         <menuitem
             action="product.product_category_action_form" id="menu_product_category_config_stock"
@@ -207,10 +225,8 @@
                         <page string="Products">
                             <field name="quant_ids">
                                 <tree string="Stock Moves">
-                                    <field name="name"/>
-                                    <field name="product_id"/>
-                                    <field name="qty"/>
                                     <field name="location_id" groups="stock.group_stock_multi_locations"/>
+                                    <field name="qty"/>
                                 </tree>
                              </field>
                         </page>
@@ -311,6 +327,9 @@
             <field name="arch" type="xml">
                 <form string="Stock Location">
                     <div class="oe_button_box" name="button_box">
+                       <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive">
+                            <field name="active" widget="boolean_button" options='{"terminology": "archive"}'/>
+                        </button>
                         <button string="Current Stock"
                                 class="oe_stat_button"
                                 icon="fa-building-o" name="%(location_open_quants)d" type="action"
@@ -333,7 +352,6 @@
                             <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
                             <field name="scrap_location"/>
                             <field name="return_location"/>
-                            <field name="active"/>
                         </group>
                         <group string="Localization" name="localization">
                             <field name="posx"/>
@@ -361,6 +379,8 @@
                     <filter name="customer" string="Customer" domain="[('usage', '=', 'customer')]" help="Customer Locations"/>
                     <filter name="supplier" string="Vendor" domain="[('usage', '=', 'supplier')]" help="Vendor Locations"/>
                     <field name="location_id" string="Parent Location"/>
+                    <separator/>
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
                 </search>
             </field>
         </record>
@@ -372,6 +392,7 @@
             <field name="priority" eval="2"/>
             <field name="arch" type="xml">
                 <tree string="Stock Location" decoration-info="usage=='view'" decoration-danger="usage=='internal'">
+                    <field name="active" invisible="1"/>
                     <field name="complete_name"/>
                     <field name="usage"/>
                     <field name="company_id" groups="base.group_multi_company"/>
@@ -421,6 +442,8 @@
             <field name="arch" type="xml">
                 <search string="Search Stock Location Paths">
                     <filter string="Global" name="route_false" domain="[('route_id','=',False)]" help="If the route is global"/>
+                    <separator/>
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
                 </search>
             </field>
         </record>
@@ -433,6 +456,7 @@
                     <field name="location_from_id" />
                     <field name="location_dest_id" />
                     <field name="name" />
+                    <field name="active" invisible="1"/>
                 </tree>
             </field>
         </record>
@@ -442,14 +466,16 @@
             <field name="model">stock.location.path</field>
             <field name="arch" type="xml">
                 <form string="Location Paths">
+                    <div class="oe_button_box" name="button_box">
+                        <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive" groups="stock.group_adv_location">
+                            <field name="active" widget="boolean_button" options='{"terminology": "archive"}'/>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <label for="name" class="oe_edit_only"/>
                         <h1><field name="name"/></h1>
                     </div>
                     <group>
-                        <group>
-                            <field name="active"/>
-                        </group>
                         <group>
                             <field name="sequence"/>
                         </group>
@@ -529,6 +555,9 @@
                 <form string="Warehouse">
                     <sheet>
                         <div class="oe_button_box" name="button_box">
+                            <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive">
+                                <field name="active" widget="boolean_button" options='{"terminology": "archive"}'/>
+                            </button>
                             <button name="view_all_routes_for_wh"
                                     string="Routes"
                                     icon="fa-refresh"
@@ -583,9 +612,19 @@
             <field name="arch" type="xml">
                 <tree string="Warehouse">
                     <field name="name"/>
+                    <field name="active" invisible="1"/>
                     <field name="lot_stock_id" groups="stock.group_stock_multi_locations"/>
                     <field name="partner_id"/>
                 </tree>
+            </field>
+        </record>
+        <record id="stock_warehouse_view_search" model="ir.ui.view">
+            <field name="name">stock.warehouse.search</field>
+            <field name="model">stock.warehouse</field>
+            <field name="arch" type="xml">
+                <search string="Warehouse">
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
+                </search>
             </field>
         </record>
         <record id="action_warehouse_form" model="ir.actions.act_window">
@@ -1568,6 +1607,7 @@
             <field name="model">stock.incoterms</field>
             <field name="arch" type="xml">
                 <tree string="Incoterms">
+                    <field name="active" invisible="1"/>
                     <field name="code"/>
                     <field colspan="4" name="name"/>
                 </tree>
@@ -1579,13 +1619,26 @@
             <field name="arch" type="xml">
                 <form string="Incoterms">
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive">
+                                <field name="active" widget="boolean_button" options='{"terminology": "archive"}'/>
+                            </button>
+                        </div>
                         <group>
                             <field name="name"/>
                             <field name="code"/>
-                            <field name="active"/>
                         </group>
                     </sheet>
                 </form>
+            </field>
+        </record>
+        <record id="stock_incoterms_view_search" model="ir.ui.view">
+            <field name="name">stock.incoterms.search</field>
+            <field name="model">stock.incoterms</field>
+            <field name="arch" type="xml">
+                <search string="Incoterms">
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
+                </search>
             </field>
         </record>
         <record id="action_incoterms_tree" model="ir.actions.act_window">
@@ -1606,6 +1659,7 @@
                     <field name="name"/>
                     <field name="sequence_id"/>
                     <field name="warehouse_id"/>
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
                 </search>
             </field>
         </record>
@@ -1616,6 +1670,7 @@
                 <tree string="Operation Types">
                     <field name="sequence" widget="handle"/>
                     <field name="name"/>
+                    <field name="active" invisible="1"/>
                     <field name="warehouse_id"/>
                     <field name="sequence_id"/>
                 </tree>
@@ -1627,6 +1682,11 @@
             <field name="arch" type="xml">
                 <form string="Operation Types">
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive">
+                                <field name="active" widget="boolean_button" options='{"terminology": "archive"}'/>
+                            </button>
+                        </div>
                         <group>
                             <group>
                                 <field name="name"/>
@@ -1727,6 +1787,7 @@
             <field name="arch" type="xml">
                 <tree string="Reordering Rules">
                     <field name="name"/>
+                    <field name="active" invisible="1"/>
                     <field name="warehouse_id" groups="stock.group_stock_multi_locations"/>
                     <field name="location_id" groups="stock.group_stock_multi_locations"/>
                     <field name="product_id"/>
@@ -1747,6 +1808,7 @@
                     <field name="location_id" groups="stock.group_stock_multi_locations"/>
                     <field name="company_id" groups="base.group_multi_company"/>
                     <field name="product_id"/>
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
                     <group expand="0" string="Group By">
                         <filter string="Warehouse" domain="[]"  context="{'group_by':'warehouse_id'}"/>
                         <filter string="Location" domain="[]" context="{'group_by':'location_id'}"/>
@@ -1762,6 +1824,9 @@
                 <form string="Reordering Rules">
                     <sheet>
                         <div class="oe_button_box" name="button_box">
+                            <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive">
+                                <field name="active" widget="boolean_button" options='{"terminology": "archive"}'/>
+                            </button>
                             <button name="%(stock.do_view_procurement_op)d" type="action" string="Procurements" class="oe_stat_button" icon="fa-refresh"/>
                         </div>
                         <group>
@@ -1784,7 +1849,6 @@
                                 <field name="qty_multiple" string="Quantity Multiple"/>
                             </group>
                             <group string="Misc">
-                                <field name="active" />
                                 <label for="lead_days"/>
                                 <div class="o_row">
                                     <field name="lead_days"/>
@@ -1813,7 +1877,7 @@
         <menuitem
             id="menu_reordering_rules_config"
             action="action_orderpoint_form"
-            name="Reordering Rules" parent="menu_stock_inventory_control" sequence="2"/>
+            name="Reordering Rules" parent="menu_stock_inventory_control" sequence="10"/>
 
         <act_window
             context="{'search_default_warehouse_id': active_id, 'default_warehouse_id': active_id}"
@@ -2178,6 +2242,7 @@
                 <tree string="Routes">
                     <field name="sequence" widget="handle" />
                     <field name="name"/>
+                    <field name="active" invisible="1"/>
                 </tree>
             </field>
         </record>
@@ -2189,6 +2254,11 @@
             <field name="arch" type="xml">
                 <form string="Route">
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="toggle_active" type="object" class="oe_stat_button" icon="fa-archive" groups="stock.group_adv_location">
+                                <field name="active" widget="boolean_button" options='{"terminology": "archive"}'/>
+                            </button>
+                        </div>
                         <div class="oe_title">
                             <label for="name" class="oe_edit_only"/>
                             <h1><field name="name"/></h1>
@@ -2196,7 +2266,6 @@
                     <group>
                         <group>
                             <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
-                            <field name="active" groups="stock.group_adv_location" />
                         </group>
                         <group>
                             <field name="sequence" string="Sequence" groups="base.group_no_one"/>
@@ -2229,6 +2298,16 @@
                     </group>
                     </sheet>
                 </form>
+            </field>
+        </record>
+
+        <record id="stock_location_route_view_search" model="ir.ui.view">
+            <field name="name">stock.location.route.search</field>
+            <field name="model">stock.location.route</field>
+            <field name="arch" type="xml">
+                <search string="Route">
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
+                </search>
             </field>
         </record>
 
