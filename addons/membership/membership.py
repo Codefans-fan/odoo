@@ -159,7 +159,7 @@ class Partner(osv.osv):
         return list_partner
 
     def _cron_update_membership(self, cr, uid, context=None):
-        partner_ids = self.search(cr, uid, [('membership_state', '=', 'paid')], context=context)
+        partner_ids = self.search(cr, uid, [('membership_state', 'in', ['invoiced', 'paid'])], context=context)
         if partner_ids:
             self._store_set_values(cr, uid, partner_ids, ['membership_state'], context=context)
 
@@ -363,7 +363,7 @@ class Partner(osv.osv):
             # create a record in cache, apply onchange then revert back to a dictionnary
             invoice_line = invoice_line_obj.new(cr, uid, line_values, context=context)
             invoice_line._onchange_product_id()
-            line_values = invoice_line._convert_to_write(invoice_line._cache)
+            line_values = invoice_line._convert_to_write({name: invoice_line[name] for name in invoice_line._cache})
             line_values['price_unit'] = amount
             invoice_obj.write(cr, uid, [invoice_id], {'invoice_line_ids': [(0, 0, line_values)]}, context=context)
             invoice_list.append(invoice_id)
@@ -419,7 +419,7 @@ class Invoice(osv.osv):
         for invoice in self.browse(cr, uid, ids, context=context):
             mlines = member_line_obj.search(cr, uid,
                     [('account_invoice_line', 'in',
-                        [l.id for l in invoice.invoice_line])])
+                        [l.id for l in invoice.invoice_line_ids])])
             member_line_obj.unlink(cr, uid, mlines, context=context)
         return super(Invoice, self).unlink(cr, uid, ids, context=context)
 

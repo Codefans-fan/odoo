@@ -157,7 +157,7 @@ class Message(models.Model):
     @api.constrains('author', 'discussion')
     def _check_author(self):
         if self.discussion and self.author not in self.discussion.participants:
-            raise ValueError(_("Author must be among the discussion participants."))
+            raise ValidationError(_("Author must be among the discussion participants."))
 
     @api.one
     @api.depends('author.name', 'discussion.name')
@@ -205,6 +205,35 @@ class Message(models.Model):
     @api.model
     def _search_author_partner(self, operator, value):
         return [('author.partner_id', operator, value)]
+
+
+class Multi(models.Model):
+    """ Model for testing multiple onchange methods in cascade that modify a
+        one2many field several times.
+    """
+    _name = 'test_new_api.multi'
+
+    name = fields.Char(related='partner.name', readonly=True)
+    partner = fields.Many2one('res.partner')
+    lines = fields.One2many('test_new_api.multi.line', 'multi')
+
+    @api.onchange('name')
+    def _onchange_name(self):
+        for line in self.lines:
+            line.name = self.name
+
+    @api.onchange('partner')
+    def _onchange_partner(self):
+        for line in self.lines:
+            line.partner = self.partner
+
+
+class MultiLine(models.Model):
+    _name = 'test_new_api.multi.line'
+
+    multi = fields.Many2one('test_new_api.multi', ondelete='cascade')
+    name = fields.Char()
+    partner = fields.Many2one('res.partner')
 
 
 class MixedModel(models.Model):

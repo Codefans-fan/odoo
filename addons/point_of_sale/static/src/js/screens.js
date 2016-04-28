@@ -1390,8 +1390,6 @@ var ReceiptScreenWidget = ScreenWidget.extend({
     print_xml: function() {
         var env = {
             widget:  this,
-            pos:     this.pos,
-            order:   this.pos.get_order(),
             receipt: this.pos.get_order().export_for_printing(),
             paymentlines: this.pos.get_order().get_paymentlines()
         };
@@ -2004,6 +2002,11 @@ return {
     ProductScreenWidget: ProductScreenWidget,
     ProductListWidget: ProductListWidget,
     ClientListScreenWidget: ClientListScreenWidget,
+    ActionpadWidget: ActionpadWidget,
+    DomCache: DomCache,
+    ProductCategoriesWidget: ProductCategoriesWidget,
+    ScaleScreenWidget: ScaleScreenWidget,
+    set_fiscal_position_button: set_fiscal_position_button,
 };
 
 });

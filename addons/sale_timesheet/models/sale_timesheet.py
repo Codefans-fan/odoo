@@ -4,7 +4,7 @@
 from openerp import models, api, fields
 from openerp.tools.translate import _
 
-from openerp.exceptions import UserError
+from openerp.exceptions import ValidationError
 
 
 class ResCompany(models.Model):
@@ -94,8 +94,10 @@ class AccountAnalyticLine(models.Model):
     @api.multi
     def write(self, values):
         self._update_values(values)
-        values = self._get_timesheet_cost(vals=values)
-        return super(AccountAnalyticLine, self).write(values)
+        for line in self:
+            values = line._get_timesheet_cost(vals=values)
+            super(AccountAnalyticLine, line).write(values)
+        return True
 
     @api.model
     def create(self, values):
@@ -131,7 +133,7 @@ class SaleOrder(models.Model):
                 if line.product_id.track_service == 'timesheet':
                     count += 1
                 if count > 1:
-                    raise UserError(_("You can use only one product on timesheet within the same sale order. You should split your order to include only one contract based on time and material."))
+                    raise ValidationError(_("You can use only one product on timesheet within the same sale order. You should split your order to include only one contract based on time and material."))
         return {}
 
     @api.multi

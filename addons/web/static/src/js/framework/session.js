@@ -236,7 +236,7 @@ var Session = core.Class.extend(mixins.EventDispatcherMixin, {
         return d;
     },
     load_qweb: function(mods) {
-        this.qweb_mutex.exec(function() {
+        this.qweb_mutex.exec(function () {
             return $.get('/web/webclient/qweb?mods=' + mods).then(function (doc) {
                 if (!doc) { return; }
                 qweb.add_template(doc);
@@ -270,6 +270,7 @@ var Session = core.Class.extend(mixins.EventDispatcherMixin, {
         if (this.override_session){
             options.data.session_id = this.session_id;
         }
+        options.session = this;
         ajax.get_file(options);
     },
     synchronized_mode: function(to_execute) {

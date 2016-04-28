@@ -63,8 +63,9 @@ Its fields are:
     search view to load for the action. Defaults to fetching the default
     search view for the model
 ``target`` (optional)
-    whether the views should be open in the main content area (``current``)
-    or in a dialog/popup (``new``). Defaults to ``current``.
+    whether the views should be open in the main content area (``current``),
+    in full screen mode (``fullscreen``) or in a dialog/popup (``new``). Defaults
+    to ``current``.
 ``context`` (optional)
     additional context data to pass to the views
 ``domain`` (optional)
@@ -208,7 +209,7 @@ field:
         <field name="name">Res Partner Server Action</field>
         <field name="model_id" ref="model_res_partner"/>
         <field name="code">
-raise Warning(object.name)
+            raise Warning(object.name)
         </field>
     </record>
 

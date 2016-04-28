@@ -56,13 +56,13 @@
                             <div attrs="{'invisible': ['|', '|', ('chart_template_id','=',False), ('complete_tax_set','=',False), ('has_chart_of_accounts','!=',False)]}">
                                 <label for="sale_tax_id"/>
                                 <field name="sale_tax_id"
-                                    domain="[('chart_template_id', '=', chart_template_id),('type_tax_use','in',('sale','all'))]"
+                                    domain="[('chart_template_id', 'parent_of', chart_template_id),('type_tax_use','in',('sale','all'))]"
                                     class="oe_inline"/>
                             </div>
                             <div attrs="{'invisible': ['|', '|', ('chart_template_id','=',False), ('complete_tax_set','=',False), ('has_chart_of_accounts','!=',False)]}">
                                 <label for="purchase_tax_id"/>
                                 <field name="purchase_tax_id"
-                                    domain="[('chart_template_id', '=', chart_template_id),('type_tax_use','in',('purchase', 'all'))]"
+                                    domain="[('chart_template_id', 'parent_of', chart_template_id),('type_tax_use','in',('purchase', 'all'))]"
                                     class="oe_inline"/>
                             </div>
                             <div attrs="{'invisible': ['|', '|', ('chart_template_id','=',False), ('complete_tax_set','=',True), ('has_chart_of_accounts','!=',False)]}">
@@ -122,6 +122,10 @@
                                 <label for="module_account_asset"/>
                             </div>
                             <div>
+                                <field name="module_account_deferred_revenue" class="oe_inline" widget="upgrade_boolean"/>
+                                <label for="module_account_deferred_revenue"/>
+                            </div>
+                            <div>
                                 <field name="module_account_budget" class="oe_inline"/>
                                 <label for="module_account_budget"/>
                             </div>
@@ -156,6 +160,11 @@
                             <div>
                                 <field name="module_account_bank_statement_import_ofx" class="oe_inline" widget="upgrade_boolean"/>
                                 <label for="module_account_bank_statement_import_ofx"/>
+                                <a href="https://www.odoo.com/page/accounting-features" target="_blank"> More Info</a>
+                            </div>
+                            <div>
+                                <field name="module_account_bank_statement_import_csv" class="oe_inline" widget="upgrade_boolean"/>
+                                <label for="module_account_bank_statement_import_csv"/>
                                 <a href="https://www.odoo.com/page/accounting-features" target="_blank"> More Info</a>
                             </div>
                         </div>
@@ -216,6 +225,7 @@
                                 <a href="https://www.odoo.com/page/accounting-features" target="_blank"> More Info</a>
                             </div>
                         </div>
+                        <field name="group_warning" widget="radio"/>
                     </group>
                     <group attrs="{'invisible': [('has_chart_of_accounts','=',False)]}">
                         <label for="id" string="Taxes"/>

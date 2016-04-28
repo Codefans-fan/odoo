@@ -299,13 +299,6 @@ exports.PosModel = Backbone.Model.extend({
 
         },
     },{
-        model: 'product.packaging',
-        fields: ['barcode','product_tmpl_id'],
-        domain: null,
-        loaded: function(self, packagings){ 
-            self.db.add_packagings(packagings);
-        },
-    },{
         model:  'pos.category',
         fields: ['id','name','parent_id','child_id','image'],
         domain: null,
@@ -317,7 +310,7 @@ exports.PosModel = Backbone.Model.extend({
         fields: ['display_name', 'list_price','price','pos_categ_id', 'taxes_id', 'barcode', 'default_code', 
                  'to_weight', 'uom_id', 'description_sale', 'description',
                  'product_tmpl_id'],
-        order:  ['sequence','name'],
+        order:  ['sequence','default_code','name'],
         domain: [['sale_ok','=',true],['available_in_pos','=',true]],
         context: function(self){ return { pricelist: self.pricelist.id, display_default_code: false }; },
         loaded: function(self, products){
@@ -453,8 +446,8 @@ exports.PosModel = Backbone.Model.extend({
             self.company_logo.onerror = function(){
                 logo_loaded.reject();
             };
-                self.company_logo.crossOrigin = "anonymous";
-            self.company_logo.src = '/web/binary/company_logo' +'?_'+Math.random();
+            self.company_logo.crossOrigin = "anonymous";
+            self.company_logo.src = '/web/binary/company_logo' +'?dbname=' + session.db + '&_'+Math.random();
 
             return logo_loaded;
         },
@@ -1227,6 +1220,7 @@ exports.Orderline = Backbone.Model.extend({
             price:              this.get_unit_display_price(),
             discount:           this.get_discount(),
             product_name:       this.get_product().display_name,
+            product_name_wrapped: this.generate_wrapped_product_name(),
             price_display :     this.get_display_price(),
             price_with_tax :    this.get_price_with_tax(),
             price_without_tax:  this.get_price_without_tax(),
@@ -1235,6 +1229,36 @@ exports.Orderline = Backbone.Model.extend({
             product_description_sale: this.get_product().description_sale,
         };
     },
+    generate_wrapped_product_name: function() {
+        var MAX_LENGTH = 24; // 40 * line ratio of .6
+        var wrapped = [];
+        var name = this.get_product().display_name;
+        var current_line = "";
+
+        while (name.length > 0) {
+            var space_index = name.indexOf(" ");
+
+            if (space_index === -1) {
+                space_index = name.length;
+            }
+
+            if (current_line.length + space_index > MAX_LENGTH) {
+                if (current_line.length) {
+                    wrapped.push(current_line);
+                }
+                current_line = "";
+            }
+
+            current_line += name.slice(0, space_index + 1);
+            name = name.slice(space_index + 1);
+        }
+
+        if (current_line.length) {
+            wrapped.push(current_line);
+        }
+
+        return wrapped;
+    },
     // changes the base price of the product for this orderline
     set_unit_price: function(price){
         this.order.assert_editable();
@@ -1242,7 +1266,7 @@ exports.Orderline = Backbone.Model.extend({
         this.trigger('change',this);
     },
     get_unit_price: function(){
-        return this.price;
+        return round_di(this.price || 0, this.pos.dp['Product Price'])
     },
     get_unit_display_price: function(){
         if (this.pos.config.iface_tax_included) {
@@ -1321,8 +1345,8 @@ exports.Orderline = Backbone.Model.extend({
     },
     _compute_all: function(tax, base_amount, quantity) {
         if (tax.amount_type === 'fixed') {
-            var ret = tax.amount * quantity;
-            return base_amount >= 0 ? ret : ret * -1;
+            var sign_base_amount = base_amount >= 0 ? 1 : -1;
+            return (Math.abs(tax.amount) * sign_base_amount) * quantity;
         }
         if ((tax.amount_type === 'percent' && !tax.price_include) || (tax.amount_type === 'division' && tax.price_include)){
             return base_amount * tax.amount / 100;
@@ -1444,7 +1468,9 @@ exports.Paymentline = Backbone.Model.extend({
         return this.amount;
     },
     get_amount_str: function(){
-        return this.amount.toFixed(this.pos.currency.decimals);
+        return formats.format_value(this.amount, {
+            type: 'float', digits: [69, this.pos.currency.decimals]
+        });
     },
     set_selected: function(selected){
         if(this.selected !== selected){
@@ -1541,6 +1567,19 @@ exports.Order = Backbone.Model.extend({
         this.session_id    = json.pos_session_id;
         this.uid = json.uid;
         this.name = _t("Order ") + this.uid;
+
+        if (json.fiscal_position_id) {
+            var fiscal_position = _.find(this.pos.fiscal_positions, function (fp) {
+                return fp.id === json.fiscal_position_id;
+            });
+
+            if (fiscal_position) {
+                this.fiscal_position = fiscal_position;
+            } else {
+                console.error('ERROR: trying to load a fiscal position not available in the pos');
+            }
+        }
+
         if (json.partner_id) {
             client = this.pos.db.get_partner_by_id(json.partner_id);
             if (!client) {

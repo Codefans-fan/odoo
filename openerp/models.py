@@ -32,7 +32,7 @@ import re
 import time
 from collections import defaultdict, MutableMapping
 from inspect import getmembers, currentframe
-from operator import itemgetter
+from operator import attrgetter, itemgetter
 
 import babel.dates
 import dateutil.relativedelta
@@ -109,9 +109,9 @@ def raise_on_invalid_object_name(name):
 def check_pg_name(name):
     """ Check whether the given name is a valid PostgreSQL identifier name. """
     if not regex_pg_name.match(name):
-        raise ValueError("Invalid characters in table name %r" % name)
+        raise ValidationError("Invalid characters in table name %r" % name)
     if len(name) > 63:
-        raise ValueError("Table name %r is too long" % name)
+        raise ValidationError("Table name %r is too long" % name)
 
 POSTGRES_CONFDELTYPES = {
     'RESTRICT': 'r',
@@ -269,7 +269,7 @@ class NewId(object):
     def __nonzero__(self):
         return False
 
-IdType = (int, long, basestring, NewId)
+IdType = (int, long, str, unicode, NewId)
 
 
 # maximum number of prefetched records
@@ -746,6 +746,7 @@ class BaseModel(object):
             attrs = {
                 'manual': True,
                 'string': field['field_description'],
+                'help': field['help'],
                 'index': bool(field['index']),
                 'copy': bool(field['copy']),
                 'related': field['related'],
@@ -944,7 +945,7 @@ class BaseModel(object):
                     # this part could be simpler, but it has to be done this way
                     # in order to reproduce the former behavior
                     if not isinstance(value, BaseModel):
-                        current[i] = field.convert_to_export(value, self.env)
+                        current[i] = field.convert_to_export(value, record)
                     else:
                         primary_done.append(name)
 
@@ -960,10 +961,10 @@ class BaseModel(object):
                         if lines2:
                             # merge first line with record's main line
                             for j, val in enumerate(lines2[0]):
-                                if val:
+                                if val or isinstance(val, bool):
                                     current[j] = val
                             # check value of current field
-                            if not current[i]:
+                            if not current[i] and not isinstance(current[i], bool):
                                 # assign xml_ids, and forget about remaining lines
                                 xml_ids = [item[1] for item in value.name_get()]
                                 current[i] = ','.join(xml_ids)
@@ -1382,7 +1383,6 @@ class BaseModel(object):
                 parent_fields[field.model_name].append(field.name)
 
         # convert default values to the right format
-        defaults = self._convert_to_cache(defaults, validate=False)
         defaults = self._convert_to_write(defaults)
 
         # add default values for inherited fields
@@ -2058,37 +2058,68 @@ class BaseModel(object):
                 value =  pytz.timezone(context['tz']).localize(value)
         return value
 
-    def _read_group_get_domain(self, groupby, value):
-        """
-            Helper method to construct the domain corresponding to a groupby and 
-            a given value. This is mostly relevant for date/datetime.
-        """
-        if groupby['type'] in ('date', 'datetime') and value:
-            dt_format = DEFAULT_SERVER_DATETIME_FORMAT if groupby['type'] == 'datetime' else DEFAULT_SERVER_DATE_FORMAT
-            domain_dt_begin = value
-            domain_dt_end = value + groupby['interval']
-            if groupby['tz_convert']:
-                domain_dt_begin = domain_dt_begin.astimezone(pytz.utc)
-                domain_dt_end = domain_dt_end.astimezone(pytz.utc)
-            return [(groupby['field'], '>=', domain_dt_begin.strftime(dt_format)),
-                   (groupby['field'], '<', domain_dt_end.strftime(dt_format))]
-        if groupby['type'] == 'many2one' and value:
-                value = value[0]
-        return [(groupby['field'], '=', value)]
-
-    def _read_group_format_result(self, data, annotated_groupbys, groupby, groupby_dict, domain, context):
+    def _read_group_format_result(self, data, annotated_groupbys, groupby, domain, context):
         """
             Helper method to format the data contained in the dictionary data by 
             adding the domain corresponding to its values, the groupbys in the 
-            context and by properly formatting the date/datetime values. 
-        """
-        domain_group = [dom for gb in annotated_groupbys for dom in self._read_group_get_domain(gb, data[gb['groupby']])]
-        for k,v in data.iteritems():
-            gb = groupby_dict.get(k)
-            if gb and gb['type'] in ('date', 'datetime') and v:
-                data[k] = babel.dates.format_date(v, format=gb['display_format'], locale=context.get('lang', 'en_US'))
+            context and by properly formatting the date/datetime values.
 
-        data['__domain'] = domain_group + domain 
+        :param data: a single group
+        :param annotated_groupbys: expanded grouping metainformation
+        :param groupby: original grouping metainformation
+        :param domain: original domain for read_group
+        """
+
+        sections = []
+        for gb in annotated_groupbys:
+            ftype = gb['type']
+            value = data[gb['groupby']]
+
+            # full domain for this groupby spec
+            d = None
+            if value:
+                if ftype == 'many2one':
+                    value = value[0]
+                elif ftype in ('date', 'datetime'):
+                    locale = context.get('lang', 'en_US')
+                    fmt = DEFAULT_SERVER_DATETIME_FORMAT if ftype == 'datetime' else DEFAULT_SERVER_DATE_FORMAT
+                    tzinfo = None
+                    range_start = value
+                    range_end = value + gb['interval']
+                    # value from postgres is in local tz (so range is
+                    # considered in local tz e.g. "day" is [00:00, 00:00[
+                    # local rather than UTC which could be [11:00, 11:00]
+                    # local) but domain and raw value should be in UTC
+                    if gb['tz_convert']:
+                        tzinfo = range_start.tzinfo
+                        range_start = range_start.astimezone(pytz.utc)
+                        range_end = range_end.astimezone(pytz.utc)
+
+                    range_start = range_start.strftime(fmt)
+                    range_end = range_end.strftime(fmt)
+                    if ftype == 'datetime':
+                        label = babel.dates.format_datetime(
+                            value, format=gb['display_format'],
+                            tzinfo=tzinfo, locale=locale
+                        )
+                    else:
+                        label = babel.dates.format_date(
+                            value, format=gb['display_format'],
+                            locale=locale
+                        )
+                    data[gb['groupby']] = ('%s/%s' % (range_start, range_end), label)
+                    d = [
+                        '&',
+                        (gb['field'], '>=', range_start),
+                        (gb['field'], '<', range_end),
+                    ]
+
+            if d is None:
+                d = [(gb['field'], '=', value)]
+            sections.append(d)
+        sections.append(domain)
+
+        data['__domain'] = expression.AND(sections)
         if len(groupby) - len(annotated_groupbys) >= 1:
             data['__context'] = { 'group_by': groupby[len(annotated_groupbys):]}
         del data['id']
@@ -2126,6 +2157,29 @@ class BaseModel(object):
         :raise AccessError: * if user has no read rights on the requested object
                             * if user tries to bypass access rules for read on the requested object
         """
+        if context is None:
+            context = context
+        result = self._read_group_raw(cr, uid, domain, fields, groupby, offset=offset, limit=limit, context=context, orderby=orderby, lazy=lazy)
+
+        groupby = [groupby] if isinstance(groupby, basestring) else groupby
+        dt = [
+            f for f in groupby
+            if self._fields[f.split(':')[0]].type in ('date', 'datetime')
+        ]
+
+        # iterate on all results and replace the "full" date/datetime value
+        # (range, label) by just the formatted label, in-place
+        for group in result:
+            for df in dt:
+                # could group on a date(time) field which is empty in some
+                # records, in which case as with m2o the _raw value will be
+                # `False` instead of a (value, label) pair. In that case,
+                # leave the `False` value alone
+                if group.get(df):
+                    group[df] = group[df][1]
+        return result
+
+    def _read_group_raw(self, cr, uid, domain, fields, groupby, offset=0, limit=None, context=None, orderby=False, lazy=True):
         if context is None:
             context = {}
         self.check_access_rights(cr, uid, 'read')
@@ -2165,7 +2219,7 @@ class BaseModel(object):
             self._inherits_join_calc(cr, uid, self._table, f, query, context=context),
             f,
         )
-        select_terms = ["%s(%s) AS %s" % field_formatter(f) for f in aggregated_fields]
+        select_terms = ['%s(%s) AS "%s" ' % field_formatter(f) for f in aggregated_fields]
 
         for gb in annotated_groupbys:
             select_terms.append('%s as "%s" ' % (gb['qualified_field'], gb['groupby']))
@@ -2215,7 +2269,7 @@ class BaseModel(object):
                 d.update(data_dict[d['id']])
 
         data = map(lambda r: {k: self._read_group_prepare_data(k,v, groupby_dict, context) for k,v in r.iteritems()}, fetched_data)
-        result = [self._read_group_format_result(d, annotated_groupbys, groupby, groupby_dict, domain, context) for d in data]
+        result = [self._read_group_format_result(d, annotated_groupbys, groupby, domain, context) for d in data]
         if lazy and groupby_fields[0] in self._group_by_full:
             # Right now, read_group only fill results in lazy mode (by default).
             # If you need to have the empty groups in 'eager' mode, then the
@@ -3135,17 +3189,32 @@ class BaseModel(object):
         cls._setup_done = True
 
     @api.model
-    def _setup_fields(self):
+    def _setup_fields(self, partial):
         """ Setup the fields, except for recomputation triggers. """
         cls = type(self)
 
         # set up fields, and determine their corresponding column
         cls._columns = {}
+        bad_fields = []
         for name, field in cls._fields.iteritems():
-            field.setup_full(self)
+            try:
+                field.setup_full(self)
+            except Exception:
+                if partial and field.manual:
+                    # Something goes wrong when setup a manual field.
+                    # This can happen with related fields using another manual many2one field
+                    # that hasn't been loaded because the comodel does not exist yet.
+                    # This can also be a manual function field depending on not loaded fields yet.
+                    bad_fields.append(name)
+                    continue
+                raise
             column = field.to_column()
             if column:
                 cls._columns[name] = column
+
+        for name in bad_fields:
+            del cls._fields[name]
+            delattr(cls, name)
 
         # map each field to the fields computed with the same method
         groups = defaultdict(list)
@@ -3162,7 +3231,10 @@ class BaseModel(object):
         if isinstance(self, Model):
             # set up field triggers (on database-persisted models only)
             for field in cls._fields.itervalues():
-                field.setup_triggers(self.env)
+                # dependencies of custom fields may not exist; ignore that case
+                exceptions = (Exception,) if field.manual else ()
+                with tools.ignore(*exceptions):
+                    field.setup_triggers(self.env)
 
             # add invalidation triggers on model dependencies
             if cls._depends:
@@ -3308,7 +3380,8 @@ class BaseModel(object):
             else:
                 _logger.warning("%s.read() with unknown field '%s'", self._name, name)
 
-        # fetch stored fields from the database to the cache
+        # fetch stored fields from the database to the cache; this should feed
+        # the prefetching of secondary records
         self._read_from_database(stored, inherited)
 
         # retrieve results from records; this takes values from the cache and
@@ -3320,7 +3393,7 @@ class BaseModel(object):
             try:
                 values = {'id': record.id}
                 for name, field in name_fields:
-                    values[name] = field.convert_to_read(record[name], use_name_get)
+                    values[name] = field.convert_to_read(record[name], record, use_name_get)
                 result.append(values)
             except MissingError:
                 pass
@@ -3377,6 +3450,7 @@ class BaseModel(object):
 
         # fetch records with read()
         assert self in records and field in fs
+        records = records.with_prefetch(self._prefetch)
         result = []
         try:
             result = records.read([f.name for f in fs], load='_classic_write')
@@ -3387,7 +3461,7 @@ class BaseModel(object):
         # check the cache, and update it if necessary
         if field not in self._cache:
             for values in result:
-                record = self.browse(values.pop('id'))
+                record = self.browse(values.pop('id'), self._prefetch)
                 record._cache.update(record._convert_to_cache(values, validate=False))
             if not self._cache.contains(field):
                 e = AccessError("No value found for %s.%s" % (self, field.name))
@@ -3473,7 +3547,7 @@ class BaseModel(object):
 
             # store result in cache for POST fields
             for vals in result:
-                record = self.browse(vals['id'])
+                record = self.browse(vals['id'], self._prefetch)
                 record._cache.update(record._convert_to_cache(vals, validate=False))
 
             # determine the fields that must be processed now;
@@ -3515,7 +3589,7 @@ class BaseModel(object):
 
         # store result in cache
         for vals in result:
-            record = self.browse(vals.pop('id'))
+            record = self.browse(vals.pop('id'), self._prefetch)
             record._cache.update(record._convert_to_cache(vals, validate=False))
 
         # store failed values in cache for the records that could not be read
@@ -4052,7 +4126,8 @@ class BaseModel(object):
                         src_trans = vals[f]
                         context_wo_lang = dict(context, lang=None)
                         self.write(cr, user, ids, {f: vals[f]}, context=context_wo_lang)
-                    self.pool['ir.translation']._set_ids(cr, user, self._name+','+f, 'model', context['lang'], ids, vals[f], src_trans)
+                    translation_value = self._columns[f]._symbol_set[1](vals[f])
+                    self.pool['ir.translation']._set_ids(cr, user, self._name+','+f, 'model', context['lang'], ids, translation_value, src_trans)
 
         # invalidate and mark new-style fields to recompute; do this before
         # setting other fields, because it can require the value of computed
@@ -4697,7 +4772,7 @@ class BaseModel(object):
         :return: the qualified field name (or expression) to use for ``field``
         """
         lang = self._context.get('lang')
-        if lang and lang != 'en_US':
+        if lang:
             # Sub-select to return at most one translation per record.
             # Even if it shoud probably not be the case,
             # this is possible to have multiple translations for a same record in the same language.
@@ -5437,24 +5512,30 @@ class BaseModel(object):
     #
 
     @classmethod
-    def _browse(cls, env, ids):
-        """ Create an instance attached to ``env``; ``ids`` is a tuple of record
-            ids.
+    def _browse(cls, ids, env, prefetch=None):
+        """ Create a recordset instance.
+
+        :param ids: a tuple of record ids
+        :param env: an environment
+        :param prefetch: an optional prefetch object
         """
         records = object.__new__(cls)
         records.env = env
         records._ids = ids
-        env.prefetch[cls._name].update(ids)
+        if prefetch is None:
+            prefetch = defaultdict(set)         # {model_name: set(ids)}
+        records._prefetch = prefetch
+        prefetch[cls._name].update(ids)
         return records
 
     @api.v7
     def browse(self, cr, uid, arg=None, context=None):
         ids = _normalize_ids(arg)
         #assert all(isinstance(id, IdType) for id in ids), "Browsing invalid ids: %s" % ids
-        return self._browse(Environment(cr, uid, context or {}), ids)
+        return self._browse(ids, Environment(cr, uid, context or {}))
 
     @api.v8
-    def browse(self, arg=None):
+    def browse(self, arg=None, prefetch=None):
         """ browse([ids]) -> records
 
         Returns a recordset for the ids provided as parameter in the current
@@ -5464,7 +5545,7 @@ class BaseModel(object):
         """
         ids = _normalize_ids(arg)
         #assert all(isinstance(id, IdType) for id in ids), "Browsing invalid ids: %s" % ids
-        return self._browse(self.env, ids)
+        return self._browse(ids, self.env, prefetch)
 
     #
     # Internal properties, for manipulating the instance's implementation
@@ -5502,10 +5583,11 @@ class BaseModel(object):
             The new environment will not benefit from the current
             environment's data cache, so later data access may incur extra
             delays while re-fetching from the database.
+            The returned recordset has the same prefetch object as ``self``.
 
         :type env: :class:`~openerp.api.Environment`
         """
-        return self._browse(env, self._ids)
+        return self._browse(self._ids, env, self._prefetch)
 
     def sudo(self, user=SUPERUSER_ID):
         """ sudo([user=SUPERUSER])
@@ -5533,6 +5615,7 @@ class BaseModel(object):
             re-evaluated, the new recordset will not benefit from the current
             environment's data cache, so later data access may incur extra
             delays while re-fetching from the database.
+            The returned recordset has the same prefetch object as ``self``.
 
         """
         return self.with_env(self.env(user=user))
@@ -5552,9 +5635,21 @@ class BaseModel(object):
             # -> r2._context is {'key2': True}
             r2 = records.with_context(key2=True)
             # -> r2._context is {'key1': True, 'key2': True}
+
+        .. note:
+
+            The returned recordset has the same prefetch object as ``self``.
         """
         context = dict(args[0] if args else self._context, **kwargs)
         return self.with_env(self.env(context=context))
+
+    def with_prefetch(self, prefetch=None):
+        """ with_prefetch([prefetch]) -> records
+
+        Return a new version of this recordset that uses the given prefetch
+        object, or a new prefetch object if not given.
+        """
+        return self._browse(self._ids, self.env, prefetch)
 
     def _convert_to_cache(self, values, update=False, validate=True):
         """ Convert the ``values`` dictionary into cached values.
@@ -5564,11 +5659,20 @@ class BaseModel(object):
             :param validate: whether values must be checked
         """
         fields = self._fields
-        target = self if update else self.browse()
+        target = self if update else self.browse([], self._prefetch)
         return {
             name: fields[name].convert_to_cache(value, target, validate=validate)
             for name, value in values.iteritems()
             if name in fields
+        }
+
+    def _convert_to_record(self, values):
+        """ Convert the ``values`` dictionary from the cache format to the
+        record format.
+        """
+        return {
+            name: self._fields[name].convert_to_record(value, self)
+            for name, value in values.iteritems()
         }
 
     def _convert_to_write(self, values):
@@ -5577,7 +5681,10 @@ class BaseModel(object):
         result = {}
         for name, value in values.iteritems():
             if name in fields:
-                value = fields[name].convert_to_write(value)
+                field = fields[name]
+                value = field.convert_to_cache(value, self, validate=False)
+                value = field.convert_to_record(value, self)
+                value = field.convert_to_write(value, self)
                 if not isinstance(value, NewId):
                     result[name] = value
         return result
@@ -5623,8 +5730,8 @@ class BaseModel(object):
         recs = self
         for name in name_seq.split('.'):
             field = recs._fields[name]
-            null = field.null(self.env)
-            recs = recs.mapped(lambda rec: rec._cache.get(field, null))
+            null = field.convert_to_cache(False, self, validate=False)
+            recs = recs.mapped(lambda rec: field.convert_to_record(rec._cache.get(field, null), rec))
         return recs
 
     def filtered(self, func):
@@ -5642,16 +5749,17 @@ class BaseModel(object):
         """ Return the recordset ``self`` ordered by ``key``.
 
             :param key: either a function of one argument that returns a
-                comparison key for each record, or ``None``, in which case
-                records are ordered according the default model's order
+                comparison key for each record, or a field name, or ``None``, in
+                which case records are ordered according the default model's order
 
             :param reverse: if ``True``, return the result in reverse order
         """
         if key is None:
             recs = self.search([('id', 'in', self.ids)])
             return self.browse(reversed(recs._ids)) if reverse else recs
-        else:
-            return self.browse(map(itemgetter('id'), sorted(self, key=key, reverse=reverse)))
+        if isinstance(key, basestring):
+            key = itemgetter(key)
+        return self.browse(map(attrgetter('id'), sorted(self, key=key, reverse=reverse)))
 
     @api.multi
     def update(self, values):
@@ -5723,7 +5831,7 @@ class BaseModel(object):
     def __iter__(self):
         """ Return an iterator over ``self``. """
         for id in self._ids:
-            yield self._browse(self.env, (id,))
+            yield self._browse((id,), self.env, self._prefetch)
 
     def __contains__(self, item):
         """ Test whether ``item`` (record or field name) is an element of ``self``.
@@ -5833,9 +5941,9 @@ class BaseModel(object):
             # important: one must call the field's getter
             return self._fields[key].__get__(self, type(self))
         elif isinstance(key, slice):
-            return self._browse(self.env, self._ids[key])
+            return self._browse(self._ids[key], self.env)
         else:
-            return self._browse(self.env, (self._ids[key],))
+            return self._browse((self._ids[key],), self.env)
 
     def __setitem__(self, key, value):
         """ Assign the field ``key`` to ``value`` in record ``self``. """
@@ -5857,10 +5965,7 @@ class BaseModel(object):
             the records of model ``self`` in cache that have no value for ``field``
             (:class:`Field` instance).
         """
-        env = self.env
-        prefetch_ids = env.prefetch[self._name]
-        prefetch_ids.update(self._ids)
-        ids = filter(None, prefetch_ids - set(env.cache[field]))
+        ids = filter(None, self._prefetch[self._name] - set(self.env.cache[field]))
         return self.browse(ids)
 
     @api.model
@@ -6004,7 +6109,7 @@ class BaseModel(object):
                 return
             if res.get('value'):
                 res['value'].pop('id', None)
-                self.update(self._convert_to_cache(res['value'], validate=False))
+                self.update({key: val for key, val in res['value'].iteritems() if key in self._fields})
             if res.get('domain'):
                 result.setdefault('domain', {}).update(res['domain'])
             if res.get('warning'):
@@ -6037,9 +6142,9 @@ class BaseModel(object):
                 def __init__(self, record):
                     self._record = record
                 def __getitem__(self, name):
-                    field = self._record._fields[name]
-                    value = self._record[name]
-                    return field.convert_to_write(value)
+                    record = self._record
+                    field = record._fields[name]
+                    return field.convert_to_write(record[name], record)
                 def __getattr__(self, name):
                     return self[name]
 
@@ -6093,7 +6198,7 @@ class BaseModel(object):
         # create a new record with values, and attach ``self`` to it
         with env.do_in_onchange():
             record = self.new(values)
-            values = dict(record._cache)
+            values = {name: record[name] for name in record._cache}
             # attach ``self`` with a different context (for cache consistency)
             record._origin = self.with_context(__onchange=True)
 
@@ -6154,7 +6259,7 @@ class BaseModel(object):
 
         # collect values from dirty fields
         result['value'] = {
-            name: self._fields[name].convert_to_onchange(record[name], subfields.get(name))
+            name: self._fields[name].convert_to_onchange(record[name], record, subfields[name])
             for name in dirty
         }
 
@@ -6318,7 +6423,7 @@ PGERROR_TO_OE = defaultdict(
     '23505': convert_pgerror_23505,
 })
 
-def _normalize_ids(arg, atoms={int, long, str, unicode, NewId}):
+def _normalize_ids(arg, atoms=set(IdType)):
     """ Normalizes the ids argument for ``browse`` (v7 and v8) to a tuple.
 
     Various implementations were tested on the corpus of all browse() calls

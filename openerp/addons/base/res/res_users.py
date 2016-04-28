@@ -174,7 +174,7 @@ class Users(models.Model):
     __uid_cache = defaultdict(dict)             # {dbname: {uid: password}}
 
     # User can write on a few of his own fields (but not his groups for example)
-    SELF_WRITEABLE_FIELDS = ['password', 'signature', 'action_id', 'company_id', 'email', 'name', 'image', 'image_medium', 'image_small', 'lang', 'tz']
+    SELF_WRITEABLE_FIELDS = ['signature', 'action_id', 'company_id', 'email', 'name', 'image', 'image_medium', 'image_small', 'lang', 'tz']
     # User can read a few of his own fields
     SELF_READABLE_FIELDS = ['signature', 'company_id', 'login', 'email', 'name', 'image', 'image_medium', 'image_small', 'lang', 'tz', 'tz_offset', 'groups_id', 'partner_id', '__last_update', 'action_id']
 
@@ -510,8 +510,8 @@ class Users(models.Model):
         """
         self.check(self._cr.dbname, self._uid, old_passwd)
         if new_passwd:
-            # do not use self.env.user here, since it has uid=SUPERUSER_ID
-            return self.browse(self._uid).write({'password': new_passwd})
+            # use self.env.user here, because it has uid=SUPERUSER_ID
+            return self.env.user.write({'password': new_passwd})
         raise UserError(_("Setting empty passwords is not allowed for security reasons!"))
 
     @api.multi
@@ -877,7 +877,7 @@ class UsersView(models.Model):
         # add reified groups fields
         if not self.env.user._is_admin():
             return res
-        for app, kind, gs in self.env['res.groups'].get_groups_by_application():
+        for app, kind, gs in self.env['res.groups'].sudo().get_groups_by_application():
             if kind == 'selection':
                 # selection group field
                 tips = ['%s: %s' % (g.name, g.comment) for g in gs if g.comment]

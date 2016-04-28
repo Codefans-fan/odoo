@@ -56,13 +56,12 @@ var PartnerInviteDialog = Dialog.extend({
                 return $('<span>').text(item.text).prepend(status);
             },
             query: function (query) {
-                chat_manager.search_partner(query.term, 20).then(function(result){
-                    var data = [];
-                    _.each(result, function(partner){
-                        partner.text = partner.name;
-                        data.push(partner);
+                chat_manager.search_partner(query.term, 20).then(function (partners) {
+                    query.callback({
+                        results: _.map(partners, function (partner) {
+                            return _.extend(partner, { text: partner.label });
+                        }),
                     });
-                    query.callback({results: data});
                 });
             }
         });
@@ -125,7 +124,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             var def = window.Notification.requestPermission();
             if (def) {
                 def.then(function () {
-                    utils.send_native_notification('Permission granted', 'Odoo has now the permission to send you native notifications on this device.');
+                    utils.send_notification('Permission granted', 'Odoo has now the permission to send you native notifications on this device.');
                 });
             }
         },
@@ -262,6 +261,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
                 });
                 chat_manager.bus.on('unsubscribe_from_channel', self, self.render_sidebar);
                 chat_manager.bus.on('update_needaction', self, self.throttled_render_sidebar);
+                chat_manager.bus.on('update_starred', self, self.throttled_render_sidebar);
                 chat_manager.bus.on('update_channel_unread_counter', self, self.throttled_render_sidebar);
                 chat_manager.bus.on('update_dm_presence', self, self.throttled_render_sidebar);
                 self.thread.$el.on("scroll", null, _.debounce(function () {
@@ -303,6 +303,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             active_channel_id: this.channel ? this.channel.id: undefined,
             channels: chat_manager.get_channels(),
             needaction_counter: chat_manager.get_needaction_counter(),
+            starred_counter: chat_manager.get_starred_counter(),
         }));
         this.$(".o_mail_chat_sidebar").html($sidebar.contents());
 
@@ -329,22 +330,28 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             focus: function(event) {
                 event.preventDefault();
             },
-            html: true,
         });
 
         this.$('.o_mail_add_channel[data-type=dm]').find("input").autocomplete({
             source: function(request, response) {
                 self.last_search_val = _.escape(request.term);
-                chat_manager.search_partner(self.last_search_val).done(response);
+                chat_manager.search_partner(self.last_search_val, 10).done(response);
             },
             select: function(event, ui) {
                 var partner_id = ui.item.id;
-                chat_manager.create_channel(partner_id, "dm");
+                var dm = chat_manager.get_dm_from_partner_id(partner_id);
+                if (dm) {
+                    self.set_channel(dm);
+                } else {
+                    chat_manager.create_channel(partner_id, "dm");
+                }
+                // clear the input
+                $(this).val('');
+                return false;
             },
             focus: function(event) {
                 event.preventDefault();
             },
-            html: true,
         });
 
         this.$('.o_mail_add_channel[data-type=private]').find("input").on('keyup', this, function (event) {
@@ -657,6 +664,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             target: 'current'
         });
     },
+            context: "{'default_no_auto_thread': False}",
 });
 
 

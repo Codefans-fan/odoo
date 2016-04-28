@@ -12,7 +12,7 @@
                         <button string="Cancel" type="object" name="cancel" class="oe_link"/>
                     </header>
                     <div>
-                        <field name="website_id" on_change="on_change_website_id(website_id)"/>
+                        <field name="website_id" on_change="on_change_website_id(website_id)" invisible="1"/>
                         <group string="Domain">
                             <field name="website_name" />
                             <label for="google_analytics_key"/>
@@ -154,9 +154,6 @@
             groups="base.group_system" web_icon="website,static/description/icon_admin.png"/>
 
         <menuitem id="menu_dashboard" name="Dashboard" action="website.backend_dashboard" parent="website.menu_website_configuration" sequence="1"/>
-
-        <menuitem id="menu_website" name="Website" parent="website.menu_website_configuration" sequence="2"/>
-        <menuitem id="menu_website_view" name="View Website" action="website.action_website" parent="website.menu_website"/>
 
         <menuitem id="menu_website_global_configuration" parent="menu_website_configuration"
             sequence="100" name="Configuration" groups="base.group_system"/>

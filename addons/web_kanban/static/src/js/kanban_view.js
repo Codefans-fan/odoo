@@ -3,6 +3,7 @@ odoo.define('web_kanban.KanbanView', function (require) {
 
 var core = require('web.core');
 var data = require('web.data');
+var data_manager = require('web.data_manager');
 var Model = require('web.DataModel');
 var Dialog = require('web.Dialog');
 var form_common = require('web.form_common');
@@ -24,7 +25,7 @@ var ColumnQuickCreate = quick_create.ColumnQuickCreate;
 var fields_registry = kanban_widgets.registry;
 
 var KanbanView = View.extend({
-    accesskey: "K",
+    accesskey: "k",
     className: "o_kanban_view",
     custom_events: {
         'kanban_record_open': 'open_record',
@@ -64,6 +65,7 @@ var KanbanView = View.extend({
         this.qweb.default_dict = _.clone(QWeb.default_dict);
 
         this.limit = this.options.limit || 40;
+        this.fields = {};
         this.fields_keys = _.keys(this.fields_view.fields);
         this.grouped = undefined;
         this.group_by_field = undefined;
@@ -71,7 +73,8 @@ var KanbanView = View.extend({
         this.grouped_by_m2o = undefined;
         this.relation = undefined;
         this.is_empty = undefined;
-        this.many2manys = [];
+        // Retrieve many2manys stored in the fields_view if it has already been processed
+        this.many2manys = this.fields_view.many2manys || [];
         this.m2m_context = {};
         this.widgets = [];
         this.data = undefined;
@@ -93,6 +96,13 @@ var KanbanView = View.extend({
             var child = this.fields_view.arch.children[i];
             if (child.tag === "templates") {
                 transform_qweb_template(child, this.fields_view, this.many2manys);
+                // transform_qweb_template(), among other things, identifies and processes the
+                // many2manys. Unfortunately, it modifies the fields_view in place and, as
+                // the fields_view is stored in the JS cache, the many2manys are only identified the
+                // first time the fields_view is processed. We thus store the identified many2manys
+                // on the fields_view, so that we can retrieve them later. A better fix would be to
+                // stop modifying shared resources in place.
+                this.fields_view.many2manys = this.many2manys;
                 this.qweb.add_template(utils.json_node_to_xml(child));
                 break;
             } else if (child.tag === 'field') {
@@ -172,7 +182,14 @@ var KanbanView = View.extend({
         var group_by_field = options.group_by_field;
         var fields_keys = _.uniq(this.fields_keys.concat(group_by_field));
 
-        return new Model(this.model, options.search_context, options.search_domain)
+        var fields_def;
+        if (this.fields_view.fields[group_by_field] === undefined) {
+            fields_def = data_manager.load_fields(this.dataset).then(function (fields) {
+                self.fields = fields;
+            })
+        }
+
+        var load_groups_def = new Model(this.model, options.search_context, options.search_domain)
         .query(fields_keys)
         .group_by([group_by_field])
         .then(function (groups) {
@@ -275,6 +292,7 @@ var KanbanView = View.extend({
                 };
             });
         });
+        return $.when(load_groups_def, fields_def);
     },
 
     is_action_enabled: function(action) {
@@ -415,8 +433,24 @@ var KanbanView = View.extend({
 
     render_grouped: function (fragment) {
         var self = this;
+
+        // Drag'n'drop activation/deactivation
+        var group_by_field_attrs = this.fields_view.fields[this.group_by_field] || this.fields[this.group_by_field];
+
+        // Deactivate the drag'n'drop if:
+        // - field is a date or datetime since we group by month
+        // - field is readonly
+        var draggable = true;
+        if (group_by_field_attrs) {
+            if (group_by_field_attrs.type === "date" || group_by_field_attrs.type === "datetime") {
+                var draggable = false;
+            }
+            else if (group_by_field_attrs.readonly !== undefined) {
+                var draggable = !(group_by_field_attrs.readonly);
+            }
+        }
         var record_options = _.extend(this.record_options, {
-            draggable: true,
+            draggable: draggable,
         });
 
         var column_options = this.get_column_options();

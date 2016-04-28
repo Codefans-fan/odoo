@@ -55,7 +55,8 @@ SLEEP_INTERVAL = 60     # 1 min
 def memory_info(process):
     """ psutil < 2.0 does not have memory_info, >= 3.0 does not have
     get_memory_info """
-    return (getattr(process, 'memory_info', None) or process.get_memory_info)()
+    pmem = (getattr(process, 'memory_info', None) or process.get_memory_info)()
+    return (pmem.rss, pmem.vms)
 
 #----------------------------------------------------------
 # Werkzeug WSGI servers patched
@@ -386,6 +387,9 @@ class PreforkServer(CommonServer):
         self.population = config['workers']
         self.timeout = config['limit_time_real']
         self.limit_request = config['limit_request']
+        self.cron_timeout = config['limit_time_real_cron'] or None
+        if self.cron_timeout == -1:
+            self.cron_timeout = self.timeout
         # working vars
         self.beat = 4
         self.app = app
@@ -508,7 +512,10 @@ class PreforkServer(CommonServer):
         for (pid, worker) in self.workers.items():
             if worker.watchdog_timeout is not None and \
                     (now - worker.watchdog_time) >= worker.watchdog_timeout:
-                _logger.error("Worker (%s) timeout", pid)
+                _logger.error("%s (%s) timeout after %ss",
+                              worker.__class__.__name__,
+                              pid,
+                              worker.watchdog_timeout)
                 self.worker_kill(pid, signal.SIGKILL)
 
     def process_spawn(self):
@@ -758,6 +765,7 @@ class WorkerCron(Worker):
         # The variable db_index is keeping track of the next database to
         # process.
         self.db_index = 0
+        self.watchdog_timeout = multi.cron_timeout  # Use a distinct value for CRON Worker
 
     def sleep(self):
         # Really sleep once all the databases have been processed.
@@ -912,12 +920,13 @@ def start(preload=None, stop=False):
         server = ThreadedServer(openerp.service.wsgi_server.application)
 
     watcher = None
-    if config['dev_mode']:
+    if 'reload' in config['dev_mode']:
         if watchdog:
             watcher = FSWatcher()
             watcher.start()
         else:
             _logger.warning("'watchdog' module not installed. Code autoreload feature is disabled")
+    if 'werkzeug' in config['dev_mode']:
         server.app = DebuggedApplication(server.app, evalex=True)
 
     rc = server.run(preload, stop)

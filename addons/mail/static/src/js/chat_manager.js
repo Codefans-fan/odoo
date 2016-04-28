@@ -12,6 +12,7 @@ var time = require('web.time');
 var web_client = require('web.web_client');
 
 var _t = core._t;
+var _lt = core._lt;
 var LIMIT = 100;
 var preview_msg_max_size = 350;  // optimal for native english speakers
 
@@ -31,6 +32,7 @@ var unread_conversation_counter = 0;
 var emojis = [];
 var emoji_substitutions = {};
 var needaction_counter = 0;
+var starred_counter = 0;
 var mention_partner_suggestions = [];
 var discuss_menu_id;
 var global_unread_counter = 0;
@@ -224,7 +226,9 @@ function add_channel (data, options) {
     } else {
         channel = chat_manager.make_channel(data, options);
         channels.push(channel);
-        channels = _.sortBy(channels, function (channel) { return channel.name.toLowerCase(); });
+        // In case of a static channel (Inbox, Starred), the name is translated thanks to _lt
+        // (lazy translate). In this case, channel.name is an object, not a string.
+        channels = _.sortBy(channels, function (channel) { return _.isString(channel.name) ? channel.name.toLowerCase() : '' });
         if (!options.silent) {
             chat_manager.bus.trigger("new_channel", channel);
         }
@@ -257,12 +261,10 @@ function make_channel (data, options) {
             messages: [],
         }},
     };
-    if (channel.type === "channel" && data.public !== "private") {
-        channel.type = "public";
-    } else if (data.public === "private") {
-        channel.type = "private";
+    if (channel.type === "channel") {
+        channel.type = data.public !== "private" ? "public" : "private";
     }
-    if ('direct_partner' in data) {
+    if (_.size(data.direct_partner) > 0) {
         channel.type = "dm";
         channel.name = data.direct_partner[0].name;
         channel.direct_partner_id = data.direct_partner[0].id;
@@ -498,14 +500,17 @@ function on_toggle_star_notification (data) {
             message.is_starred = data.starred;
             if (!message.is_starred) {
                 remove_message_from_channel("channel_starred", message);
+                starred_counter--;
             } else {
                 add_to_cache(message, []);
                 var channel_starred = chat_manager.get_channel('channel_starred');
                 channel_starred.cache = _.pick(channel_starred.cache, "[]");
+                starred_counter++;
             }
             chat_manager.bus.trigger('update_message', message);
         }
     });
+    chat_manager.bus.trigger('update_starred', starred_counter);
 }
 
 function on_mark_as_read_notification (data) {
@@ -682,9 +687,7 @@ var chat_manager = {
         }
     },
     toggle_star_status: function (message_id) {
-        var msg = _.findWhere(messages, { id: message_id });
-
-        return MessageModel.call('set_message_starred', [[message_id], !msg.is_starred]);
+        return MessageModel.call('toggle_message_starred', [[message_id]]);
     },
     unstar_all: function () {
         return MessageModel.call('unstar_all', [[]], {});
@@ -760,6 +763,9 @@ var chat_manager = {
 
     get_needaction_counter: function () {
         return needaction_counter;
+    },
+    get_starred_counter: function () {
+        return starred_counter;
     },
     get_chat_unread_counter: function () {
         return chat_unread_counter;
@@ -928,16 +934,28 @@ var chat_manager = {
     },
 
     search_partner: function (search_val, limit) {
-        return PartnerModel.call('im_search', [search_val, limit || 20], {}, {shadow: true}).then(function(result) {
-            var values = [];
-            _.each(result, function(user) {
-                var escaped_name = _.escape(user.name);
-                values.push(_.extend(user, {
-                    'value': escaped_name,
-                    'label': escaped_name,
-                }));
+        var def = $.Deferred();
+        var values = [];
+        // search among prefetched partners
+        var search_regexp = new RegExp(utils.unaccent(search_val), 'i');
+        _.each(mention_partner_suggestions, function (partners) {
+            if (values.length < limit) {
+                values = values.concat(_.filter(partners, function (partner) {
+                    return session.partner_id !== partner.id && search_regexp.test(partner.name);
+                })).splice(0, limit);
+            }
+        });
+        if (!values.length) {
+            // extend the research to all users
+            def = PartnerModel.call('im_search', [search_val, limit || 20], {}, {shadow: true});
+        } else {
+            def = $.when(values);
+        }
+        return def.then(function (values) {
+            var autocomplete_data = _.map(values, function (value) {
+                return { id: value.id, value: value.name, label: value.name };
             });
-            return values;
+            return _.sortBy(autocomplete_data, 'label');
         });
     },
 };
@@ -951,13 +969,13 @@ chat_manager.bus.on('client_action_open', null, function (open) {
 function init () {
     add_channel({
         id: "channel_inbox",
-        name: _t("Inbox"),
+        name: _lt("Inbox"),
         type: "static",
     }, { display_needactions: true });
 
     add_channel({
         id: "channel_starred",
-        name: _t("Starred"),
+        name: _lt("Starred"),
         type: "static"
     });
 
@@ -968,6 +986,7 @@ function init () {
             _.each(channels, add_channel);
         });
         needaction_counter = result.needaction_inbox_counter;
+        starred_counter = result.starred_counter;
         mention_partner_suggestions = result.mention_partner_suggestions;
         emojis = result.emoji;
         _.each(emojis, function(emoji) {

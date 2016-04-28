@@ -374,13 +374,6 @@ class MailThread(models.AbstractModel):
                 options = eval(node.get('options', '{}'))
                 is_employee = self.env.user.has_group('base.group_user')
                 options['display_log_button'] = is_employee
-                if is_employee:
-                    Subtype = self.env['mail.message.subtype'].sudo()
-                    # fetch internal subtypes
-                    internal_subtypes = Subtype.search_read([
-                        ('res_model', 'in', [False, self._name]),
-                        ('internal', '=', True)], ['name', 'description', 'sequence'])
-                    options['internal_subtypes'] = internal_subtypes
                 # emoji list
                 options['emoji_list'] = self.env['mail.shortcode'].search([('shortcode_type', '=', 'image')]).read(['source', 'description', 'substitution'])
                 # save options on the node
@@ -747,8 +740,11 @@ class MailThread(models.AbstractModel):
                     ('alias_parent_model_id.model', '=', model_name),
                     ('alias_parent_thread_id', 'in', res_ids),
                     ('alias_name', '!=', False)])
-                aliases.update(
-                    dict((alias.alias_parent_thread_id, '%s@%s' % (alias.alias_name, alias_domain)) for alias in mail_aliases))
+                # take only first found alias for each thread_id, to match
+                # order (1 found -> limit=1 for each res_id)
+                for alias in mail_aliases:
+                    if alias.alias_parent_thread_id not in aliases:
+                        aliases[alias.alias_parent_thread_id] = '%s@%s' % (alias.alias_name, alias_domain)
                 doc_names.update(
                     dict((ng_res[0], ng_res[1])
                          for ng_res in self.env[model_name].sudo().browse(aliases.keys()).name_get()))
@@ -839,15 +835,20 @@ class MailThread(models.AbstractModel):
         record_set = None
 
         def _create_bounce_email():
-            self.env['mail.mail'].create({
+            bounce_to = decode_header(message, 'Return-Path') or email_from
+            bounce_mail_values = {
                 'body_html': '<div><p>Hello,</p>'
                              '<p>The following email sent to %s cannot be accepted because this is '
                              'a private email address. Only allowed people can contact us at this address.</p></div>'
                              '<blockquote>%s</blockquote>' % (message.get('to'), message_dict.get('body')),
                 'subject': 'Re: %s' % message.get('subject'),
-                'email_to': message.get('from'),
+                'email_to': bounce_to,
                 'auto_delete': True,
-            }).send()
+            }
+            bounce_from = self.env['ir.mail_server']._get_default_bounce_address()
+            if bounce_from:
+                bounce_mail_values['email_from'] = 'MAILER-DAEMON <%s>' % bounce_from
+            self.env['mail.mail'].create(bounce_mail_values).send()
 
         def _warn(message):
             _logger.info('Routing mail with Message-Id %s: route %s: %s',
@@ -1671,7 +1672,7 @@ class MailThread(models.AbstractModel):
                     fname = cid_mapping.get(node.get('src').split('cid:')[1], node.get('data-filename', ''))
                     attachment = parameter_attachments.filtered(lambda attachment: attachment.name == fname)
                     if attachment:
-                        node.set('src', '/web/image/%s' % attachment.id)
+                        node.set('src', '/web/image/%s' % attachment.ids[0])
                         postprocessed = True
             if postprocessed:
                 body = lxml.html.tostring(root, pretty_print=False, encoding='UTF-8')
