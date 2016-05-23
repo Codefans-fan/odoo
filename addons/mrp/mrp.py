@@ -804,13 +804,7 @@ class mrp_production(osv.osv):
         return True
 
     def _compute_costs_from_production(self, cr, uid, ids, context=None):
-        """ Generate workcenter costs and rectify the value of the quant
-
-        Must be called at the end of the production.
-        The value of the quant was not possible to compute before the end of
-        the manufacturing order due to the cost of raw manterial and production
-        costs. The price of the quant was not set in get_price_unit.
-        """
+        """ Generate workcenter costs in analytic accounts"""
         for production in self.browse(cr, uid, ids):
             total_cost = self._costs_generate(cr, uid, production)
 
@@ -957,6 +951,16 @@ class mrp_production(osv.osv):
             total_cost += sum([x.inventory_value for x in consumed_move.quant_ids if x.qty > 0])
         return total_cost
 
+    def _calculate_workcenter_cost(self, cr, uid, production_id, context=None):
+        """ Compute the planned production cost from the workcenters """
+        production = self.browse(cr, uid, production_id, context=context)
+        total_cost = 0.0
+        for wc_line in production.workcenter_lines:
+            wc = wc_line.workcenter_id
+            total_cost += wc_line.hour*wc.costs_hour + wc_line.cycle*wc.costs_cycle
+
+        return total_cost
+
     def action_produce(self, cr, uid, production_id, production_qty, production_mode, wiz=False, context=None):
         """ To produce final product based on production mode (consume/consume&produce).
         If Production mode is consume, all stock move lines of raw materials will be done/consumed.
@@ -1012,17 +1016,24 @@ class mrp_production(osv.osv):
                     total_consume_moves.append(extra_move_id)
 
         if production_mode == 'consume_produce':
+            # add production lines that have already been consumed since the last 'consume & produce'
+            last_production_date = production.move_created_ids2 and max(production.move_created_ids2.mapped('date')) or False
+            already_consumed_lines = production.move_lines2.filtered(lambda l: l.date > last_production_date)
+            total_consume_moves += already_consumed_lines.ids
+
             price_unit = 0
             for produce_product in production.move_created_ids:
                 is_main_product = (produce_product.product_id.id == production.product_id.id) and production.product_id.cost_method=='real'
                 if is_main_product:
                     total_cost = self._calculate_total_cost(cr, uid, total_consume_moves, context=context)
-                    price_unit = total_cost / production_qty_uom
+                    production_cost = self._calculate_workcenter_cost(cr, uid, production_id, context=context)
+                    price_unit = (total_cost + production_cost) / production_qty_uom
+
                 lot_id = False
                 if wiz:
                     lot_id = wiz.lot_id.id
                 qty, remaining_qty = self._calculate_produce_line_qty(cr, uid, produce_product, production_qty_uom, context=context)
-                if is_main_product:
+                if is_main_product and price_unit:
                     stock_mov_obj.write(cr, uid, [produce_product.id], {'price_unit': price_unit}, context=context)
                 new_moves = stock_mov_obj.action_consume(cr, uid, [produce_product.id], qty,
                                                          location_id=produce_product.location_id.id, restrict_lot_id=lot_id, context=context)
@@ -1137,7 +1148,9 @@ class mrp_production(osv.osv):
             'group_id': procurement and procurement.group_id.id,
         }
         move_id = stock_move.create(cr, uid, data, context=context)
-        return stock_move.action_confirm(cr, uid, [move_id], context=context)[0]
+        # TDE FIXME: necessary return ?
+        stock_move.action_confirm(cr, uid, [move_id], context=context)
+        return move_id
 
     def _get_raw_material_procure_method(self, cr, uid, product, location_id=False, location_dest_id=False, context=None):
         '''This method returns the procure_method to use when creating the stock move for the production raw materials
@@ -1178,12 +1191,12 @@ class mrp_production(osv.osv):
         move = stock_move.browse(cr, uid, move_id, context=context)
         src_loc = loc_obj.browse(cr, uid, source_location_id, context=context)
         dest_loc = loc_obj.browse(cr, uid, dest_location_id, context=context)
-        code = stock_move.get_code_from_locs(cr, uid, move, src_loc, dest_loc, context=context)
+        code = stock_move.get_code_from_locs(cr, uid, [move.id], src_loc, dest_loc, context=context)
         if code == 'outgoing':
             check_loc = src_loc
         else:
             check_loc = dest_loc
-        wh = loc_obj.get_warehouse(cr, uid, check_loc, context=context)
+        wh = loc_obj.get_warehouse(cr, uid, [check_loc.id], context=context)
         domain = [('code', '=', code)]
         if wh: 
             domain += [('warehouse_id', '=', wh)]
@@ -1230,7 +1243,7 @@ class mrp_production(osv.osv):
             #this saves us a browse in create()
             'price_unit': product.standard_price,
             'origin': production.name,
-            'warehouse_id': loc_obj.get_warehouse(cr, uid, production.location_src_id, context=context),
+            'warehouse_id': loc_obj.get_warehouse(cr, uid, [production.location_src_id.id], context=context),
             'group_id': production.move_prod_id.group_id.id,
         }, context=context)
         

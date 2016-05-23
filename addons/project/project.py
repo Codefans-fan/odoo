@@ -129,9 +129,9 @@ class project(osv.osv):
 
     def _get_visibility_selection(self, cr, uid, context=None):
         """ Overriden in portal_project to offer more options """
-        return [('portal', _('Customer Project: visible in portal if the customer is a follower')),
-                ('employees', _('All Employees Project: all employees can access')),
-                ('followers', _('Private Project: followers only'))]
+        return [('portal', _('Customer project')),
+                ('employees', _('All employees')),
+                ('followers', _('Private: followers only'))]
 
     def attachment_tree_view(self, cr, uid, ids, context):
         task_ids = self.pool.get('project.task').search(cr, uid, [('project_id', 'in', ids)])
@@ -891,7 +891,7 @@ class account_analytic_account(osv.osv):
         'use_tasks': fields.boolean('Tasks', help="Check this box to manage internal activities through this project"),
         'company_uom_id': fields.related('company_id', 'project_time_mode_id', string="Company UOM", type='many2one', relation='product.uom'),
         'project_ids': fields.one2many('project.project', 'analytic_account_id', 'Projects'),
-        'project_count': fields.function(_compute_project_count, 'Project Count', type='integer')
+        'project_count': fields.function(_compute_project_count, string='Project Count', type='integer')
     }
 
     def on_change_template(self, cr, uid, ids, template_id, date_start=False, context=None):

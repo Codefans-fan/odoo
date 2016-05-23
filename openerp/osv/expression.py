@@ -5,7 +5,7 @@
 
 The main duty of this module is to compile a domain expression into a
 SQL query. A lot of things should be documented here, but as a first
-step in the right direction, some tests in test_osv_expression.yml
+step in the right direction, some tests in test_expression.py
 might give you some additional information.
 
 For legacy reasons, a domain uses an inconsistent two-levels abstract
@@ -1012,7 +1012,7 @@ class expression(object):
                     if right is not False:
                         if isinstance(right, basestring):
                             op = {'!=': '=', 'not like': 'like', 'not ilike': 'ilike'}.get(operator, operator)
-                            res_ids = [x[0] for x in comodel.name_search(cr, uid, right, [], op, context=context)]
+                            res_ids = [x[0] for x in comodel.name_search(cr, uid, right, [], op, context=context, limit=None)]
                             if res_ids:
                                 operator = 'not in' if operator in NEGATIVE_TERM_OPERATORS else 'in'
                         else:

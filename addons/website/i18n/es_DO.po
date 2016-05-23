@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: Odoo 9.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2015-10-09 09:18+0000\n"
-"PO-Revision-Date: 2016-04-12 05:04+0000\n"
+"PO-Revision-Date: 2016-05-09 21:41+0000\n"
 "Last-Translator: Juliano Henriquez <juliano@consultoriahenca.com>\n"
 "Language-Team: Spanish (Dominican Republic) (http://www.transifex.com/odoo/odoo-9/language/es_DO/)\n"
 "MIME-Version: 1.0\n"
@@ -40,7 +40,7 @@ msgstr ""
 #: code:addons/website/static/src/xml/website.gallery.xml:97
 #, python-format
 msgid "&times;"
-msgstr ""
+msgstr "&times;"
 
 #. module: website
 #: model:ir.ui.view,arch_db:website.show_website_info
@@ -2313,7 +2313,7 @@ msgstr ""
 #. module: website
 #: model:ir.ui.view,arch_db:website.snippet_options
 msgid "Landscape"
-msgstr ""
+msgstr "Horizontal"
 
 #. module: website
 #: model:ir.ui.view,arch_db:website.view_website_config_settings
@@ -2366,7 +2366,7 @@ msgstr "Última actualización en"
 #. module: website
 #: model:ir.ui.view,arch_db:website.website_planner
 msgid "Launch"
-msgstr ""
+msgstr "Iniciar"
 
 #. module: website
 #: model:ir.ui.view,arch_db:website.website_planner
@@ -4423,7 +4423,7 @@ msgstr "ir.attachment"
 #. module: website
 #: model:ir.model,name:website.model_ir_qweb
 msgid "ir.qweb"
-msgstr ""
+msgstr "ir.qweb"
 
 #. module: website
 #: model:ir.model,name:website.model_ir_ui_view

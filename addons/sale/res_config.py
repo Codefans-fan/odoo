@@ -41,6 +41,10 @@ class sale_configuration(osv.TransientModel):
             ], "Incoterms",
             implied_group='sale.group_display_incoterm',
             help="The printed reports will display the incoterms for the sale orders and the related invoices"),
+        'module_product_visible_discount': fields.selection([
+            (0, 'No discount policy on sale order line'),
+            (1, 'Allow discount policy on sale order line')
+            ], "Discount Policy"),
         'module_sale_margin': fields.selection([
             (0, 'Salespeople do not need to view margins when quoting'),
             (1, 'Display margins on quotations and sales orders')
@@ -49,10 +53,10 @@ class sale_configuration(osv.TransientModel):
             (0, 'Do not personalize sale orders and invoice reports'),
             (1, 'Personalize the sale orders and invoice report with categories, subtotals and page-breaks')
             ], "Sale Reports Layout", implied_group='sale.group_sale_layout'),
-        'group_warning': fields.selection([
+        'group_warning_sale': fields.selection([
             (0, 'All the products and the customers can be used in sale orders'),
             (1, 'An informative or blocking warning can be set on a product or a customer')
-            ], "Warning", implied_group='sale.group_warning'),
+            ], "Warning", implied_group='sale.group_warning_sale'),
         'module_website_quote': fields.selection([
             (0, 'Print quotes or send by email'),
             (1, 'Send online quotations based on templates (advanced)')
@@ -67,8 +71,7 @@ class sale_configuration(osv.TransientModel):
              'Advanced pricing based on formula: You can have all the rights on pricelist'),
         'default_invoice_policy': fields.selection([
             ('order', 'Invoice ordered quantities'),
-            ('delivery', 'Invoice delivered quantities'),
-            ('cost', 'Invoice based on costs (time and material, expenses)')
+            ('delivery', 'Invoice delivered quantities')
             ], 'Default Invoicing', default_model='product.template'),
         'deposit_product_id_setting': fields.many2one('product.product', 'Deposit Product',\
             domain="[('type', '=', 'service')]",\

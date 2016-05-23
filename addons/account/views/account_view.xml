@@ -281,7 +281,7 @@
                                     <group>
                                         <field name="code"/>
                                         <field name="refund_sequence" attrs="{'invisible': [('type', 'not in', ['sale', 'purchase'])]}" groups="base.group_no_one"/>
-                                        <field name="sequence_id" required="0" groups="base.group_no_one"/>
+                                        <field name="sequence_id" required="0" attrs="{'readonly': 1}" groups="base.group_no_one"/>
                                         <field name="refund_sequence_id" attrs="{'required': [('refund_sequence', '=', True)], 'invisible': ['|',('type', 'not in', ['sale', 'purchase']), ('refund_sequence', '!=', True)]}" required="0" groups="base.group_no_one"/>
                                     </group>
                                     <group>
@@ -994,6 +994,7 @@
                                 <group name="advanced_booleans">
                                     <field name="price_include" attrs="{'invisible':[('amount_type','=', 'group')]}" />
                                     <field name="include_base_amount" attrs="{'invisible':[('amount_type','=', 'group')]}" />
+                                    <field name="tax_adjustment"/>
                                 </group>
                             </group>
                         </page>
@@ -1078,6 +1079,7 @@
                                     </group>
                                     <group groups="analytic.group_analytic_accounting" string="Analytic">
                                         <field name="analytic_account_id"/>
+                                        <field name="analytic_tag_ids" widget="many2many_tags"/>
                                     </group>
                                 </group>
                                 <field name="narration" colspan="4" nolabel="1" placeholder="Add an internal note..."/>
@@ -1153,9 +1155,9 @@
                     <field name="reconciled"/>
                     <field name="debit" sum="Total Debit"/>
                     <field name="credit" sum="Total Credit"/>
+                    <field name="amount_currency" readonly="True" groups="base.group_multi_currency"/>
+                    <field name="currency_id" readonly="True" invisible="1" />
                     <field name="date_maturity"/>
-                    <field name="amount_currency" readonly="True" invisible="not context.get('currency',False)"/>
-                    <field name="currency_id" readonly="True" invisible="not context.get('currency',False)" />
                     <field name="company_currency_id" invisible="1"/>
                     <field name="company_id" invisible="1"/>
                 </tree>

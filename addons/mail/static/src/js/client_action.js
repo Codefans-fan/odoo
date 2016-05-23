@@ -105,7 +105,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
         "click .o_mail_partner_unpin": function (event) {
             event.stopPropagation();
             var channel_id = $(event.target).data("channel-id");
-            this.unsubscribe_from_channel(chat_manager.get_channel(channel_id));
+            chat_manager.unsubscribe(chat_manager.get_channel(channel_id));
         },
         "click .o_snackbar_undo": function (event) {
             event.preventDefault();
@@ -259,7 +259,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
                 chat_manager.bus.on('anyone_listening', self, function (channel, query) {
                     query.is_displayed = query.is_displayed || (channel.id === self.channel.id && self.thread.is_at_bottom());
                 });
-                chat_manager.bus.on('unsubscribe_from_channel', self, self.render_sidebar);
+                chat_manager.bus.on('unsubscribe_from_channel', self, self.on_channel_unsubscribed);
                 chat_manager.bus.on('update_needaction', self, self.throttled_render_sidebar);
                 chat_manager.bus.on('update_starred', self, self.throttled_render_sidebar);
                 chat_manager.bus.on('update_channel_unread_counter', self, self.throttled_render_sidebar);
@@ -287,12 +287,13 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
     },
 
     unselect_message: function() {
-        if (this.channel.type !== 'static' && !this.channel.mass_mailing) {
-            this.basic_composer.toggle(true);
-            this.basic_composer.focus();
+        this.basic_composer.toggle(this.channel.type !== 'static' && !this.channel.mass_mailing);
+        this.extended_composer.toggle(this.channel.type !== 'static' && this.channel.mass_mailing);
+        if (!config.device.touch) {
+            var composer = this.channel.mass_mailing ? this.extended_composer : this.basic_composer;
+            composer.focus();
         }
         this.$el.removeClass('o_mail_selection_mode');
-        this.extended_composer.toggle(this.channel.mass_mailing);
         this.thread.unselect();
         this.selected_message = null;
     },
@@ -330,6 +331,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             focus: function(event) {
                 event.preventDefault();
             },
+            html: true,
         });
 
         this.$('.o_mail_add_channel[data-type=dm]').find("input").autocomplete({
@@ -435,10 +437,6 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
                 .find('.o_mail_chat_button_unstar_all')
                 .toggle(channel.id === "channel_starred");
 
-            self.basic_composer.toggle(channel.type !== 'static' && !channel.mass_mailing);
-            self.extended_composer.toggle(channel.type !== 'static' && channel.mass_mailing);
-            self.$el.removeClass('o_mail_selection_mode');
-
             self.$('.o_mail_chat_channel_item')
                 .removeClass('o_active')
                 .filter('[data-channel-id=' + channel.id + ']')
@@ -454,33 +452,19 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
 
             // Update control panel before focusing the composer, otherwise focus is on the searchview
             self.update_cp();
-            if (!config.device.touch) {
-                var composer = channel.mass_mailing ? self.extended_composer : self.basic_composer;
-                composer.focus();
-            }
             if (config.device.size_class === config.device.SIZES.XS) {
                 self.$('.o_mail_chat_sidebar').hide();
             }
+
+            // Display and focus the adequate composer, and unselect possibly selected message
+            // to prevent sending messages as reply to that message
+            self.unselect_message();
 
             self.action_manager.do_push_state({
                 action: self.action.id,
                 active_id: self.channel.id,
             });
         });
-    },
-    unsubscribe_from_channel: function (channel) {
-        var self = this;
-        chat_manager
-            .unsubscribe(channel)
-            .then(this.render_sidebar.bind(this))
-            .then(this.set_channel.bind(this, chat_manager.get_channel("channel_inbox")))
-            .then(function () {
-                if (_.contains(['public', 'private'], channel.type)) {
-                    var msg = _.str.sprintf(_t('You unsubscribed from <b>%s</b>.'), channel.name);
-                    self.do_notify(_t("Unsubscribed"), msg);
-                }
-                delete self.channels_scrolltop[channel.id];
-            });
     },
 
     get_thread_rendering_options: function (messages) {
@@ -641,10 +625,19 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
             this.set_channel(channel);
         }
     },
+    on_channel_unsubscribed: function (channel_id) {
+        if (this.channel.id === channel_id) {
+            this.set_channel(chat_manager.get_channel("channel_inbox"));
+        }
+        this.render_sidebar();
+        delete this.channels_scrolltop[channel_id];
+    },
     on_composer_input_focused: function () {
-        var suggestions = chat_manager.get_mention_partner_suggestions(this.channel);
         var composer = this.channel.mass_mailing ? this.extended_composer : this.basic_composer;
-        composer.mention_set_prefetched_partners(suggestions);
+        var commands = chat_manager.get_commands(this.channel);
+        var partners = chat_manager.get_mention_partner_suggestions(this.channel);
+        composer.mention_set_enabled_commands(commands);
+        composer.mention_set_prefetched_partners(partners);
     },
 
     on_click_button_invite: function () {
@@ -653,7 +646,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
     },
 
     on_click_button_unsubscribe: function () {
-        this.unsubscribe_from_channel(this.channel);
+        chat_manager.unsubscribe(this.channel);
     },
     on_click_button_settings: function() {
         this.do_action({

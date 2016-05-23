@@ -104,6 +104,7 @@ class product_uom(osv.osv):
         ('factor_gt_zero', 'CHECK (factor!=0)', 'The conversion ratio for a unit of measure cannot be 0!')
     ]
 
+    @api.cr_uid
     def _compute_qty(self, cr, uid, from_uom_id, qty, to_uom_id=False, round=True, rounding_method='UP'):
         if not from_uom_id or not qty or not to_uom_id:
             return qty
@@ -261,7 +262,7 @@ class produce_price_history(osv.osv):
 class product_attribute(osv.osv):
     _name = "product.attribute"
     _description = "Product Attribute"
-    _order = 'sequence,id'
+    _order = 'sequence, name'
     _columns = {
         'name': fields.char('Name', translate=True, required=True),
         'value_ids': fields.one2many('product.attribute.value', 'attribute_id', 'Values', copy=True),

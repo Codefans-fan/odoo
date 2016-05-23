@@ -228,13 +228,13 @@ class SaleOrderLine(models.Model):
         if wh_mto_route and wh_mto_route <= product_routes:
             is_available = True
         else:
-            mto_route_id = False
+            mto_route = False
             try:
-                mto_route_id = self.env['stock.warehouse']._get_mto_route()
+                mto_route = self.env['stock.warehouse']._get_mto_route()
             except UserError:
                 # if route MTO not found in ir_model_data, we treat the product as in MTS
                 pass
-            if mto_route_id and mto_route_id in product_routes.ids:
+            if mto_route and mto_route in product_routes:
                 is_available = True
 
         # Check Drop-Shipping
@@ -265,9 +265,8 @@ class AccountInvoice(models.Model):
 class ProcurementOrder(models.Model):
     _inherit = "procurement.order"
 
-    @api.model
-    def _run_move_create(self, procurement):
-        vals = super(ProcurementOrder, self)._run_move_create(procurement)
+    def _run_move_create(self):
+        vals = super(ProcurementOrder, self)._run_move_create()
         if self.sale_line_id:
             vals.update({'sequence': self.sale_line_id.sequence})
         return vals
@@ -286,7 +285,7 @@ class StockMove(models.Model):
         # Update delivered quantities on sale order lines
         todo = self.env['sale.order.line']
         for move in self:
-            if (move.procurement_id.sale_line_id) and (move.product_id.invoice_policy in ('order', 'delivery')):
+            if (move.procurement_id.sale_line_id) and (move.product_id.expense_policy=='no'):
                 todo |= move.procurement_id.sale_line_id
         for line in todo:
             line.qty_delivered = line._get_delivered_qty()
@@ -351,26 +350,30 @@ class AccountInvoiceLine(models.Model):
                 # Go through all the moves and do nothing until you get to qty_done
                 # Beyond qty_done we need to calculate the average of the price_unit
                 # on the moves we encounter.
-                average_price_unit = 0
-                qty_delivered = 0
-                invoiced_qty = 0
-                for move in moves:
-                    if move.state != 'done':
-                        continue
-                    invoiced_qty += move.product_qty
-                    if invoiced_qty <= qty_done:
-                        continue
-                    qty_to_consider = move.product_qty
-                    if invoiced_qty - move.product_qty < qty_done:
-                        qty_to_consider = invoiced_qty - qty_done
-                    qty_to_consider = min(qty_to_consider, quantity - qty_delivered)
-                    qty_delivered += qty_to_consider
-                    average_price_unit = (average_price_unit * (qty_delivered - qty_to_consider) + move.price_unit * qty_to_consider) / qty_delivered
-                    if qty_delivered == quantity:
-                        break
+                average_price_unit = self._compute_average_price(qty_done, quantity, moves)
                 price_unit = average_price_unit or price_unit
                 price_unit = uom_obj._compute_qty_obj(self.uom_id, price_unit, self.product_id.uom_id, round=False)
         return price_unit
+
+    def _compute_average_price(self, qty_done, quantity, moves):
+        average_price_unit = 0
+        qty_delivered = 0
+        invoiced_qty = 0
+        for move in moves:
+            if move.state != 'done':
+                continue
+            invoiced_qty += move.product_qty
+            if invoiced_qty <= qty_done:
+                continue
+            qty_to_consider = move.product_qty
+            if invoiced_qty - move.product_qty < qty_done:
+                qty_to_consider = invoiced_qty - qty_done
+            qty_to_consider = min(qty_to_consider, quantity - qty_delivered)
+            qty_delivered += qty_to_consider
+            average_price_unit = (average_price_unit * (qty_delivered - qty_to_consider) + move.price_unit * qty_to_consider) / qty_delivered
+            if qty_delivered == quantity:
+                break
+        return average_price_unit
 
 
 class ProductProduct(models.Model):

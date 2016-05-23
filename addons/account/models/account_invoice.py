@@ -630,6 +630,7 @@ class AccountInvoice(models.Model):
                 for child in tax.children_tax_ids:
                     if child.type_tax_use != 'none':
                         tax_ids.append((4, child.id, None))
+            analytic_tag_ids = [(4, analytic_tag.id, None) for analytic_tag in line.analytic_tag_ids]
 
             move_line_dict = {
                 'invl_id': line.id,
@@ -644,6 +645,7 @@ class AccountInvoice(models.Model):
                 'account_analytic_id': line.account_analytic_id.id,
                 'tax_ids': tax_ids,
                 'invoice_id': self.id,
+                'analytic_tag_ids': analytic_tag_ids
             }
             if line['account_analytic_id']:
                 move_line_dict['analytic_line_ids'] = [(0, 0, line._get_analytic_line())]
@@ -679,6 +681,7 @@ class AccountInvoice(models.Model):
             invoice_line.get('product_id', 'False'),
             invoice_line.get('analytic_account_id', 'False'),
             invoice_line.get('date_maturity', 'False'),
+            invoice_line.get('analytic_tag_ids', 'False'),
         )
 
     def group_lines(self, iml, line):
@@ -827,6 +830,7 @@ class AccountInvoice(models.Model):
             'invoice_id': line.get('invoice_id', False),
             'tax_ids': line.get('tax_ids', False),
             'tax_line_id': line.get('tax_line_id', False),
+            'analytic_tag_ids': line.get('analytic_tag_ids', False),
         }
 
     @api.multi
@@ -1104,6 +1108,7 @@ class AccountInvoiceLine(models.Model):
         string='Taxes', domain=[('type_tax_use','!=','none')], oldname='invoice_line_tax_id')
     account_analytic_id = fields.Many2one('account.analytic.account',
         string='Analytic Account')
+    analytic_tag_ids = fields.Many2many('account.analytic.tag', string='Analytic Tags')
     company_id = fields.Many2one('res.company', string='Company',
         related='invoice_id.company_id', store=True, readonly=True)
     partner_id = fields.Many2one('res.partner', string='Partner',
@@ -1222,7 +1227,6 @@ class AccountInvoiceLine(models.Model):
     def _onchange_uom_id(self):
         warning = {}
         result = {}
-        self._onchange_product_id()
         if not self.uom_id:
             self.price_unit = 0.0
         if self.product_id and self.uom_id:
@@ -1252,6 +1256,14 @@ class AccountInvoiceTax(models.Model):
     _description = "Invoice Tax"
     _order = 'sequence'
 
+    def _compute_base_amount(self):
+        for tax in self:
+            base = 0.0
+            for line in tax.invoice_id.invoice_line_ids:
+                if tax.tax_id in line.invoice_line_tax_ids:
+                    base += line.price_subtotal
+            tax.base = base
+
     invoice_id = fields.Many2one('account.invoice', string='Invoice', ondelete='cascade', index=True)
     name = fields.Char(string='Tax Description', required=True)
     tax_id = fields.Many2one('account.tax', string='Tax')
@@ -1262,6 +1274,9 @@ class AccountInvoiceTax(models.Model):
     sequence = fields.Integer(help="Gives the sequence order when displaying a list of invoice tax.")
     company_id = fields.Many2one('res.company', string='Company', related='account_id.company_id', store=True, readonly=True)
     currency_id = fields.Many2one('res.currency', related='invoice_id.currency_id', store=True, readonly=True)
+    base = fields.Monetary(string='Base', compute='_compute_base_amount')
+
+
 
 
 class AccountPaymentTerm(models.Model):

@@ -93,6 +93,7 @@
                     <field name="manual"/>
                     <field name="name"/>
                     <field name="account_id" groups="base.group_account_user"/>
+                    <field name="base"/>
                     <field name="amount"/>
                     <field name="currency_id" invisible="1"/>
                 </tree>
@@ -111,6 +112,7 @@
                         <field name="account_analytic_id" domain="[('company_id', '=', parent.company_id)]" groups="analytic.group_analytic_accounting"/>
                         <field name="manual"/>
                         <field name="amount"/>
+                        <field name="base"/>
                         <field name="currency_id" invisible="1"/>
                     </group>
                 </form>
@@ -266,6 +268,7 @@
                                         domain="[('company_id', '=', parent.company_id), ('internal_type', '=', 'other')]"/>
                                     <field name="account_analytic_id" groups="analytic.group_analytic_accounting"
                                         domain="[('company_id', '=', parent.company_id)]"/>
+                                    <field name="analytic_tag_ids" groups="analytic.group_analytic_accounting" widget="many2many_tags"/>
                                     <field name="quantity"/>
                                     <field name="uom_id" groups="product.group_uom"/>
                                     <field name="price_unit"/>
@@ -404,6 +407,7 @@
                                         domain="[('company_id', '=', parent.company_id), ('internal_type', '=', 'other')]"/>
                                     <field name="account_analytic_id" groups="analytic.group_analytic_accounting"
                                         domain="[('company_id', '=', parent.company_id)]"/>
+                                    <field name="analytic_tag_ids" groups="analytic.group_analytic_accounting" widget="many2many_tags"/>
                                     <field name="quantity"/>
                                     <field name="uom_id" groups="product.group_uom"/>
                                     <field name="price_unit"/>
