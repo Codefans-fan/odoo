@@ -28,6 +28,17 @@ from pyPdf import PdfFileWriter, PdfFileReader
 from reportlab.graphics.barcode import createBarcodeDrawing
 
 
+# A lock occurs when the user wants to print a report having multiple barcode while the server is
+# started in threaded-mode. The reason is that reportlab has to build a cache of the T1 fonts
+# before rendering a barcode (done in a C extension) and this part is not thread safe. We attempt
+# here to init the T1 fonts cache at the start-up of Odoo so that rendering of barcode in multiple
+# thread does not lock the server.
+try:
+    createBarcodeDrawing('Code128', value='foo', format='png', width=100, height=100, humanReadable=1).asString('png')
+except Exception:
+    pass
+
+
 #--------------------------------------------------------------------------
 # Helpers
 #--------------------------------------------------------------------------
@@ -50,7 +61,7 @@ except (OSError, IOError):
 else:
     _logger.info('Will use the Wkhtmltopdf binary at %s' % _get_wkhtmltopdf_bin())
     out, err = process.communicate()
-    version = re.search('([0-9.]+)', out).group(0)
+    version = re.search('([0-9.]+)', out or "0").group(0)
     if LooseVersion(version) < LooseVersion('0.12.0'):
         _logger.info('Upgrade Wkhtmltopdf to (at least) 0.12.0')
         wkhtmltopdf_state = 'upgrade'
@@ -128,7 +139,7 @@ class Report(osv.Model):
                 'doc_model': report.model,
                 'docs': docs,
             }
-            return self.render(cr, uid, [], report.report_name, docargs, context=context)
+            return self.render(cr, uid, [], report.report_name, docargs, context=context).encode('utf-8')
 
     @api.v8
     def get_html(self, records, report_name, data=None):
@@ -162,8 +173,6 @@ class Report(osv.Model):
         # the html version.
         if isinstance(cr, TestCursor):
             return html
-
-        html = html.decode('utf-8')  # Ensure the current document is utf-8 encoded.
 
         # Get the ir.actions.report.xml record we are working on.
         report = self._get_report_from_name(cr, uid, report_name)
@@ -296,19 +305,20 @@ class Report(osv.Model):
         save_in_attachment['loaded_documents'] = {}
 
         if report.attachment:
+            records = self.pool[report.model].browse(cr, uid, ids)
+            filenames = self._attachment_filename(cr, uid, records, report)
+            attachments = None
+            if report.attachment_use:
+                attachments = self._attachment_stored(cr, uid, records, report, filenames=filenames)
             for record_id in ids:
-                obj = self.pool[report.model].browse(cr, uid, record_id)
-                filename = eval(report.attachment, {'object': obj, 'time': time})
+                filename = filenames[record_id]
 
                 # If the user has checked 'Reload from Attachment'
-                if report.attachment_use:
-                    alreadyindb = [('datas_fname', '=', filename),
-                                   ('res_model', '=', report.model),
-                                   ('res_id', '=', record_id)]
-                    attach_ids = self.pool['ir.attachment'].search(cr, uid, alreadyindb)
-                    if attach_ids:
+                if attachments:
+                    attachment = attachments[record_id]
+                    if attachment:
                         # Add the loaded pdf in the loaded_documents list
-                        pdf = self.pool['ir.attachment'].browse(cr, uid, attach_ids[0]).datas
+                        pdf = attachment.datas
                         pdf = base64.decodestring(pdf)
                         save_in_attachment['loaded_documents'][record_id] = pdf
                         _logger.info('The PDF document %s was loaded from the database' % filename)
@@ -329,6 +339,20 @@ class Report(osv.Model):
     def _check_attachment_use(self, records, report):
         return Report._check_attachment_use(
             self._model, self._cr, self._uid, records.ids, report, context=self._context)
+
+    @api.model
+    def _attachment_filename(self, records, report):
+        return dict((record.id, eval(report.attachment, {'object': record, 'time': time})) for record in records)
+
+    @api.model
+    def _attachment_stored(self, records, report, filenames=None):
+        if not filenames:
+            filenames = self._attachment_filename(records, report)
+        return dict((record.id, self.env['ir.attachment'].search([
+            ('datas_fname', '=', filenames[record.id]),
+            ('res_model', '=', report.model),
+            ('res_id', '=', record.id)
+        ], limit=1)) for record in records)
 
     def _check_wkhtmltopdf(self):
         return wkhtmltopdf_state

@@ -158,8 +158,13 @@ class crm_lead(FormatAddress, osv.osv):
             for opp_id in ids
         }
 
+    def _get_company_currency(self, cr, uid, context=None):
+        if context is None:
+            context = {}
+        return self.pool['res.users'].browse(cr, uid, uid, context=context).company_id.currency_id.id
+
     _columns = {
-        'partner_id': fields.many2one('res.partner', 'Partner', ondelete='set null', track_visibility='onchange',
+        'partner_id': fields.many2one('res.partner', 'Customer', ondelete='set null', track_visibility='onchange',
             select=True, help="Linked partner (optional). Usually created when converting the lead."),
 
         'id': fields.integer('ID', readonly=True),
@@ -241,6 +246,7 @@ class crm_lead(FormatAddress, osv.osv):
     _defaults = {
         'active': 1,
         'type': lambda s, cr, uid, c: 'lead' if s.pool['res.users'].has_group(cr, uid, 'crm.group_use_lead') else 'opportunity',
+        'company_currency': _get_company_currency,
         'user_id': lambda s, cr, uid, c: uid,
         'stage_id': lambda s, cr, uid, c: s._get_default_stage_id(cr, uid, c),
         'team_id': lambda s, cr, uid, c: s.pool['crm.team']._get_default_team_id(cr, SUPERUSER_ID, context=c, user_id=uid),
@@ -458,11 +464,11 @@ class crm_lead(FormatAddress, osv.osv):
                 value = dict(key).get(lead[field_name], lead[field_name])
             elif field.type == 'many2one':
                 if lead[field_name]:
-                    value = lead[field_name].name_get()[0][1]
+                    value = lead[field_name].sudo().name_get()[0][1]
             elif field.type == 'many2many':
                 if lead[field_name]:
                     for val in lead[field_name]:
-                        field_value = val.name_get()[0][1]
+                        field_value = val.sudo().name_get()[0][1]
                         value += field_value + ","
             else:
                 value = lead[field_name]
@@ -833,7 +839,7 @@ class crm_lead(FormatAddress, osv.osv):
             vals.update(onchange_stage_values)
         if vals.get('probability') >= 100 or not vals.get('active', True):
             vals['date_closed'] = fields.datetime.now()
-        elif vals.get('probability') < 100:
+        elif 'probability' in vals and vals['probability'] < 100:
             vals['date_closed'] = False
         return super(crm_lead, self).write(cr, uid, ids, vals, context=context)
 
@@ -889,7 +895,7 @@ Update your business card, phone book, social media,... Send an email right now 
     def _notification_group_recipients(self, cr, uid, ids, message, recipients, done_ids, group_data, context=None):
         """ Override the mail.thread method to handle salesman recipients.
         Indeed those will have specific action in their notification emails. """
-        group_sale_salesman = self.pool['ir.model.data'].xmlid_to_res_id(cr, uid, 'base.group_sale_salesman')
+        group_sale_salesman = self.pool['ir.model.data'].xmlid_to_res_id(cr, uid, 'sales_team.group_sale_salesman')
         for recipient in recipients:
             if recipient.id in done_ids:
                 continue
@@ -901,11 +907,12 @@ Update your business card, phone book, social media,... Send an email right now 
     def _notification_get_recipient_groups(self, cr, uid, ids, message, recipients, context=None):
         res = super(crm_lead, self)._notification_get_recipient_groups(cr, uid, ids, message, recipients, context=context)
 
+        lead = self.browse(cr, uid, ids[0], context=context)
+
         won_action = self._notification_link_helper(cr, uid, ids, 'method', context=context, method='case_mark_won')
         lost_action = self._notification_link_helper(cr, uid, ids, 'method', context=context, method='case_mark_lost')
-        convert_action = self._notification_link_helper(cr, uid, ids, 'method', context=context, method='convert_opportunity')
+        convert_action = self._notification_link_helper(cr, uid, ids, 'method', context=context, method='convert_opportunity', partner_id=lead.partner_id.id)
 
-        lead = self.browse(cr, uid, ids[0], context=context)
         if lead.type == 'lead':
             res['group_sale_salesman'] = {
                 'actions': [{'url': convert_action, 'title': 'Convert to opportunity'}]
@@ -1160,6 +1167,8 @@ Update your business card, phone book, social media,... Send an email right now 
         else:
             raise UserError(_('This target does not exist.'))
 
+    def close_dialog(self, cr, uid, ids, context=None):
+        return {'type': 'ir.actions.act_window_close'}
 
 class crm_lead_tag(osv.Model):
     _name = "crm.lead.tag"

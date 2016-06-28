@@ -15,13 +15,13 @@
         <link rel="stylesheet" type="text/css" href="/web/static/lib/jquery.ui/jquery-ui.css"/>
 
         <link rel="stylesheet" type="text/css" href="/web/static/lib/fontawesome/css/font-awesome.css"/>
-        <link rel="stylesheet" type="text/css" href="/web/static/src/fonts/lato/stylesheet.css" />
+        <link rel="stylesheet" type="text/less" href="/web/static/src/less/fonts.less"/>
 
         <link rel="stylesheet" type="text/less" href="/web/static/src/less/navbar.less"/>
 
         <link rel="stylesheet" type="text/less" href="/web/static/src/less/mimetypes.less"/>
         <link rel="stylesheet" type="text/less" href="/web/static/src/less/animation.less"/>
-        
+
         <link rel="stylesheet" type="text/less" href="/web/static/lib/bootstrap-datetimepicker/src/less/bootstrap-datetimepicker.less"/>
         <link rel="stylesheet" type="text/css" href="/web/static/lib/select2/select2.css"/>
         <link rel="stylesheet" type="text/css" href="/web/static/lib/select2-bootstrap-css/select2-bootstrap.css"/>
@@ -55,6 +55,7 @@
 
         <script type="text/javascript" src="/web/static/lib/qweb/qweb2.js"></script>
         <script type="text/javascript" src="/web/static/src/js/boot.js"></script>
+        <script type="text/javascript" src="/web/static/src/js/config.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/class.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/translation.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/ajax.js"></script>
@@ -64,9 +65,13 @@
         <script type="text/javascript" src="/web/static/src/js/framework/registry.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/session.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/model.js"></script>
+        <script type="text/javascript" src="/web/static/src/js/framework/dom_utils.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/utils.js"></script>
-        <script type="text/javascript" src="/web/static/src/js/framework/core.js"></script>
+        <script type="text/javascript" src="/web/static/src/js/framework/qweb.js"></script>
+        <script type="text/javascript" src="/web/static/src/js/framework/bus.js"></script>
+        <script type="text/javascript" src="/web/static/src/js/services/core.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/dialog.js"></script>
+        <script type="text/javascript" src="/web/static/src/js/framework/local_storage.js"></script>
         <script type="text/javascript" src="/web/static/src/js/tour.js"></script>
         <script type="text/javascript" src="/web/static/test/x2many.js"></script>
 
@@ -87,7 +92,6 @@
         <link rel="stylesheet" type="text/less" href="/web/static/src/less/webclient_layout.less"/>
 
         <link rel="stylesheet" type="text/less" href="/web/static/src/less/webclient.less"/>
-        <link rel="stylesheet" type="text/less" href="/web/static/src/less/fonts.less"/>
         <link rel="stylesheet" type="text/less" href="/web/static/src/less/datepicker.less"/>
         <link rel="stylesheet" type="text/less" href="/web/static/src/less/progress_bar.less"/>
         <link rel="stylesheet" type="text/less" href="/web/static/src/less/dropdown.less"/>
@@ -139,10 +143,11 @@
         <script type="text/javascript" src="/web/static/src/js/framework/data.js"></script>
         <script type="text/javascript" src="/web/static/src/js/compatibility.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/misc.js"></script>
-        <script type="text/javascript" src="/web/static/src/js/framework/session_instance.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/crash_manager.js"></script>
         <script type="text/javascript" src="/web/static/src/js/framework/data_manager.js"></script>
+        <script type="text/javascript" src="/web/static/src/js/services/crash_manager.js"></script>
         <script type="text/javascript" src="/web/static/src/js/services/data_manager.js"></script>
+        <script type="text/javascript" src="/web/static/src/js/services/session.js"></script>
         <script type="text/javascript" src="/web/static/src/js/widgets/auto_complete.js"></script>
         <script type="text/javascript" src="/web/static/src/js/widgets/change_password.js"></script>
         <script type="text/javascript" src="/web/static/src/js/widgets/debug_manager.js"></script>
@@ -181,7 +186,7 @@
         <t t-call="web.less_helpers"/>
 
         <link rel="stylesheet" type="text/less" href="/web/static/src/less/import_bootstrap.less"/>
-        <script type="text/javascript" src="/web/static/src/js/framework/session_instance.js"></script>
+        <script type="text/javascript" src="/web/static/src/js/services/session.js"></script>
     </template>
 
     <template id="web.layout" name="Web layout">&lt;!DOCTYPE html&gt;
@@ -242,7 +247,7 @@
 
                 <div class="form-group field-login">
                     <label for="login" class="control-label">Email</label>
-                    <input type="text" name="login" t-att-value="login" id="login" class="form-control" required="required" autofocus="autofocus"/>
+                    <input type="text" name="login" t-att-value="login" id="login" class="form-control" required="required" autofocus="autofocus" autocapitalize="off"/>
                 </div>
 
                 <div class="form-group field-password">
@@ -288,7 +293,7 @@
             <t t-foreach="menu_data['children']" t-as="menu">
                 <div style="display: none" class="oe_secondary_menu" t-att-data-menu-parent="menu['id']">
                     <t t-foreach="menu['children']" t-as="menu">
-                        <div class="oe_secondary_menu_section">
+                        <div class="oe_secondary_menu_section" t-att-data-menu-xmlid="menu.get('xmlid')">
                             <t t-if="menu['children']"><t t-esc="menu['name']"/></t>
                             <t t-if="not menu['children']"><t t-call="web.menu_link"/></t>
                         </div>
@@ -314,8 +319,9 @@
         <a t-att-href="'/web%s#menu_id=%s&amp;action=%s' % (debug_param, menu['id'], menu['action'] and menu['action'].split(',')[1] or '')"
             t-att-class="'oe_menu_toggler' if menu.get('children') else 'oe_menu_leaf'"
             t-att-data-menu="menu['id']"
-            t-att-data-action-model="menu['action'] and menu['action'].split(',')[0] or ''"
-            t-att-data-action-id="menu['action'] and menu['action'].split(',')[1] or ''">
+            t-att-data-menu-xmlid="menu.get('xmlid')"
+            t-att-data-action-model="menu['action'] and menu['action'].split(',')[0] or None"
+            t-att-data-action-id="menu['action'] and menu['action'].split(',')[1] or None">
             <span class="oe_menu_text">
                 <t t-esc="menu['name']"/>
             </span>
@@ -385,18 +391,16 @@
                 <title>Odoo</title>
 
                 <link rel="shortcut icon" href="/web/static/src/img/favicon.ico" type="image/x-icon"/>
+                <script type="text/javascript">
+                    var odoo = {
+                        session_info: <t t-raw="session_info"/>,
+                        csrf_token: "<t t-esc="request.csrf_token(None)"/>",
+                    };
+                </script>
 
                 <t t-call-assets="web.assets_common" t-js="false"/>
                 <t t-call-assets="web.assets_backend" t-js="false"/>
                 <t t-call-assets="web.assets_common" t-css="false"/>
-                <script type="text/javascript">
-                    odoo.define('web.csrf', function (require) {
-                        var token = "<t t-esc="request.csrf_token(None)"/>";
-                        require('web.core').csrf_token = token;
-                        require('qweb').default_dict.csrf_token = token;
-                    });
-                    odoo.db_info = <t t-raw="db_info"/>;
-                </script>
                 <t t-call-assets="web.assets_backend" t-css="false"/>
 
                 <![CDATA[

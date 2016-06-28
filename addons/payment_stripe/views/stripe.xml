@@ -4,6 +4,8 @@
         <template id="stripe_acquirer_button">
             <form t-if="acquirer" method="post" target="_self">
                 <script src="https://checkout.stripe.com/checkout.js"></script>
+                <input type='hidden' name='stripe_image' t-att-value="acquirer.stripe_image_url"/>
+                <input type='hidden' name='merchant' t-att-value='acquirer.company_id.name'/>
                 <input type='hidden' name='amount' t-att-value="amount"/>
                 <input type="hidden" name='return_url' t-att-value='returndata'/>
                 <!--Order Information -->
@@ -30,7 +32,7 @@
 
         <template id="stripe_s2s_form">
             <form method="post" t-att-action="'/payment/stripe/s2s/create' if not json else '/payment/stripe/s2s/create_json'">
-                <div t-att-class="'row' if bootstrap_formatting else ''">
+                <div t-att-class="'row' if bootstrap_formatting else None">
                     <div t-att-class="'form-group col-md-8' if bootstrap_formatting else 'form-group'">
                         <label class="control-label" for="cc_number">Card Number</label>
                         <input type="tel" name="cc_number" id="cc_number" class="form-control" placeholder="&#8226;&#8226;&#8226;&#8226;&#32;&#8226;&#8226;&#8226;&#8226;&#32;&#8226;&#8226;&#8226;&#8226;&#32;&#8226;&#8226;&#8226;&#8226;&#32;"/>

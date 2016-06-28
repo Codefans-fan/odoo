@@ -111,16 +111,21 @@ class WebsiteSale(http.Controller):
         """
         # product attributes with at least two choices
         visible_attrs_ids = product.mapped('attribute_line_ids.attribute_id').filtered(lambda attr: len(attr.value_ids) > 1).ids
-        to_currency = request.website.get_current_pricelist().currency_id
+        pl = request.website.get_current_pricelist()
+        to_currency = pl.currency_id
         attribute_value_ids = []
         for variant in product.product_variant_ids:
             if to_currency != product.currency_id:
-                price = variant.currency_id.compute(variant.lst_price, to_currency)
+                price = variant.currency_id.compute(variant.display_price(pl, public=True), to_currency)
             else:
-                price = variant.lst_price
+                price = variant.display_price(pl, public=True)
             visible_attribute_ids = [v.id for v in variant.attribute_value_ids if v.attribute_id.id in visible_attrs_ids]
-            attribute_value_ids.append([variant.id, visible_attribute_ids, variant.price, price])
+            attribute_value_ids.append([variant.id, visible_attribute_ids, variant.display_price(pl), price])
         return attribute_value_ids
+
+    def _get_search_order(self, post):
+        # OrderBy will be parsed in orm and so no direct sql injection
+        return 'website_published desc,%s' % post.get('order', 'website_sequence desc')
 
     @http.route(['/shop/change_pricelist/<model("product.pricelist"):pl_id>'], type='http', auth="public", website=True)
     def pricelist_change(self, pl_id, **post):
@@ -211,7 +216,7 @@ class WebsiteSale(http.Controller):
 
         product_count = Product.search_count(domain)
         pager = request.website.pager(url=url, total=product_count, page=page, step=ppg, scope=7, url_args=post)
-        products = Product.with_context(pricelist_context).search(domain, limit=ppg, offset=pager['offset'], order='website_published desc, website_sequence desc')
+        products = Product.with_context(pricelist_context).search(domain, limit=ppg, offset=pager['offset'], order=self._get_search_order(post))
 
         ProductAttribute = request.env['product.attribute']
         if products:
@@ -611,7 +616,6 @@ class WebsiteSale(http.Controller):
 
     @http.route(['/shop/confirm_order'], type='http', auth="public", website=True)
     def confirm_order(self, **post):
-
         order = request.website.sale_get_order()
         if not order:
             return request.redirect("/shop")
@@ -774,10 +778,6 @@ class WebsiteSale(http.Controller):
             'payment_acquirer_id': acquirer_id,
             'payment_tx_id': request.session['sale_transaction_id']
         })
-
-        # confirm the quotation
-        if tx.acquirer_id.auto_confirm == 'at_pay_now':
-            order.with_context(send_email=True).action_confirm()
 
         return tx.acquirer_id.with_context(submit_class='btn btn-primary', submit_txt=_('Pay Now')).sudo().render(
             tx.reference,
@@ -977,9 +977,6 @@ class WebsiteSale(http.Controller):
         return ret
 
     @http.route(['/shop/get_unit_price'], type='json', auth="public", methods=['POST'], website=True)
-    def get_unit_price(self, product_ids, add_qty, use_order_pricelist=False, **kw):
+    def get_unit_price(self, product_ids, add_qty, **kw):
         products = request.env['product.product'].browse(product_ids)
-        partner = request.env.user.partner_id
-        pricelist = request.website.get_current_pricelist()
-        prices = pricelist.price_rule_get_multi([(product, add_qty, partner) for product in products])
-        return {product_id: prices[product_id][pricelist.id][0] for product_id in product_ids}
+        return {product.id: request.website.get_product_price(product, qty=add_qty) / add_qty for product in products}

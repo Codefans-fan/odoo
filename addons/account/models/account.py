@@ -102,7 +102,7 @@ class AccountAccount(models.Model):
     deprecated = fields.Boolean(index=True, default=False)
     user_type_id = fields.Many2one('account.account.type', string='Type', required=True, oldname="user_type", 
         help="Account Type is used for information purpose, to generate country-specific legal reports, and set the rules to close a fiscal year and generate opening entries.")
-    internal_type = fields.Selection(related='user_type_id.type', store=True, readonly=True)
+    internal_type = fields.Selection(related='user_type_id.type', string="Internal Type", store=True, readonly=True)
     #has_unreconciled_entries = fields.Boolean(compute='_compute_has_unreconciled_entries',
     #    help="The account has at least one unreconciled debit and credit since last time the invoices & payments matching was performed.")
     last_time_entries_checked = fields.Datetime(string='Latest Invoices & Payments Matching Date', readonly=True, copy=False,
@@ -252,7 +252,7 @@ class AccountJournal(models.Model):
     belongs_to_company = fields.Boolean('Belong to the user\'s current company', compute="_belong_to_company", search="_search_company_journals",)
 
     # Bank journals fields
-    bank_account_id = fields.Many2one('res.partner.bank', string="Bank Account", ondelete='restrict')
+    bank_account_id = fields.Many2one('res.partner.bank', string="Bank Account", ondelete='restrict', copy=False)
     display_on_footer = fields.Boolean("Show in Invoices Footer", help="Display this bank account on the footer of printed documents like invoices and sales orders.")
     bank_statements_source = fields.Selection([('manual', 'Record Manually')], string='Bank Feeds')
     bank_acc_number = fields.Char(related='bank_account_id.acc_number')
@@ -294,7 +294,11 @@ class AccountJournal(models.Model):
 
     @api.multi
     def unlink(self):
-        bank_accounts = self.mapped('bank_account_id')
+        bank_accounts = self.env['res.partner.bank'].browse()
+        for bank_account in self.mapped('bank_account_id'):
+            accounts = self.search([('bank_account_id', '=', bank_account.id)])
+            if accounts <= self:
+                bank_accounts += bank_account
         ret = super(AccountJournal, self).unlink()
         bank_accounts.unlink()
         return ret
@@ -548,6 +552,20 @@ class AccountTax(models.Model):
         ('name_company_uniq', 'unique(name, company_id, type_tax_use)', 'Tax names must be unique !'),
     ]
 
+    @api.multi
+    def unlink(self):
+        company_id = self.env.user.company_id.id
+        ir_values = self.env['ir.values']
+        supplier_taxes_id = set(ir_values.get_default('product.template', 'supplier_taxes_id', company_id=company_id))
+        deleted_sup_tax = self.filtered(lambda tax: tax.id in supplier_taxes_id)
+        if deleted_sup_tax:
+            ir_values.sudo().set_default('product.template', "supplier_taxes_id", list(supplier_taxes_id - set(deleted_sup_tax.ids)), for_all_users=True, company_id=company_id)
+        taxes_id = set(self.env['ir.values'].get_default('product.template', 'taxes_id', company_id=company_id))
+        deleted_tax = self.filtered(lambda tax: tax.id in taxes_id)
+        if deleted_tax:
+            ir_values.sudo().set_default('product.template', "taxes_id", list(taxes_id - set(deleted_tax.ids)), for_all_users=True, company_id=company_id)
+        return super(AccountTax, self).unlink()
+
     @api.one
     @api.constrains('children_tax_ids', 'type_tax_use')
     def _check_children_scope(self):
@@ -658,7 +676,11 @@ class AccountTax(models.Model):
             prec += 5
         total_excluded = total_included = base = round(price_unit * quantity, prec)
 
-        for tax in self.sorted():
+        # Sorting key is mandatory in this case. When no key is provided, sorted() will perform a
+        # search. However, the search method is overridden in account.tax in order to add a domain
+        # depending on the context. This domain might filter out some taxes from self, e.g. in the
+        # case of group taxes.
+        for tax in self.sorted(key=lambda r: r.sequence):
             if tax.amount_type == 'group':
                 ret = tax.children_tax_ids.compute_all(price_unit, currency, quantity, product, partner)
                 total_excluded = ret['total_excluded']
@@ -738,16 +760,16 @@ class AccountOperationTemplate(models.Model):
     tax_id = fields.Many2one('account.tax', string='Tax', ondelete='restrict', domain=[('type_tax_use', '=', 'purchase')])
     analytic_account_id = fields.Many2one('account.analytic.account', string='Analytic Account', ondelete='set null')
 
-    second_account_id = fields.Many2one('account.account', string='Account', ondelete='cascade', domain=[('deprecated', '=', False)])
-    second_journal_id = fields.Many2one('account.journal', string='Journal', ondelete='cascade', help="This field is ignored in a bank statement reconciliation.")
-    second_label = fields.Char(string='Journal Item Label')
+    second_account_id = fields.Many2one('account.account', string='Second Account', ondelete='cascade', domain=[('deprecated', '=', False)])
+    second_journal_id = fields.Many2one('account.journal', string='Second Journal', ondelete='cascade', help="This field is ignored in a bank statement reconciliation.")
+    second_label = fields.Char(string='Second Journal Item Label')
     second_amount_type = fields.Selection([
         ('fixed', 'Fixed'),
         ('percentage', 'Percentage of amount')
-        ], string='Amount type', required=True, default='percentage')
-    second_amount = fields.Float(string='Amount', digits=0, required=True, default=100.0, help="Fixed amount will count as a debit if it is negative, as a credit if it is positive.")
-    second_tax_id = fields.Many2one('account.tax', string='Tax', ondelete='restrict', domain=[('type_tax_use', '=', 'purchase')])
-    second_analytic_account_id = fields.Many2one('account.analytic.account', string='Analytic Account', ondelete='set null')
+        ], string="Second Amount type",required=True, default='percentage')
+    second_amount = fields.Float(string='Second Amount', digits=0, required=True, default=100.0, help="Fixed amount will count as a debit if it is negative, as a credit if it is positive.")
+    second_tax_id = fields.Many2one('account.tax', string='Second Tax', ondelete='restrict', domain=[('type_tax_use', '=', 'purchase')])
+    second_analytic_account_id = fields.Many2one('account.analytic.account', string='Second Analytic Account', ondelete='set null')
 
     @api.onchange('name')
     def onchange_name(self):

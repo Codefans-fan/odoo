@@ -1,4 +1,4 @@
-# -*- coding: utf-'8' "-*-"
+# coding: utf-8
 
 from odoo import api, fields, models
 
@@ -13,6 +13,10 @@ class PaymentAcquirerStripe(models.Model):
 
     stripe_secret_key = fields.Char(required_if_provider='stripe')
     stripe_publishable_key = fields.Char(required_if_provider='stripe')
+    stripe_image_url = fields.Char("Checkout Image URL",
+        help="A relative or absolute URL pointing to a square image of your "
+             "brand or product. As defined in your Stripe profile. See: "
+             "https://stripe.com/docs/checkout")
 
     @api.model
     def _get_providers(self):
@@ -46,7 +50,7 @@ class PaymentAcquirerStripe(models.Model):
 
     @api.model
     def stripe_s2s_form_process(self, data):
-        payment_method = self.env['payment.method'].sudo().create({
+        payment_token = self.env['payment.token'].sudo().create({
             'cc_number': data['cc_number'],
             'cc_holder_name': data['cc_holder_name'],
             'cc_expiry': data['cc_expiry'],
@@ -55,7 +59,7 @@ class PaymentAcquirerStripe(models.Model):
             'acquirer_id': int(data['acquirer_id']),
             'partner_id': int(data['partner_id'])
         })
-        return payment_method.id
+        return payment_token.id
 
     @api.multi
     def stripe_s2s_form_validate(self, data):

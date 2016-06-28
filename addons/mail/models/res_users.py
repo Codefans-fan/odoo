@@ -27,11 +27,11 @@ class Users(models.Model):
         """
         init_res = super(Users, self).__init__(pool, cr)
         # duplicate list to avoid modifying the original reference
-        self.SELF_WRITEABLE_FIELDS = list(self.SELF_WRITEABLE_FIELDS)
-        self.SELF_WRITEABLE_FIELDS.extend(['notify_email'])
+        type(self).SELF_WRITEABLE_FIELDS = list(self.SELF_WRITEABLE_FIELDS)
+        type(self).SELF_WRITEABLE_FIELDS.extend(['notify_email'])
         # duplicate list to avoid modifying the original reference
-        self.SELF_READABLE_FIELDS = list(self.SELF_READABLE_FIELDS)
-        self.SELF_READABLE_FIELDS.extend(['notify_email', 'alias_domain', 'alias_name'])
+        type(self).SELF_READABLE_FIELDS = list(self.SELF_READABLE_FIELDS)
+        type(self).SELF_READABLE_FIELDS.extend(['notify_email', 'alias_domain', 'alias_name'])
         return init_res
 
     def get_alias_model_name(self, vals):
@@ -65,11 +65,12 @@ class Users(models.Model):
             self.env['mail.channel'].search([('group_ids', 'in', user_group_ids)])._subscribe_users()
         return write_res
 
-    def copy_data(self, *args, **kwargs):
-        data = super(Users, self).copy_data(*args, **kwargs)
+    @api.multi
+    def copy_data(self, default=None):
+        data = super(Users, self).copy_data(default)[0]
         if data and data.get('alias_name'):
             data['alias_name'] = data['login']
-        return data
+        return [data]
 
     def _create_welcome_message(self):
         self.ensure_one()

@@ -11,6 +11,18 @@
             </field>
         </record>
 
+        <record id="view_currency_rate_form" model="ir.ui.view">
+            <field name="name">res.currency.rate.form</field>
+            <field name="model">res.currency.rate</field>
+            <field name="arch" type="xml">
+                <form string="Currency Rates">
+                    <field name="name"/>
+                    <field name="rate"/>
+                    <field name="company_id" groups="base.group_multi_company"/>
+                </form>
+            </field>
+        </record>
+
         <record id="view_currency_rate_tree" model="ir.ui.view">
             <field name="name">res.currency.rate.tree</field>
             <field name="model">res.currency.rate</field>
@@ -105,8 +117,6 @@
             <field name="context">{'active_test': False}</field>
         </record>
 
-        <menuitem action="action_currency_form" id="menu_action_currency_form" parent="menu_localisation" sequence="3" groups="base.group_multi_currency"/>
-
         <record id="action_currency_form_company" model="ir.actions.act_window">
             <field name="name">Currencies</field>
             <field name="res_model">res.currency</field>
@@ -126,7 +136,7 @@
                 <xpath expr="//field[@id='company_currency']" position="after">
                     <label for="id"/>
                     <p class="text-muted">
-                        Activate <a type="action" name="%(base.action_currency_form_company)d">here</a> a new currency before creating a new company.
+                        Activate <a href="" type="action" name="%(base.action_currency_form_company)d">here</a> a new currency before creating a new company.
                     </p>
                 </xpath>
             </field>

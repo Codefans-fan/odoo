@@ -147,7 +147,6 @@ class View(models.Model):
                              ('diagram', 'Diagram'),
                              ('gantt', 'Gantt'),
                              ('kanban', 'Kanban'),
-                             ('sales_team_dashboard', 'Sales Team Dashboard'),
                              ('search', 'Search'),
                              ('qweb', 'QWeb')], string='View Type')
     arch = fields.Text(compute='_compute_arch', inverse='_inverse_arch', string='View Architecture', nodrop=True)
@@ -299,6 +298,12 @@ actual arch.
                         raise ValidationError(_('Invalid view definition'))
         return True
 
+    @api.constrains('type', 'groups_id')
+    def _check_groups(self):
+        for view in self:
+            if view.type == 'qweb' and view.groups_id:
+                raise ValidationError(_("Qweb view cannot have 'Groups' define on the record. Use 'groups' atttributes inside the view definition"))
+
     _sql_constraints = [
         ('inheritance_mode',
          "CHECK (mode != 'extension' OR inherit_id IS NOT NULL)",
@@ -398,12 +403,15 @@ actual arch.
         if self.pool._init and not self._context.get('load_all_views'):
             # Module init currently in progress, only consider views from
             # modules whose code is already loaded
-            conditions.extend([
-                '|',
-                ('model_ids.module', 'in', tuple(self.pool._init_modules)),
-                ('id', 'in', self._context.get('check_view_ids') or (0,)),
-            ])
-        views = self.search(conditions)
+
+            # Search terms inside an OR branch in a domain
+            # cannot currently use relationships that are
+            # not required. The root cause is the INNER JOIN
+            # used to implement it.
+            views = self.search(conditions + [('model_ids.module', 'in', tuple(self.pool._init_modules))])
+            views = self.search(conditions + [('id', 'in', list(self._context.get('check_view_ids') or (0,)) + map(int, views))])
+        else:
+            views = self.search(conditions)
 
         return [(view.arch, view.id)
                 for view in views.sudo()
@@ -1016,20 +1024,11 @@ actual arch.
             time=time,
             datetime=datetime,
             relativedelta=relativedelta,
+            xmlid=self.key,
         )
         qcontext.update(values or {})
 
-        # TODO: This helper can be used by any template that wants to embedd the backend.
-        #       It is currently necessary because the ir.ui.view bundle inheritance does not
-        #       match the module dependency graph.
-        def get_modules_order():
-            if request:
-                from odoo.addons.web.controllers.main import module_boot
-                return json.dumps(module_boot())
-            return '[]'
-        qcontext['get_modules_order'] = get_modules_order
-
-        return self.env[engine].render(self.id, qcontext, loader=self.read_template)
+        return self.env[engine].render(self.id, qcontext)
 
     #------------------------------------------------------
     # Misc

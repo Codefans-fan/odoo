@@ -4,6 +4,7 @@ import base64
 import csv
 import functools
 import glob
+import imghdr
 import itertools
 import jinja2
 import logging
@@ -31,11 +32,12 @@ except ImportError:
 
 import openerp
 import openerp.modules.registry
-from openerp.addons.base.ir.ir_qweb import AssetsBundle, QWebTemplateNotFound
+from openerp.addons.base.ir.ir_qweb import AssetsBundle
 from openerp.modules import get_resource_path
 from openerp.tools import topological_sort
 from openerp.tools.translate import _
 from openerp.tools import ustr
+from openerp.tools.misc import str2bool
 from openerp import http
 from openerp.http import request, serialize_exception as _serialize_exception
 from openerp.exceptions import AccessError
@@ -446,15 +448,9 @@ class Home(http.Controller):
             return werkzeug.utils.redirect(kw.get('redirect'), 303)
 
         request.uid = request.session.uid
-        menu_data = request.registry['ir.ui.menu'].load_menus(request.cr, request.uid, request.debug, context=request.context)
+        context = request.env['ir.http'].webclient_rendering_context()
 
-        version_info = openerp.service.common.exp_version()
-        db_info = {
-            'server_version': version_info.get('server_version'),
-            'server_version_info': version_info.get('server_version_info'),
-        }
-
-        return request.render('web.webclient_bootstrap', qcontext={'menu_data': menu_data, 'db_info': json.dumps(db_info)})
+        return request.render('web.webclient_bootstrap', qcontext=context)
 
     @http.route('/web/dbredirect', type='http', auth="none")
     def web_db_redirect(self, redirect='/', **kw):
@@ -519,7 +515,7 @@ class WebClient(http.Controller):
         headers = [('Content-Type', 'application/javascript'), ('Cache-Control', 'max-age=%s' % (36000))]
         return request.make_response(momentjs_locale, headers)
 
-    @http.route('/web/webclient/qweb', type='http', auth="none")
+    @http.route('/web/webclient/qweb', type='http', auth="none", cors="*")
     def qweb(self, mods=None, db=None):
         files = [f[0] for f in manifest_glob('qweb', addons=mods, db=db)]
         last_modified = get_last_modified(files)
@@ -694,7 +690,7 @@ class Database(http.Controller):
     def restore(self, master_pwd, backup_file, name, copy=False):
         try:
             data = base64.b64encode(backup_file.read())
-            request.session.proxy("db").restore(master_pwd, name, data, copy)
+            request.session.proxy("db").restore(master_pwd, name, data, str2bool(copy))
             return http.local_redirect('/web/database/manager')
         except Exception, e:
             error = "Database restore error: %s" % e
@@ -711,32 +707,17 @@ class Database(http.Controller):
 
 class Session(http.Controller):
 
-    def session_info(self):
-        request.session.ensure_valid()
-        user = request.env.user
-        display_switch_company_menu = user.has_group('base.group_multi_company') and len(user.company_ids) > 1
-        return {
-            "session_id": request.session_id,
-            "uid": request.session.uid,
-            "user_context": request.session.get_context() if request.session.uid else {},
-            "db": request.session.db,
-            "username": request.session.login,
-            "company_id": request.env.user.company_id.id if request.session.uid else None,
-            "partner_id": request.env.user.partner_id.id if request.session.uid and request.env.user.partner_id else None,
-            "user_companies": {'current_company': (user.company_id.id, user.company_id.name), 'allowed_companies': [(comp.id, comp.name) for comp in user.company_ids]} if display_switch_company_menu else False,
-        }
-
     @http.route('/web/session/get_session_info', type='json', auth="none")
     def get_session_info(self):
+        request.session.check_security()
         request.uid = request.session.uid
         request.disable_db = False
-        return self.session_info()
+        return request.env['ir.http'].session_info()
 
     @http.route('/web/session/authenticate', type='json', auth="none")
     def authenticate(self, db, login, password, base_location=None):
         request.session.authenticate(db, login, password)
-
-        return self.session_info()
+        return request.env['ir.http'].session_info()
 
     @http.route('/web/session/change_password', type='json', auth="user")
     def change_password(self, fields):
@@ -1067,7 +1048,8 @@ class Binary(http.Controller):
         '/logo.png',
     ], type='http', auth="none", cors="*")
     def company_logo(self, dbname=None, **kw):
-        imgname = 'logo.png'
+        imgname = 'logo'
+        imgext = '.png'
         placeholder = functools.partial(get_resource_path, 'web', 'static', 'src', 'img')
         uid = None
         if request.session.db:
@@ -1080,7 +1062,7 @@ class Binary(http.Controller):
             uid = openerp.SUPERUSER_ID
 
         if not dbname:
-            response = http.send_file(placeholder(imgname))
+            response = http.send_file(placeholder(imgname + imgext))
         else:
             try:
                 # create an empty registry
@@ -1094,12 +1076,14 @@ class Binary(http.Controller):
                                """, (uid,))
                     row = cr.fetchone()
                     if row and row[0]:
-                        image_data = StringIO(str(row[0]).decode('base64'))
-                        response = http.send_file(image_data, filename=imgname, mtime=row[1])
+                        image_base64 = str(row[0]).decode('base64')
+                        image_data = StringIO(image_base64)
+                        imgext = '.' + (imghdr.what(None, h=image_base64) or 'png')
+                        response = http.send_file(image_data, filename=imgname + imgext, mtime=row[1])
                     else:
                         response = http.send_file(placeholder('nologo.png'))
             except Exception:
-                response = http.send_file(placeholder(imgname))
+                response = http.send_file(placeholder(imgname + imgext))
 
         return response
 
@@ -1156,8 +1140,8 @@ class Export(http.Controller):
         ]
 
     def fields_get(self, model):
-        Model = request.session.model(model)
-        fields = Model.fields_get(False, request.context)
+        Model = request.env[model]
+        fields = Model.fields_get()
         return fields
 
     @http.route('/web/export/get_fields', type='json', auth="user")

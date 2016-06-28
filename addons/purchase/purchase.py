@@ -9,6 +9,7 @@ from openerp.tools.translate import _
 from openerp.tools.float_utils import float_is_zero, float_compare
 import openerp.addons.decimal_precision as dp
 from openerp.exceptions import UserError, AccessError
+from openerp.tools.misc import formatLang
 from openerp.addons.base.res.res_partner import WARNING_MESSAGE, WARNING_HELP
 
 class PurchaseOrder(models.Model):
@@ -178,6 +179,8 @@ class PurchaseOrder(models.Model):
             name = po.name
             if po.partner_ref:
                 name += ' ('+po.partner_ref+')'
+            if po.amount_total:
+                name += ': ' + formatLang(self.env, po.amount_total, currency_obj=po.currency_id)
             result.append((po.id, name))
         return result
 
@@ -196,7 +199,7 @@ class PurchaseOrder(models.Model):
 
     @api.multi
     def copy(self, default=None):
-        new_po = super(PurchaseOrder, self).copy()
+        new_po = super(PurchaseOrder, self).copy(default=default)
         for line in new_po.order_line:
             seller = line.product_id._select_seller(
                 line.product_id, partner_id=line.partner_id, quantity=line.product_qty,
@@ -387,6 +390,9 @@ class PurchaseOrder(models.Model):
                 moves = order.order_line.filtered(lambda r: r.product_id.type in ['product', 'consu'])._create_stock_moves(picking)
                 moves.action_confirm()
                 moves.force_assign()
+                picking.message_post_with_view('mail.message_origin_link',
+                    values={'self': picking, 'origin': order},
+                    subtype_id=self.env.ref('mail.mt_note').id)
         return True
 
     @api.multi
@@ -492,7 +498,8 @@ class PurchaseOrderLine(models.Model):
         for line in self:
             qty = 0.0
             for inv_line in line.invoice_lines:
-                qty += inv_line.uom_id._compute_qty_obj(inv_line.uom_id, inv_line.quantity, line.product_uom)
+                if inv_line.invoice_id.state not in ['cancel']:
+                    qty += inv_line.uom_id._compute_qty_obj(inv_line.uom_id, inv_line.quantity, line.product_uom)
             line.qty_invoiced = qty
 
     @api.depends('order_id.state', 'move_ids.state')
@@ -550,7 +557,7 @@ class PurchaseOrderLine(models.Model):
     name = fields.Text(string='Description', required=True)
     product_qty = fields.Float(string='Quantity', digits=dp.get_precision('Product Unit of Measure'), required=True)
     date_planned = fields.Datetime(string='Scheduled Date', required=True, select=True)
-    taxes_id = fields.Many2many('account.tax', string='Taxes')
+    taxes_id = fields.Many2many('account.tax', string='Taxes', domain=['|', ('active', '=', False), ('active', '=', True)])
     product_uom = fields.Many2one('product.uom', string='Product Unit of Measure', required=True)
     product_id = fields.Many2one('product.product', string='Product', domain=[('purchase_ok', '=', True)], change_default=True, required=True)
     move_ids = fields.One2many('stock.move', 'purchase_line_id', string='Reservation', readonly=True, ondelete='set null', copy=False)
@@ -564,7 +571,7 @@ class PurchaseOrderLine(models.Model):
     account_analytic_id = fields.Many2one('account.analytic.account', string='Analytic Account')
     analytic_tag_ids = fields.Many2many('account.analytic.tag', string='Analytic Tags')
     company_id = fields.Many2one('res.company', related='order_id.company_id', string='Company', store=True, readonly=True)
-    state = fields.Selection(related='order_id.state', stored=True)
+    state = fields.Selection(related='order_id.state', store=True)
 
     invoice_lines = fields.One2many('account.invoice.line', 'purchase_line_id', string="Invoice Lines", readonly=True, copy=False)
 
@@ -971,6 +978,9 @@ class ProcurementOrder(models.Model):
             if not po:
                 vals = procurement._prepare_purchase_order(partner)
                 po = self.env['purchase.order'].create(vals)
+                name = (procurement.group_id and (procurement.group_id.name + ":") or "") + (procurement.name != "/" and procurement.name or procurement.move_dest_id.raw_material_production_id and procurement.move_dest_id.raw_material_production_id.name or "")
+                message = _("This purchase order has been created from: <a href=# data-oe-model=procurement.order data-oe-id=%d>%s</a>") % (procurement.id, name)
+                po.message_post(body=message)
                 cache[domain] = po
             elif not po.origin or procurement.origin not in po.origin.split(', '):
                 # Keep track of all procurements
@@ -981,6 +991,9 @@ class ProcurementOrder(models.Model):
                         po.write({'origin': po.origin})
                 else:
                     po.write({'origin': procurement.origin})
+                name = (self.group_id and (self.group_id.name + ":") or "") + (self.name != "/" and self.name or self.move_dest_id.raw_material_production_id and self.move_dest_id.raw_material_production_id.name or "")
+                message = _("This purchase order has been modified from: <a href=# data-oe-model=procurement.order data-oe-id=%d>%s</a>") % (procurement.id, name)
+                po.message_post(body=message)
             if po:
                 res += [procurement.id]
 
@@ -1078,7 +1091,8 @@ class MailComposeMessage(models.Model):
 
     @api.multi
     def send_mail(self, auto_commit=False):
-        if self._context.get('default_model') == 'purchase.order' and self._context.get('default_res_id'):
+        compose_internal = self.filtered('subtype_id.internal')
+        if self._context.get('default_model') == 'purchase.order' and self._context.get('default_res_id') and not compose_internal:
             order = self.env['purchase.order'].browse([self._context['default_res_id']])
             if order.state == 'draft':
                 order.state = 'sent'

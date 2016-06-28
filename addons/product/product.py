@@ -86,7 +86,7 @@ class product_uom(osv.osv):
         'rounding': fields.float('Rounding Precision', digits=0, required=True,
             help="The computed quantity will be a multiple of this value. "\
                  "Use 1.0 for a Unit of Measure that cannot be further split, such as a piece."),
-        'active': fields.boolean('Active', help="By unchecking the active field you can disable a unit of measure without deleting it."),
+        'active': fields.boolean('Active', help="Uncheck the active field to disable a unit of measure without deleting it."),
         'uom_type': fields.selection([('bigger','Bigger than the reference Unit of Measure'),
                                       ('reference','Reference Unit of Measure for this category'),
                                       ('smaller','Smaller than the reference Unit of Measure')],'Type', required=1),
@@ -198,6 +198,13 @@ class product_category(osv.osv):
         res = self.name_get(cr, uid, ids, context=context)
         return dict(res)
 
+    def _compute_product_count(self, cr, uid, ids, field_name, arg, context=None):
+        res = {}
+        prod_templates = self.pool['product.template'].read_group(cr, uid, [('categ_id', 'in', ids)], ['categ_id'], ['categ_id'], context=context)
+        for prod_template in prod_templates:
+            res[prod_template['categ_id'][0]] = prod_template['categ_id_count']
+        return res
+
     _name = "product.category"
     _description = "Product Category"
     _columns = {
@@ -205,10 +212,10 @@ class product_category(osv.osv):
         'complete_name': fields.function(_name_get_fnc, type="char", string='Name'),
         'parent_id': fields.many2one('product.category','Parent Category', select=True, ondelete='cascade'),
         'child_id': fields.one2many('product.category', 'parent_id', string='Child Categories'),
-        'sequence': fields.integer('Sequence', select=True, help="Gives the sequence order when displaying a list of product categories."),
         'type': fields.selection([('view','View'), ('normal','Normal')], 'Category Type', help="A category of the view type is a virtual category that can be used as the parent of another category to create a hierarchical structure."),
         'parent_left': fields.integer('Left Parent', select=1),
         'parent_right': fields.integer('Right Parent', select=1),
+        'product_count': fields.function(_compute_product_count, type="integer", help="The number of products under this category (Does not consider the children categories)"),
     }
 
 
@@ -218,7 +225,7 @@ class product_category(osv.osv):
 
     _parent_name = "parent_id"
     _parent_store = True
-    _parent_order = 'sequence, name'
+    _parent_order = 'name'
     _order = 'parent_left'
 
     _constraints = [
@@ -716,8 +723,9 @@ class product_template(osv.osv):
     def copy(self, cr, uid, id, default=None, context=None):
         if default is None:
             default = {}
-        template = self.browse(cr, uid, id, context=context)
-        default['name'] = _("%s (copy)") % (template['name'])
+        if 'name' not in default:
+            template = self.browse(cr, uid, id, context=context)
+            default['name'] = _("%s (copy)") % (template['name'])
         return super(product_template, self).copy(cr, uid, id, default=default, context=context)
 
     _defaults = {
@@ -782,7 +790,7 @@ class product_product(osv.osv):
     _description = "Product"
     _inherits = {'product.template': 'product_tmpl_id'}
     _inherit = ['mail.thread']
-    _order = 'default_code,name_template'
+    _order = 'default_code'
 
     def _product_price(self, cr, uid, ids, name, arg, context=None):
         plobj = self.pool.get('product.pricelist')
@@ -886,10 +894,6 @@ class product_product(osv.osv):
     def _is_product_variant_impl(self, cr, uid, ids, name, arg, context=None):
         return dict.fromkeys(ids, True)
 
-    def _get_name_template_ids(self, cr, uid, ids, context=None):
-        template_ids = self.pool.get('product.product').search(cr, uid, [('product_tmpl_id', 'in', ids)])
-        return list(set(template_ids))
-
     def _get_image_variant(self, cr, uid, ids, name, args, context=None):
         result = dict.fromkeys(ids, False)
         for obj in self.browse(cr, uid, ids, context=context):
@@ -964,10 +968,6 @@ class product_product(osv.osv):
         'active': fields.boolean('Active', help="If unchecked, it will allow you to hide the product without removing it."),
         'product_tmpl_id': fields.many2one('product.template', 'Product Template', required=True, ondelete="cascade", select=True, auto_join=True),
         'barcode': fields.char('Barcode', help="International Article Number used for product identification.", oldname='ean13', copy=False),
-        'name_template': fields.related('product_tmpl_id', 'name', string="Template Name", type='char', store={
-            'product.template': (_get_name_template_ids, ['name'], 10),
-            'product.product': (lambda self, cr, uid, ids, c=None: ids, [], 10),
-        }, select=True),
         'attribute_value_ids': fields.many2many('product.attribute.value', id1='prod_id', id2='att_id', string='Attributes', ondelete='restrict'),
         'is_product_variant': fields.function( _is_product_variant_impl, type='boolean', string='Is a product variant'),
         # image: all image fields are base64 encoded and PIL-supported
@@ -1245,8 +1245,8 @@ class product_packaging(osv.osv):
         'name' : fields.char('Packaging Type', required=True),
         'sequence': fields.integer('Sequence', help="The first in the sequence is the default one."),
         'product_tmpl_id': fields.many2one('product.template', string='Product'),
-        'qty' : fields.float('Quantity by Package',
-            help="The total number of products you can put by pallet or box."),
+        'qty' : fields.float('Quantity per Package',
+            help="The total number of products you can have per pallet or box."),
     }
     _defaults = {
         'sequence' : 1,

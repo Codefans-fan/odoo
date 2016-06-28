@@ -31,7 +31,8 @@ return ControlPanelMixin;
 odoo.define('web.ControlPanel', function (require) {
 "use strict";
 
-var core = require('web.core');
+var Bus = require('web.Bus');
+var data = require('web.data');
 var Widget = require('web.Widget');
 
 var ControlPanel = Widget.extend({
@@ -46,7 +47,7 @@ var ControlPanel = Widget.extend({
             this.template = template;
         }
 
-        this.bus = new core.Bus();
+        this.bus = new Bus();
         this.bus.on("update", this, this.update);
     },
     /**
@@ -64,6 +65,11 @@ var ControlPanel = Widget.extend({
             $sidebar: this.$('.o_cp_sidebar'),
             $switch_buttons: this.$('.o_cp_switch_buttons'),
         };
+
+        // Prevent the search dropdowns to close when clicking inside them
+        this.$el.on('click.bs.dropdown', '.oe-search-options .dropdown-menu', function (e) {
+            e.stopPropagation();
+        });
 
         // By default, hide the ControlPanel and remove its contents from the DOM
         this._toggle_visibility(false);
@@ -190,8 +196,9 @@ var ControlPanel = Widget.extend({
     _render_breadcrumbs_li: function (bc, index, length) {
         var self = this;
         var is_last = (index === length-1);
+        var li_content = _.escape(bc.title.trim()) || data.noDisplayContent;
         var $bc = $('<li>')
-            .append(is_last ? _.escape(bc.title) : $('<a>').text(bc.title))
+            .append(is_last ? li_content : $('<a>').html(li_content))
             .toggleClass('active', is_last);
         if (!is_last) {
             $bc.click(function () {

@@ -5,10 +5,9 @@ Store database-specific configuration parameters
 """
 
 import uuid
-import datetime
 
 from odoo import api, fields, models
-from odoo.tools import misc, config, ormcache
+from odoo.tools import config, ormcache
 
 """
 A dictionary holding some configuration parameters to be initialized when the database is created.
@@ -42,10 +41,10 @@ class IrConfigParameter(models.Model):
         """
         for key, func in _default_parameters.iteritems():
             # force=True skips search and always performs the 'if' body (because ids=False)
-            self = not force and self.sudo().search([('key', '=', key)])
-            if not self.ids:
+            params = self.sudo().search([('key', '=', key)])
+            if force or not params:
                 value, groups = func()
-                self.sudo().set_param(key, value, groups=groups)
+                params.set_param(key, value, groups=groups)
 
     @api.model
     def get_param(self, key, default=False):

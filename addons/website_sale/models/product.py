@@ -88,10 +88,16 @@ class ProductTemplate(models.Model):
     website_size_x = fields.Integer('Size X', default=1)
     website_size_y = fields.Integer('Size Y', default=1)
     website_style_ids = fields.Many2many('product.style', string='Styles')
-    website_sequence = fields.Integer('Sequence', help="Determine the display order in the Website E-commerce",
+    website_sequence = fields.Integer('Website Sequence', help="Determine the display order in the Website E-commerce",
                                       default=lambda self: self._default_website_sequence())
     public_categ_ids = fields.Many2many('product.public.category', string='Website Product Category',
                                         help="Those categories are used to group similar products for e-commerce.")
+    availability = fields.Selection([
+        ('empty', 'Display Nothing'),
+        ('in_stock', 'In Stock'),
+        ('warning', 'Warning'),
+    ], "Availability", default='empty', help="This field is used to display a availability banner with a message on the ecommerce")
+    availability_warning = fields.Text("Availability Warning", translate=True)
 
     def _default_website_sequence(self):
         min_sequence = self.sudo().search([], order='website_sequence', limit=1).website_sequence
@@ -126,6 +132,11 @@ class ProductTemplate(models.Model):
             res[product.id] = "/shop/product/%s" % (product.id,)
         return res
 
+    @api.multi
+    def display_price(self, pricelist, qty=1, public=False, **kw):
+        self.ensure_one()
+        return self.product_variant_ids and self.product_variant_ids[0].display_price(pricelist, qty=qty, public=public) or 0
+
 
 class Product(models.Model):
     _inherit = "product.product"
@@ -134,6 +145,19 @@ class Product(models.Model):
     def website_publish_button(self):
         self.ensure_one()
         return self.product_tmpl_id.website_publish_button()
+
+    @api.multi
+    def display_price(self, pricelist, qty=1, public=False, **kw):
+        self.ensure_one()
+        partner = self.env.user.partner_id
+        context = {
+            'pricelist': pricelist.id,
+            'quantity': qty,
+            'partner': partner
+        }
+        ret = self.env.user.has_group('sale.group_show_price_subtotal') and 'total_excluded' or 'total_included'
+        taxes = partner.property_account_position_id.map_tax(self.taxes_id)
+        return taxes.compute_all(public and self.lst_price or self.with_context(context).price, pricelist.currency_id, qty, product=self, partner=partner)[ret]
 
 
 class ProductAttribute(models.Model):

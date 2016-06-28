@@ -1,4 +1,4 @@
-# -*- coding: utf-'8' "-*-"
+# coding: utf-8
 import logging
 
 import openerp
@@ -56,6 +56,16 @@ class PaymentAcquirer(osv.Model):
     def _get_providers(self, cr, uid, context=None):
         return [('manual', 'Manual Configuration')]
 
+    def _compute_fees_implemented(self, cr, uid, ids, field_names, arg, context=None):
+        acquirer_model = self.pool['payment.acquirer']
+        res = {}
+
+        for acquirer in acquirer_model.browse(cr, uid, ids, context=context):
+            custom_method_name = '%s_compute_fees' % acquirer.provider
+            res[acquirer.id] = hasattr(acquirer_model, custom_method_name)
+
+        return res
+
     # indirection to ease inheritance
     _provider_selection = lambda self, *args, **kwargs: self._get_providers(*args, **kwargs)
 
@@ -79,14 +89,15 @@ class PaymentAcquirer(osv.Model):
             help="Make this payment acquirer available (Customer invoices, etc.)"),
         'auto_confirm': fields.selection(
             [('none', 'No automatic confirmation'),
-             ('at_pay_confirm', 'At payment with acquirer confirmation'),
-             ('at_pay_now', 'At payment no acquirer confirmation needed')],
+             ('confirm_so', 'Confirm the SO on acquirer confirmation'),
+             ('generate_and_pay_invoice', 'On acquirer confirmation, confirm the SO, generate the invoice and pay it')],
             string='Order Confirmation', required=True),
         'pending_msg': fields.html('Pending Message', translate=True, help='Message displayed, if order is in pending state after having done the payment process.'),
         'done_msg': fields.html('Done Message', translate=True, help='Message displayed, if order is done successfully after having done the payment process.'),
         'cancel_msg': fields.html('Cancel Message', translate=True, help='Message displayed, if order is cancel during the payment process.'),
         'error_msg': fields.html('Error Message', translate=True, help='Message displayed, if error is occur during the payment process.'),
         # Fees
+        'fees_implemented': fields.function(_compute_fees_implemented, type="boolean"),
         'fees_active': fields.boolean('Add Extra Fees'),
         'fees_dom_fixed': fields.float('Fixed domestic fees'),
         'fees_dom_var': fields.float('Variable domestic fees (in percents)'),
@@ -96,6 +107,7 @@ class PaymentAcquirer(osv.Model):
         'module_id': fields.many2one('ir.module.module', string='Corresponding Module'),
         'module_state': fields.related('module_id', 'state', type='char', string='Installation State'),
         'description': fields.html('Description'),
+        'journal_id': fields.many2one('account.journal', 'Accounting Journal', help="Account journal used for automatic payment reconciliation."),
     }
 
     image = openerp.fields.Binary("Image", attachment=True,
@@ -113,7 +125,7 @@ class PaymentAcquirer(osv.Model):
         'company_id': lambda self, cr, uid, obj, ctx=None: self.pool['res.users'].browse(cr, uid, uid).company_id.id,
         'environment': 'test',
         'website_published': False,
-        'auto_confirm': 'at_pay_confirm',
+        'auto_confirm': 'confirm_so',
         'pending_msg': '<i>Pending,</i> Your online payment has been successfully processed. But your order is not validated yet.',
         'done_msg': '<i>Done,</i> Your online payment has been successfully processed. Thank you for your order.',
         'cancel_msg': '<i>Cancel,</i> Your payment has been cancelled.',
@@ -129,7 +141,7 @@ class PaymentAcquirer(osv.Model):
         return True
 
     _constraints = [
-        (_check_required_if_provider, 'Required fields not filled', ['required for this provider']),
+        (_check_required_if_provider, 'Required fields not filled', []),
     ]
 
     @openerp.api.model
@@ -254,7 +266,7 @@ class PaymentAcquirer(osv.Model):
         # compute fees
         fees_method_name = '%s_compute_fees' % acquirer.provider
         if hasattr(self, fees_method_name):
-            fees = getattr(self, fees_method_name)(cr, uid, id, values['amount'], values['currency_id'], values['partner_country_id'], context=None)
+            fees = getattr(self, fees_method_name)(cr, uid, id, values['amount'], values['currency_id'], values.get('partner_country_id'), context=None)
             values['fees'] = float_round(fees, 2)
 
         # call <name>_form_generate_values to update the tx dict with acqurier specific values
@@ -401,7 +413,7 @@ class PaymentTransaction(osv.Model):
         'callback_eval': fields.char('S2S Callback', help="""\
             Will be safe_eval with `self` being the current transaction. i.e.:
                 self.env['my.model'].payment_validated(self)""", oldname="s2s_cb_eval"),
-        'payment_method_id': fields.many2one('payment.method', 'Payment Method', domain="[('acquirer_id', '=', acquirer_id)]"),
+        'payment_token_id': fields.many2one('payment.token', 'Payment Token', domain="[('acquirer_id', '=', acquirer_id)]"),
     }
 
     def _check_reference(self, cr, uid, ids, context=None):
@@ -575,17 +587,17 @@ class PaymentTransaction(osv.Model):
         return True
 
 
-class PaymentMethod(osv.Model):
-    _name = 'payment.method'
+class PaymentToken(osv.Model):
+    _name = 'payment.token'
     _order = 'partner_id'
 
     _columns = {
-        'name': fields.char('Name', help='Name of the payment method'),
+        'name': fields.char('Name', help='Name of the payment token'),
         'partner_id': fields.many2one('res.partner', 'Partner', required=True),
         'acquirer_id': fields.many2one('payment.acquirer', 'Acquirer Account', required=True),
         'acquirer_ref': fields.char('Acquirer Ref.', required=True),
         'active': fields.boolean('Active'),
-        'payment_ids': fields.one2many('payment.transaction', 'payment_method_id', 'Payment Transactions'),
+        'payment_ids': fields.one2many('payment.transaction', 'payment_token_id', 'Payment Transactions'),
     }
 
     _defaults = {
@@ -602,4 +614,4 @@ class PaymentMethod(osv.Model):
             if hasattr(self, custom_method_name):
                 values.update(getattr(self, custom_method_name)(cr, uid, values, context=context))
 
-        return super(PaymentMethod, self).create(cr, uid, values, context=context)
+        return super(PaymentToken, self).create(cr, uid, values, context=context)

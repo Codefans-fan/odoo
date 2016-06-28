@@ -148,19 +148,15 @@ class AccountAssetAsset(models.Model):
                 amount = amount_to_depr / (undone_dotation_number - len(posted_depreciation_line_ids))
                 if self.prorata and self.category_id.type == 'purchase':
                     amount = amount_to_depr / self.method_number
-                    days = total_days - float(depreciation_date.strftime('%j'))
                     if sequence == 1:
+                        days = (self.company_id.compute_fiscalyear_dates(depreciation_date)['date_to'] - depreciation_date).days + 1
                         amount = (amount_to_depr / self.method_number) / total_days * days
-                    elif sequence == undone_dotation_number:
-                        amount = (amount_to_depr / self.method_number) / total_days * (total_days - days)
             elif self.method == 'degressive':
                 amount = residual_amount * self.method_progress_factor
                 if self.prorata:
-                    days = total_days - float(depreciation_date.strftime('%j'))
                     if sequence == 1:
+                        days = (self.company_id.compute_fiscalyear_dates(depreciation_date)['date_to'] - depreciation_date).days + 1
                         amount = (residual_amount * self.method_progress_factor) / total_days * days
-                    elif sequence == undone_dotation_number:
-                        amount = (residual_amount * self.method_progress_factor) / total_days * (total_days - days)
         return amount
 
     def _compute_board_undone_dotation_nb(self, depreciation_date, total_days):
@@ -179,7 +175,7 @@ class AccountAssetAsset(models.Model):
     def compute_depreciation_board(self):
         self.ensure_one()
 
-        posted_depreciation_line_ids = self.depreciation_line_ids.filtered(lambda x: x.move_check)
+        posted_depreciation_line_ids = self.depreciation_line_ids.filtered(lambda x: x.move_check).sorted(key=lambda l: l.depreciation_date)
         unposted_depreciation_line_ids = self.depreciation_line_ids.filtered(lambda x: not x.move_check)
 
         # Remove old unposted depreciation lines. We cannot use unlink() with One2many field
@@ -191,10 +187,10 @@ class AccountAssetAsset(models.Model):
                 depreciation_date = datetime.strptime(self._get_last_depreciation_date()[self.id], DF).date()
             else:
                 # depreciation_date = 1st of January of purchase year
-                asset_date = datetime.strptime(self.date, DF).date()
+                asset_date = datetime.strptime(self.date[:4] + '-01-01', DF).date()
                 # if we already have some previous validated entries, starting date isn't 1st January but last entry + method period
-                if posted_depreciation_line_ids and posted_depreciation_line_ids[0].depreciation_date:
-                    last_depreciation_date = datetime.strptime(posted_depreciation_line_ids[0].depreciation_date, DF).date()
+                if posted_depreciation_line_ids and posted_depreciation_line_ids[-1].depreciation_date:
+                    last_depreciation_date = datetime.strptime(posted_depreciation_line_ids[-1].depreciation_date, DF).date()
                     depreciation_date = last_depreciation_date + relativedelta(months=+self.method_period)
                 else:
                     depreciation_date = asset_date
@@ -204,6 +200,7 @@ class AccountAssetAsset(models.Model):
             total_days = (year % 4) and 365 or 366
 
             undone_dotation_number = self._compute_board_undone_dotation_nb(depreciation_date, total_days)
+
             for x in range(len(posted_depreciation_line_ids), undone_dotation_number):
                 sequence = x + 1
                 amount = self._compute_board_amount(sequence, residual_amount, amount_to_depr, undone_dotation_number, posted_depreciation_line_ids, total_days, depreciation_date)
@@ -366,7 +363,7 @@ class AccountAssetAsset(models.Model):
         if default is None:
             default = {}
         default['name'] = self.name + _(' (copy)')
-        return super(AccountAssetAsset, self).copy_data(default)[0]
+        return super(AccountAssetAsset, self).copy_data(default)
 
     @api.multi
     def _compute_entries(self, date, group_entries=False):
@@ -386,7 +383,7 @@ class AccountAssetAsset(models.Model):
     @api.multi
     def write(self, vals):
         res = super(AccountAssetAsset, self).write(vals)
-        if 'depreciation_line_ids' not in vals:
+        if 'depreciation_line_ids' not in vals and 'state' not in vals:
             self.compute_depreciation_board()
         return res
 
@@ -421,12 +418,20 @@ class AccountAssetDepreciationLine(models.Model):
     depreciated_value = fields.Float(string='Cumulative Depreciation', required=True)
     depreciation_date = fields.Date('Depreciation Date', index=True)
     move_id = fields.Many2one('account.move', string='Depreciation Entry')
-    move_check = fields.Boolean(compute='_get_move_check', string='Posted', track_visibility='always', store=True)
+    move_check = fields.Boolean(compute='_get_move_check', string='Linked', track_visibility='always', store=True)
+    move_posted_check = fields.Boolean(compute='_get_move_posted_check', string='Posted', track_visibility='always', store=True)
 
-    @api.one
+    @api.multi
     @api.depends('move_id')
     def _get_move_check(self):
-        self.move_check = bool(self.move_id)
+        for line in self:
+            line.move_check = bool(line.move_id)
+
+    @api.multi
+    @api.depends('move_id.state')
+    def _get_move_posted_check(self):
+        for line in self:
+            line.move_posted_check = True if line.move_id and line.move_id.state == 'posted' else False
 
     @api.multi
     def create_move(self, post_move=True):
@@ -472,7 +477,7 @@ class AccountAssetDepreciationLine(models.Model):
             created_moves |= move
 
         if post_move and created_moves:
-            created_moves.post()
+            created_moves.filtered(lambda m: any(m.asset_depreciation_ids.mapped('asset_id.category_id.open_asset'))).post()
         return [x.id for x in created_moves]
 
     @api.multi
@@ -569,6 +574,13 @@ class AccountMove(models.Model):
     _inherit = 'account.move'
 
     asset_depreciation_ids = fields.One2many('account.asset.depreciation.line', 'move_id', string='Assets Depreciation Lines', ondelete="restrict")
+
+    @api.multi
+    def button_cancel(self):
+        for move in self:
+            for line in move.asset_depreciation_ids:
+                line.move_posted_check = False
+        return super(AccountMove, self).button_cancel()
 
     @api.multi
     def post(self):

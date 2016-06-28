@@ -614,7 +614,7 @@ class GroupsImplied(models.Model):
         if values.get('users') or values.get('implied_ids'):
             # add all implied groups (to all users of each group)
             for group in self:
-                vals = {'users': zip(repeat(4), group.users.ids)}
+                vals = {'users': zip(repeat(4), group.with_context(active_test=False).users.ids)}
                 super(GroupsImplied, group.trans_implied_ids).write(vals)
         return res
 
@@ -876,8 +876,8 @@ class UsersView(models.Model):
                 values[f] = selected and selected[-1] or False
 
     @api.model
-    def fields_get(self, allfields=None, write_access=True, attributes=None):
-        res = super(UsersView, self).fields_get(allfields=allfields, write_access=write_access, attributes=attributes)
+    def fields_get(self, allfields=None, attributes=None):
+        res = super(UsersView, self).fields_get(allfields, attributes=attributes)
         # add reified groups fields
         if not self.env.user._is_admin():
             return res

@@ -234,7 +234,7 @@
                 <t t-esc="section.label"/> <span class="caret"/>
             </button>
             <t t-if="section.name == 'buttons'" t-foreach="widget.items[section.name]" t-as="item" t-att-class="item.classname">
-                <a t-att-title="item.title or ''" t-att-data-section="section.name" t-att-data-index="item_index" t-att-href="item.url" target="_blank">
+                <a t-att-title="item.title or None" t-att-data-section="section.name" t-att-data-index="item_index" t-att-href="item.url" target="_blank">
                     <t t-raw="item.label"/>
                 </a>
             </t>
@@ -256,7 +256,7 @@
                             <t t-raw="item.write_uid[1] + ' ' + item.write_date"/>
                         </t>
                     </t>
-                    <a t-att-title="item.title or ''" t-att-data-section="section.name" t-att-data-index="item_index" t-att-href="item.url">
+                    <a t-att-title="item.title or None" t-att-data-section="section.name" t-att-data-index="item_index" t-att-href="item.url">
                         <t t-raw="item.label"/>
                         <span t-if="section.name == 'files' and widget.options.editable and !item.callback" class="fa fa-trash-o o_sidebar_delete_attachment" t-att-data-id="item.id" title="Delete this attachment"/>
                     </a>
@@ -414,8 +414,7 @@
 <button t-name="ListView.row.button" type="button"
         t-att-title="widget.string" t-att-disabled="disabled || undefined"
         t-attf-class="o_icon_button #{disabled ? 'oe_list_button_disabled' : ''}"
-        ><img t-if="!widget.icon.indexOf('fa-') == 0" t-attf-src="#{prefix}/web/static/src/img/icons/#{widget.icon}.png"
-        t-att-alt="widget.string"/><i t-if="widget.icon.indexOf('fa-') == 0" t-attf-class="fa #{widget.icon}" t-att-title="widget.string"/>
+        ><i t-attf-class="fa #{widget.icon}" t-att-title="widget.string"/>
 </button>
 <t t-extend="ListView.row">
     <!-- adds back padding to row being rendered after edition, if necessary
@@ -693,7 +692,7 @@
         <span class="o_count"/>
         <button class="btn btn-default" type="button"
             t-att-accesskey="widget.node.attrs.accesskey"/>
-        <input t-if="widget.debug" type="text" class="o_form_input o_debug_input"/>
+        <input t-if="widget.debug" t-att-readonly="widget.get('effective_readonly')" type="text" class="o_form_input o_debug_input"/>
     </div>
 </t>
 <t t-name="web.datepicker">
@@ -745,12 +744,12 @@
     </div>
 </t>
 <t t-name="Many2OneButton.cell">
-    <img t-attf-src="#{prefix}/web/static/src/img/icons/#{widget.icon}.png" t-att-alt="widget.string" width="16" height="16"/>
+    <i t-attf-class="fa #{widget.icon}" t-att-title="widget.string"/>
 </t>
 <t t-name="FieldMany2ManyTag">
     <t t-foreach="elements" t-as="el">
         <span t-attf-class="badge dropdown #{'o_tag_color_' + (el['color'] || 0)}" t-att-data-color="(el['color'] || 0)" t-att-data-index="el_index" t-att-data-id="el['id']">
-            <span class="o_badge_text"><t t-esc="el['display_name']"/></span>
+            <span class="o_badge_text" t-attf-title="#{el['display_name']}"><t t-raw="el['display_name']"/></span>
             <span t-if="!readonly" class="fa fa-times o_delete"/>
         </span>
     </t>
@@ -902,7 +901,7 @@
     <t t-if="widget.get('effective_readonly')">
         <div t-foreach="widget.get('value')" t-as="id">
             <t t-set="file" t-value="widget.data[id]"/>
-            <a t-att-href="file.url" t-attf-title="#{(file.name || file.filename) + (file.date?' \n('+file.date+')':'' )}"><t t-raw="file.name || file.filename"/></a>
+            <a target="_blank" t-att-href="file.url" t-attf-title="#{(file.name || file.filename) + (file.date?' \n('+file.date+')':'' )}"><t t-raw="file.name || file.filename"/></a>
         </div>
     </t>
     <t t-if="!widget.get('effective_readonly')">
@@ -919,7 +918,7 @@
                     <a href="#" class="fa fa-times pull-right oe_delete" title="Delete this file" t-att-data-id="file.id"/>
                     <t t-raw="file.name || file.filename"/>
                 </div>
-                <a class="o_image" t-att-href="file.url"
+                <a class="o_image" target="_blank" t-att-href="file.url"
                    t-att-title="(file.name || file.filename) + ((file.date)? (' \n(' + file.date + ')') : '')"
                    t-att-data-mimetype="file.mimetype"
                    t-attf-data-src="/web/image/#{file.id}/100x80"/>
@@ -1120,7 +1119,7 @@
             <div class="o_export_format"/>
         </div>
     </div>
-    
+
     <div class="o_export_panel">
         <div class="o_left_panel">
             <h4>Available fields</h4>
@@ -1216,7 +1215,7 @@
 
 <t t-name="toggle_button">
     <button type="button" class="o_icon_button" t-att-title="widget.string">
-        <img t-attf-src="#{prefix || _s}/web/static/src/img/icons/#{widget.icon}.png" t-att-alt="widget.string"/>
+        <i t-attf-class="fa #{widget.icon}" t-att-title="widget.string"/>
     </button>
 </t>
 

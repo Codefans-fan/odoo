@@ -69,6 +69,9 @@ class AccountInvoice(models.Model):
 
     @api.model
     def _default_currency(self):
+        if 'default_purchase_id' in self.env.context:
+            purchase_id = self.env.context['default_purchase_id']
+            return self.env['purchase.order'].browse(purchase_id).currency_id
         journal = self._default_journal()
         return journal.currency_id or journal.company_id.currency_id
 
@@ -145,14 +148,19 @@ class AccountInvoice(models.Model):
             info = {'title': _('Less Payment'), 'outstanding': False, 'content': []}
             currency_id = self.currency_id
             for payment in self.payment_move_line_ids:
+                payment_currency_id = False
                 if self.type in ('out_invoice', 'in_refund'):
                     amount = sum([p.amount for p in payment.matched_debit_ids if p.debit_move_id in self.move_id.line_ids])
                     amount_currency = sum([p.amount_currency for p in payment.matched_debit_ids if p.debit_move_id in self.move_id.line_ids])
+                    if payment.matched_debit_ids:
+                        payment_currency_id = all([p.currency_id == payment.matched_debit_ids[0].currency_id for p in payment.matched_debit_ids]) and payment.matched_debit_ids[0].currency_id or False
                 elif self.type in ('in_invoice', 'out_refund'):
                     amount = sum([p.amount for p in payment.matched_credit_ids if p.credit_move_id in self.move_id.line_ids])
                     amount_currency = sum([p.amount_currency for p in payment.matched_credit_ids if p.credit_move_id in self.move_id.line_ids])
+                    if payment.matched_credit_ids:
+                        payment_currency_id = all([p.currency_id == payment.matched_credit_ids[0].currency_id for p in payment.matched_credit_ids]) and payment.matched_credit_ids[0].currency_id or False
                 # get the payment value in invoice currency
-                if payment.currency_id and payment.currency_id == self.currency_id:
+                if payment_currency_id and payment_currency_id == self.currency_id:
                     amount_to_show = amount_currency
                 else:
                     amount_to_show = payment.company_id.currency_id.with_context(date=payment.date).compute(amount, self.currency_id)
@@ -180,8 +188,8 @@ class AccountInvoice(models.Model):
     def _compute_payments(self):
         payment_lines = []
         for line in self.move_id.line_ids:
-            payment_lines.extend([rp.credit_move_id.id for rp in line.matched_credit_ids])
-            payment_lines.extend([rp.debit_move_id.id for rp in line.matched_debit_ids])
+            payment_lines.extend(filter(None, [rp.credit_move_id.id for rp in line.matched_credit_ids]))
+            payment_lines.extend(filter(None, [rp.debit_move_id.id for rp in line.matched_debit_ids]))
         self.payment_move_line_ids = self.env['account.move.line'].browse(list(set(payment_lines)))
 
     name = fields.Char(string='Reference/Description', index=True,
@@ -198,8 +206,9 @@ class AccountInvoice(models.Model):
         default=lambda self: self._context.get('type', 'out_invoice'),
         track_visibility='always')
 
+    refund_invoice_id = fields.Many2one('account.invoice', string="Invoice for which this invoice is the refund")
     number = fields.Char(related='move_id.name', store=True, readonly=True, copy=False)
-    move_name = fields.Char(string='Journal Entry', readonly=True,
+    move_name = fields.Char(string='Journal Entry Name', readonly=True,
         default=False, copy=False,
         help="Technical field holding the number given to the invoice, automatically set when the invoice is validated then stored to set the same number again if the invoice is cancelled, set to draft and re-validated.")
     reference = fields.Char(string='Vendor Reference',
@@ -261,22 +270,22 @@ class AccountInvoice(models.Model):
 
     amount_untaxed = fields.Monetary(string='Untaxed Amount',
         store=True, readonly=True, compute='_compute_amount', track_visibility='always')
-    amount_untaxed_signed = fields.Monetary(string='Untaxed Amount', currency_field='company_currency_id',
+    amount_untaxed_signed = fields.Monetary(string='Untaxed Amount in Company Currency', currency_field='company_currency_id',
         store=True, readonly=True, compute='_compute_amount')
     amount_tax = fields.Monetary(string='Tax',
         store=True, readonly=True, compute='_compute_amount')
     amount_total = fields.Monetary(string='Total',
         store=True, readonly=True, compute='_compute_amount')
-    amount_total_signed = fields.Monetary(string='Total', currency_field='currency_id',
+    amount_total_signed = fields.Monetary(string='Total in Invoice Currency', currency_field='currency_id',
         store=True, readonly=True, compute='_compute_amount',
         help="Total amount in the currency of the invoice, negative for credit notes.")
-    amount_total_company_signed = fields.Monetary(string='Total', currency_field='company_currency_id',
+    amount_total_company_signed = fields.Monetary(string='Total in Company Currency', currency_field='company_currency_id',
         store=True, readonly=True, compute='_compute_amount',
         help="Total amount in the currency of the company, negative for credit notes.")
     currency_id = fields.Many2one('res.currency', string='Currency',
         required=True, readonly=True, states={'draft': [('readonly', False)]},
         default=_default_currency, track_visibility='always')
-    company_currency_id = fields.Many2one('res.currency', related='company_id.currency_id', readonly=True)
+    company_currency_id = fields.Many2one('res.currency', related='company_id.currency_id', string="Company Currency", readonly=True)
     journal_id = fields.Many2one('account.journal', string='Journal',
         required=True, readonly=True, states={'draft': [('readonly', False)]},
         default=_default_journal,
@@ -293,12 +302,12 @@ class AccountInvoice(models.Model):
 
     residual = fields.Monetary(string='Amount Due',
         compute='_compute_residual', store=True, help="Remaining amount due.")
-    residual_signed = fields.Monetary(string='Amount Due', currency_field='currency_id',
+    residual_signed = fields.Monetary(string='Amount Due in Invoice Currency', currency_field='currency_id',
         compute='_compute_residual', store=True, help="Remaining amount due in the currency of the invoice.")
-    residual_company_signed = fields.Monetary(string='Amount Due', currency_field='company_currency_id',
+    residual_company_signed = fields.Monetary(string='Amount Due in Company Currency', currency_field='company_currency_id',
         compute='_compute_residual', store=True, help="Remaining amount due in the currency of the company.")
     payment_ids = fields.Many2many('account.payment', 'account_invoice_payment_rel', 'invoice_id', 'payment_id', string="Payments", copy=False, readonly=True)
-    payment_move_line_ids = fields.Many2many('account.move.line', string='Payments', compute='_compute_payments', store=True)
+    payment_move_line_ids = fields.Many2many('account.move.line', string='Payment Move Lines', compute='_compute_payments', store=True)
     user_id = fields.Many2one('res.users', string='Salesperson', track_visibility='onchange',
         readonly=True, states={'draft': [('readonly', False)]},
         default=lambda self: self.env.user)
@@ -318,9 +327,26 @@ class AccountInvoice(models.Model):
 
     @api.model
     def create(self, vals):
+        onchanges = {
+            '_onchange_partner_id': ['account_id', 'payment_term_id', 'fiscal_position_id', 'partner_bank_id'],
+            '_onchange_journal_id': ['currency_id'],
+        }
+        for onchange_method, changed_fields in onchanges.items():
+            if any(f not in vals for f in changed_fields):
+                invoice = self.new(vals)
+                getattr(invoice, onchange_method)()
+                for field in changed_fields:
+                    if field not in vals and invoice[field]:
+                        vals[field] = invoice._fields[field].convert_to_write(invoice[field], invoice)
         if not vals.get('account_id',False):
             raise UserError(_('Configuration error!\nCould not find any account to create the invoice, are you sure you have a chart of account installed?'))
-        return super(AccountInvoice, self.with_context(mail_create_nolog=True)).create(vals)
+
+        invoice = super(AccountInvoice, self.with_context(mail_create_nolog=True)).create(vals)
+
+        if any(line.invoice_line_tax_ids for line in invoice.invoice_line_ids) and not invoice.tax_line_ids:
+            invoice.compute_taxes()
+
+        return invoice
 
     @api.model
     def fields_view_get(self, view_id=None, view_type=False, toolbar=False, submenu=False):
@@ -431,30 +457,16 @@ class AccountInvoice(models.Model):
         payment_term_id = False
         fiscal_position = False
         bank_id = False
-        p = self.partner_id
         company_id = self.company_id.id
+        p = self.partner_id if not company_id else self.partner_id.with_context(force_company=company_id)
         type = self.type
         if p:
-            partner_id = p.id
             rec_account = p.property_account_receivable_id
             pay_account = p.property_account_payable_id
-            if company_id:
-                if p.property_account_receivable_id.company_id and \
-                        p.property_account_receivable_id.company_id.id != company_id and \
-                        p.property_account_payable_id.company_id and \
-                        p.property_account_payable_id.company_id.id != company_id:
-                    prop = self.env['ir.property']
-                    rec_dom = [('name', '=', 'property_account_receivable_id'), ('company_id', '=', company_id)]
-                    pay_dom = [('name', '=', 'property_account_payable_id'), ('company_id', '=', company_id)]
-                    res_dom = [('res_id', '=', 'res.partner,%s' % partner_id)]
-                    rec_prop = prop.search(rec_dom + res_dom) or prop.search(rec_dom)
-                    pay_prop = prop.search(pay_dom + res_dom) or prop.search(pay_dom)
-                    rec_account = rec_prop.get_by_record()
-                    pay_account = pay_prop.get_by_record()
-                    if not rec_account and not pay_account:
-                        action = self.env.ref('account.action_account_config')
-                        msg = _('Cannot find a chart of accounts for this company, You should configure it. \nPlease go to Account Configuration.')
-                        raise RedirectWarning(msg, action.id, _('Go to the configuration panel'))
+            if not rec_account and not pay_account:
+                action = self.env.ref('account.action_account_config')
+                msg = _('Cannot find a chart of accounts for this company, You should configure it. \nPlease go to Account Configuration.')
+                raise RedirectWarning(msg, action.id, _('Go to the configuration panel'))
 
             if type in ('out_invoice', 'out_refund'):
                 account_id = rec_account.id
@@ -512,14 +524,24 @@ class AccountInvoice(models.Model):
         self.write({'state': 'draft', 'date': False})
         self.delete_workflow()
         self.create_workflow()
-        # Delete attachments now since an invoice can also be generated when the invoice is cancelled
-        self.env['ir.attachment'].search([('res_model', '=', self._name), ('res_id', 'in', self.ids)]).unlink()
+        # Delete former printed invoice
+        try:
+            report_invoice = self.env['report']._get_report_from_name('account.report_invoice')
+        except IndexError:
+            report_invoice = False
+        if report_invoice:
+            for invoice in self:
+                with invoice.env.do_in_draft():
+                    invoice.number, invoice.state = invoice.move_name, 'open'
+                    attachment = self.env['report']._attachment_stored(invoice, report_invoice)[invoice.id]
+                if attachment:
+                    attachment.unlink()
         return True
 
     @api.multi
     def get_formview_id(self):
         """ Update form view id of action to open the invoice """
-        if self.type == 'in_invoice':
+        if self.type in ('in_invoice', 'in_refund'):
             return self.env.ref('account.invoice_supplier_form').id
         else:
             return self.env.ref('account.invoice_form').id
@@ -696,6 +718,9 @@ class AccountInvoice(models.Model):
                     line2[tmp]['credit'] = (am < 0) and -am or 0.0
                     line2[tmp]['amount_currency'] += l['amount_currency']
                     line2[tmp]['analytic_line_ids'] += l['analytic_line_ids']
+                    qty = l.get('quantity')
+                    if qty:
+                        line2[tmp]['quantity'] = line2[tmp].get('quantity', 0.0) + qty
                 else:
                     line2[tmp] = l
             line = []
@@ -940,6 +965,7 @@ class AccountInvoice(models.Model):
         values['state'] = 'draft'
         values['number'] = False
         values['origin'] = invoice.number
+        values['refund_invoice_id'] = invoice.id
 
         if date:
             values['date'] = date
@@ -955,7 +981,12 @@ class AccountInvoice(models.Model):
             # create the new invoice
             values = self._prepare_refund(invoice, date_invoice=date_invoice, date=date,
                                     description=description, journal_id=journal_id)
-            new_invoices += self.create(values)
+            refund_invoice = self.create(values)
+            invoice_type = {'out_invoice': ('customer invoices refund'),
+                'in_invoice': ('vendor bill refund')}
+            message = _("This %s has been created from: <a href=# data-oe-model=account.invoice data-oe-id=%d>%s</a>") % (invoice_type[invoice.type], invoice.id, invoice.number)
+            refund_invoice.message_post(body=message)
+            new_invoices += refund_invoice
         return new_invoices
 
     @api.v8
@@ -1105,7 +1136,7 @@ class AccountInvoiceLine(models.Model):
         default=0.0)
     invoice_line_tax_ids = fields.Many2many('account.tax',
         'account_invoice_line_tax', 'invoice_line_id', 'tax_id',
-        string='Taxes', domain=[('type_tax_use','!=','none')], oldname='invoice_line_tax_id')
+        string='Taxes', domain=[('type_tax_use','!=','none'), '|', ('active', '=', False), ('active', '=', True)], oldname='invoice_line_tax_id')
     account_analytic_id = fields.Many2one('account.analytic.account',
         string='Analytic Account')
     analytic_tag_ids = fields.Many2many('account.analytic.tag', string='Analytic Tags')
@@ -1266,7 +1297,7 @@ class AccountInvoiceTax(models.Model):
 
     invoice_id = fields.Many2one('account.invoice', string='Invoice', ondelete='cascade', index=True)
     name = fields.Char(string='Tax Description', required=True)
-    tax_id = fields.Many2one('account.tax', string='Tax')
+    tax_id = fields.Many2one('account.tax', string='Tax', ondelete='restrict')
     account_id = fields.Many2one('account.account', string='Tax Account', required=True, domain=[('deprecated', '=', False)])
     account_analytic_id = fields.Many2one('account.analytic.account', string='Analytic account')
     amount = fields.Monetary()

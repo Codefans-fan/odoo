@@ -70,6 +70,7 @@
                                                <p class="oe_account_font_help oe_account_font_title">Plus Non-Current Assets</p>
                                                <p class="oe_account_font_help" style="color: grey;border-top: 2px solid;border-bottom: 2px solid;">TOTAL ASSETS</p>
                                                <p class="oe_account_font_help oe_account_font_title">Minus Current Liabilities</p>
+                                               <p class="oe_account_font_help oe_account_font_title">Minus Credit Card Accounts</p>
                                                <p class="oe_account_font_help oe_account_font_title">Minus Payable Accounts</p>
                                                <p class="oe_account_font_help oe_account_font_title">Minus Non-Current Liabilities</p>
                                                <p class="oe_account_font_help" style="color: grey;border-top: 2px solid;border-bottom: 2px solid;">NET ASSETS</p>
@@ -426,7 +427,7 @@
             </field>
         </record>
         <record id="account_tag_action" model="ir.actions.act_window">
-            <field name="name">Tags</field>
+            <field name="name">Accounts Tags</field>
             <field name="res_model">account.account.tag</field>
             <field name="view_type">form</field>
             <field name="help" type="html">
@@ -786,19 +787,19 @@
                         </div>
                         <group attrs="{'invisible':[('has_second_line','!=',True)]}">
                             <group>
-                                <field name="second_account_id" domain="[('company_id', '=', company_id)]"/>
-                                <field name="second_amount_type"/>
-                                <field name="second_tax_id" domain="[('company_id', '=', company_id)]" widget="selection"/>
-                                <field name="second_analytic_account_id" groups="analytic.group_analytic_accounting" domain="[('company_id', '=', company_id)]"/>
+                                <field name="second_account_id" string="Account" domain="[('company_id', '=', company_id)]"/>
+                                <field name="second_amount_type" string="Amount type"/>
+                                <field name="second_tax_id" string="Tax" domain="[('company_id', '=', company_id)]" widget="selection"/>
+                                <field name="second_analytic_account_id" string="Analytic Account" groups="analytic.group_analytic_accounting" domain="[('company_id', '=', company_id)]"/>
                             </group>
                             <group>
-                                <field name="second_label"/>
-                                <label for="second_amount"/>
+                                <field name="second_label" string="Journal Item Label"/>
+                                <label for="second_amount" string="Amount"/>
                                 <div>
                                     <field name="second_amount" class="oe_inline"/>
                                     <label string="%" class="oe_inline" attrs="{'invisible':[('amount_type','!=','percentage')]}" />
                                 </div>
-                                <field name="second_journal_id" domain="[('company_id', '=', company_id)]" widget="selection"/>
+                                <field name="second_journal_id" string="Journal" domain="[('company_id', '=', company_id)]" widget="selection"/>
                             </group>
                         </group>
                     </sheet>
@@ -1221,7 +1222,7 @@
             <field name="view_id" ref="view_move_line_tree"/>
             <field name="view_mode">tree,form</field>
         </record>
-        <menuitem action="action_account_moves_all_a" icon="STOCK_JUSTIFY_FILL" id="menu_action_account_moves_all" parent="account.menu_finance_entries" sequence="1" groups="base.group_no_one" />
+        <menuitem action="action_account_moves_all_a" id="menu_action_account_moves_all" parent="account.menu_finance_entries" sequence="1" groups="base.group_no_one" />
         <record id="action_account_moves_all_tree" model="ir.actions.act_window">
             <field name="name">Journal Items</field>
             <field name="res_model">account.move.line</field>
@@ -1389,7 +1390,6 @@
             </field>
         </record>
         <menuitem
-            icon="STOCK_JUSTIFY_FILL"
             action="action_move_journal_line"
             id="menu_action_move_journal_line_form"
             parent="account.menu_finance_entries"
@@ -1461,10 +1461,11 @@
                         </group>
                         <group string="Due Date Computation">
                             <label for="days"/>
-                            <div class="o_row">
-                                <div>
-                                    <field name="days" attrs="{'invisible': [('option', 'in', ['last_day_following_month', 'last_day_current_month'])]}"/>
-                                    <field name="option" widget="radio"/>
+                            <div>
+                                <field name="option" widget="radio"/>
+                                <div class="o_row" attrs="{'invisible': [('option', 'in', ['last_day_following_month', 'last_day_current_month'])]}">
+                                    <field name="days"/>
+                                    days
                                 </div>
                             </div>
                         </group>
@@ -1893,6 +1894,10 @@
             parent="menu_finance_receivables"
             action="base.action_partner_customer_form" sequence="100"/>
 
+        <menuitem id="menu_product_template_action" name="Sellable Products"
+            parent="menu_finance_receivables"
+            action="product.product_template_action" sequence="110"/>
+
         <menuitem id="menu_account_supplier" name="Vendors"
             parent="menu_finance_payables"
             action="base.action_partner_supplier_form" sequence="100"/>
@@ -1948,8 +1953,8 @@
                     <field name="type"/>
                     <field name="account_report_id"/>
                     <group expand="0" string="Group By">
-                        <filter string="Parent Report" icon="terp-folder-orange" domain="" context="{'group_by':'parent_id'}"/>
-                        <filter string="Report Type" icon="terp-stock_symbol-selection" domain="[]" context="{'group_by':'type'}"/>
+                        <filter string="Parent Report" domain="" context="{'group_by':'parent_id'}"/>
+                        <filter string="Report Type" domain="[]" context="{'group_by':'type'}"/>
                     </group>
                 </search>
             </field>

@@ -48,7 +48,7 @@ class Currency(models.Model):
         self._cr.execute(query, (date, company_id, tuple(self.ids)))
         currency_rates = dict(self._cr.fetchall())
         for currency in self:
-            currency.rate = currency_rates.get(currency.id, 1.0)
+            currency.rate = currency_rates.get(currency.id) or 1.0
 
     @api.multi
     @api.depends('rounding')
@@ -77,12 +77,6 @@ class Currency(models.Model):
     @api.multi
     def name_get(self):
         return [(currency.id, tools.ustr(currency.name)) for currency in self]
-
-    @api.multi
-    def copy(self, default=None):
-        self.ensure_one()
-        default = dict(default or {}, name=_("%s (copy)") % self.name)
-        return super(Currency, self).copy(default=default)
 
     @api.v7
     def round(self, cr, uid, currency, amount):
@@ -221,7 +215,7 @@ class Currency(models.Model):
                 (SELECT name FROM res_currency_rate r2
                  WHERE r2.name > r.name AND
                        r2.currency_id = r.currency_id AND
-                       (r2.company_id is null  or r2.company_id = r.company_id)
+                       (r2.company_id is null or r2.company_id = c.id)
                  ORDER BY r2.name ASC
                  LIMIT 1) AS date_end
             FROM res_currency_rate r

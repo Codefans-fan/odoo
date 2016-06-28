@@ -28,8 +28,9 @@ class HrEmployee(models.Model):
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
     track_service = fields.Selection(selection_add=[('timesheet', 'Timesheets on project'), ('task', 'Create a task and track hours')])
-    project_id = fields.Many2one('project.project', string='Project', help='Create a task under this project on sale order validation.',
-                             ondelete='set null')
+    project_id = fields.Many2one('project.project', string='Project',
+                                 help='Create a task under this project on sale order validation. This setting must be set for each company.',
+                                 company_dependent=True)
 
     @api.onchange('type', 'invoice_policy')
     def onchange_type_timesheet(self):
@@ -162,9 +163,9 @@ class SaleOrder(models.Model):
             'name': action.name,
             'help': action.help,
             'type': action.type,
-            'views': [[list_view_id, 'tree'], [False, 'kanban'], [form_view_id, 'form'], [False, 'graph'], [False, 'calendar'], [False, 'pivot'], [False, 'graph']],
+            'views': [[False, 'kanban'], [list_view_id, 'tree'], [form_view_id, 'form'], [False, 'graph'], [False, 'calendar'], [False, 'pivot'], [False, 'graph']],
             'target': action.target,
-            'context': action.context,
+            'context': "{'group_by':'stage_id'}",
             'res_model': action.res_model,
         }
         if len(self.tasks_ids) > 1:
@@ -209,7 +210,7 @@ class SaleOrder(models.Model):
                 for line in order.order_line:
                     if line.product_id.track_service == 'timesheet':
                         if not order.project_id:
-                            order._create_analytic_account(prefix=order.product_id.default_code or None)
+                            order._create_analytic_account(prefix=line.product_id.default_code or None)
                         order.project_id.project_create({'name': order.project_id.name, 'use_tasks': True})
                         break
         return result
@@ -249,5 +250,8 @@ class SaleOrderLine(models.Model):
         return super(SaleOrderLine, self)._compute_analytic(domain=domain)
 
     @api.model
-    def _get_analytic_track_service(self):
-        return super(SaleOrderLine, self)._get_analytic_track_service() + ['timesheet', 'task']
+    def create(self, values):
+        line = super(SaleOrderLine, self).create(values)
+        if line.state == 'sale' and not line.order_id.project_id and line.product_id.track_service in ['timesheet', 'task']:
+            line.order_id._create_analytic_account()
+        return line

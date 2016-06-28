@@ -130,6 +130,9 @@ class Discussion(models.Model):
     message_concat = fields.Text(string='Message concatenate')
     important_messages = fields.One2many('test_new_api.message', 'discussion',
                                          domain=[('important', '=', True)])
+    emails = fields.One2many('test_new_api.emailmessage', 'discussion')
+    important_emails = fields.One2many('test_new_api.emailmessage', 'discussion',
+                                       domain=[('important', '=', True)])
 
     @api.onchange('moderator')
     def _onchange_moderator(self):
@@ -150,7 +153,7 @@ class Message(models.Model):
     display_name = fields.Char(string='Abstract', compute='_compute_display_name')
     size = fields.Integer(compute='_compute_size', search='_search_size')
     double_size = fields.Integer(compute='_compute_double_size')
-    discussion_name = fields.Char(related='discussion.name')
+    discussion_name = fields.Char(related='discussion.name', string="Discussion Name")
     author_partner = fields.Many2one(
         'res.partner', compute='_compute_author_partner',
         search='_search_author_partner')
@@ -210,6 +213,14 @@ class Message(models.Model):
         return [('author.partner_id', operator, value)]
 
 
+class EmailMessage(models.Model):
+    _name = 'test_new_api.emailmessage'
+    _inherits = {'test_new_api.message': 'message'}
+
+    message = fields.Many2one('test_new_api.message', 'Message',
+                              required=True, ondelete='cascade')
+    email_to = fields.Char('To')
+
 class Multi(models.Model):
     """ Model for testing multiple onchange methods in cascade that modify a
         one2many field several times.
@@ -248,6 +259,13 @@ class MixedModel(models.Model):
     lang = fields.Selection(string='Language', selection='_get_lang')
     reference = fields.Reference(string='Related Document',
         selection='_reference_models')
+    comment1 = fields.Html(sanitize=False)
+    comment2 = fields.Html(sanitize=True, strip_classes=False)
+    comment3 = fields.Html(sanitize=True, strip_classes=True)
+    comment4 = fields.Html(sanitize=True, strip_style=True)
+
+    currency_id = fields.Many2one('res.currency', default=lambda self: self.env.ref('base.EUR'))
+    amount = fields.Monetary()
 
     @api.one
     def _compute_now(self):

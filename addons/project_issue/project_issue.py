@@ -474,7 +474,7 @@ class project(osv.Model):
     def _issue_count(self, cr, uid, ids, field_name, arg, context=None):
         Issue = self.pool['project.issue']
         return {
-            project_id: Issue.search_count(cr,uid, [('project_id', '=', project_id), ('stage_id.fold', '=', False)], context=context)
+            project_id: Issue.search_count(cr,uid, [('project_id', '=', project_id), '|', ('stage_id.fold', '=', False), ('stage_id', '=', False)], context=context)
             for project_id in ids
         }
 
@@ -507,7 +507,7 @@ class account_analytic_account(osv.Model):
     _description = 'Analytic Account'
 
     _columns = {
-        'use_issues': fields.boolean('Issues', help="Check this box to manage customer activities through this project"),
+        'use_issues': fields.boolean('Use Issues', help="Check this box to manage customer activities through this project"),
     }
 
     def on_change_template(self, cr, uid, ids, template_id, date_start=False, context=None):
@@ -570,9 +570,10 @@ class project_project(osv.Model):
 class res_partner(osv.osv):
     def _issue_count(self, cr, uid, ids, field_name, arg, context=None):
         Issue = self.pool['project.issue']
+        partners = {id: self.search(cr, uid, [('id', 'child_of', ids)]) for id in ids}
         return {
-            partner_id: Issue.search_count(cr,uid, [('partner_id', '=', partner_id)])
-            for partner_id in ids
+            partner_id: Issue.search_count(cr, uid, [('partner_id', 'in', partners[partner_id])])
+            for partner_id in partners.keys()
         }
 
     """ Inherits partner and adds Issue information in the partner form """

@@ -1,6 +1,7 @@
 odoo.define('web.ActionManager', function (require) {
 "use strict";
 
+var Bus = require('web.Bus');
 var ControlPanel = require('web.ControlPanel');
 var core = require('web.core');
 var crash_manager = require('web.crash_manager');
@@ -585,6 +586,9 @@ var ActionManager = Widget.extend({
 
         core.bus.trigger('action', action);
 
+        // Force clear breadcrumbs if action's target is main
+        options.clear_breadcrumbs = (action.target === 'main') || options.clear_breadcrumbs;
+
         // Ensure context & domain are evaluated and can be manipulated/used
         var ncontext = new data.CompoundContext(options.additional_context, action.context || {});
         action.context = pyeval.eval('context', ncontext);
@@ -691,6 +695,9 @@ var ActionManager = Widget.extend({
                     // underlying form view (see comments above)
                     pre_dialog.on_close();
                 }
+                if (!pre_dialog) {
+                    self.dialog = null;
+                }
             };
             this.dialog.on("closed", null, this.dialog.on_close);
             this.dialog_widget = executor.widget();
@@ -706,7 +713,7 @@ var ActionManager = Widget.extend({
             if (this.dialog_widget.need_control_panel) {
                 // Set a fake bus to Dialogs needing a ControlPanel as they should not
                 // communicate with the main ControlPanel
-                this.dialog_widget.set_cp_bus(new core.Bus());
+                this.dialog_widget.set_cp_bus(new Bus());
             }
             this.dialog_widget.setParent(this.dialog);
 

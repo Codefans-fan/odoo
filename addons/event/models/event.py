@@ -47,7 +47,7 @@ class event_event(models.Model):
         readonly=False, states={'done': [('readonly', True)]},
         oldname='type')
     color = fields.Integer('Kanban Color Index')
-    event_mail_ids = fields.One2many('event.mail', 'event_id', string='Mail Schedule', default=lambda self: self._default_event_mail_ids())
+    event_mail_ids = fields.One2many('event.mail', 'event_id', string='Mail Schedule', default=lambda self: self._default_event_mail_ids(), copy=True)
 
     @api.model
     def _default_event_mail_ids(self):
@@ -72,7 +72,7 @@ class event_event(models.Model):
         oldname='register_current', string='Reserved Seats',
         store=True, readonly=True, compute='_compute_seats')
     seats_available = fields.Integer(
-        oldname='register_avail', string='Maximum Attendees',
+        oldname='register_avail', string='Available Seats',
         store=True, readonly=True, compute='_compute_seats')
     seats_unconfirmed = fields.Integer(
         oldname='register_prospect', string='Unconfirmed Seat Reservations',

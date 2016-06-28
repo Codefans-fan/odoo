@@ -182,8 +182,8 @@ class Applicant(models.Model):
         for record in self:
             record.attachment_number = attach_data.get(record.id, 0)
 
-    @api.model
-    def _read_group_stage_ids(self, ids, domain, read_group_order=None, access_rights_uid=None):
+    @api.multi
+    def _read_group_stage_ids(self, domain, read_group_order=None, access_rights_uid=None):
         access_rights_uid = access_rights_uid or self.env.uid
         Stage = self.env['hr.recruitment.stage']
         order = Stage._order
@@ -351,6 +351,7 @@ class Applicant(models.Model):
         action = attachment_action.read()[0]
         action['context'] = {'default_res_model': self._name, 'default_res_id': self.ids[0]}
         action['domain'] = str(['&', ('res_model', '=', self._name), ('res_id', 'in', self.ids)])
+        action['search_view_id'] = (self.env.ref('hr_recruitment.ir_attachment_view_search_inherit_hr_recruitment').id, )
         return action
 
     @api.multi

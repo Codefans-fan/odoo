@@ -73,7 +73,7 @@ class Partner(models.Model):
                              tracking_value.get_old_display_value()[0],
                              tracking_value.get_new_display_value()[0]))
 
-        is_discussion = message.subtype_id.id == self.env['ir.model.data'].xmlid_to_res_id('mail.mt_comment'),
+        is_discussion = message.subtype_id.id == self.env['ir.model.data'].xmlid_to_res_id('mail.mt_comment')
 
         return {
             'signature': signature,
@@ -83,6 +83,7 @@ class Partner(models.Model):
             'record_name': record_name,
             'tracking': tracking,
             'is_discussion': is_discussion,
+            'is_accessible': message._is_accessible()
         }
 
     @api.model

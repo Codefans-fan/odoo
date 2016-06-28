@@ -100,7 +100,10 @@ class SaleOrder(models.Model):
         for order in self:
             order.order_line._compute_tax_id()
 
-    name = fields.Char(string='Order Reference', required=True, copy=False, readonly=True, index=True, default=lambda self: _('New'))
+    def _inverse_project_id(self):
+        self.project_id = self.related_project_id
+
+    name = fields.Char(string='Order Reference', required=True, copy=False, readonly=True, states={'draft': [('readonly', False)]}, index=True, default=lambda self: _('New'))
     origin = fields.Char(string='Source Document', help="Reference of the document that generated this sales order request.")
     client_order_ref = fields.Char(string='Customer Reference', copy=False)
 
@@ -124,6 +127,7 @@ class SaleOrder(models.Model):
     pricelist_id = fields.Many2one('product.pricelist', string='Pricelist', required=True, readonly=True, states={'draft': [('readonly', False)], 'sent': [('readonly', False)]}, help="Pricelist for current sales order.")
     currency_id = fields.Many2one("res.currency", related='pricelist_id.currency_id', string="Currency", readonly=True, required=True)
     project_id = fields.Many2one('account.analytic.account', 'Analytic Account', readonly=True, states={'draft': [('readonly', False)], 'sent': [('readonly', False)]}, help="The analytic account related to a sales order.", copy=False)
+    related_project_id = fields.Many2one('account.analytic.account', inverse='_inverse_project_id', related='project_id', string='Analytic Account', help="The analytic account related to a sales order.")
 
     order_line = fields.One2many('sale.order.line', 'order_id', string='Order Lines', states={'cancel': [('readonly', True)], 'done': [('readonly', True)]}, copy=True)
 
@@ -282,6 +286,7 @@ class SaleOrder(models.Model):
             'type': 'out_invoice',
             'account_id': self.partner_invoice_id.property_account_receivable_id.id,
             'partner_id': self.partner_invoice_id.id,
+            'partner_shipping_id': self.partner_shipping_id.id,
             'journal_id': journal_id,
             'currency_id': self.pricelist_id.currency_id.id,
             'comment': self.note,
@@ -336,7 +341,7 @@ class SaleOrder(models.Model):
         inv_obj = self.env['account.invoice']
         precision = self.env['decimal.precision'].precision_get('Product Unit of Measure')
         invoices = {}
-
+        references = {}
         for order in self:
             group_key = order.id if grouped else (order.partner_invoice_id.id, order.currency_id.id)
             for line in order.order_line.sorted(key=lambda l: l.qty_to_invoice < 0):
@@ -345,6 +350,7 @@ class SaleOrder(models.Model):
                 if group_key not in invoices:
                     inv_data = order._prepare_invoice()
                     invoice = inv_obj.create(inv_data)
+                    references[invoice] = order
                     invoices[group_key] = invoice
                 elif group_key in invoices:
                     vals = {}
@@ -357,6 +363,14 @@ class SaleOrder(models.Model):
                     line.invoice_line_create(invoices[group_key].id, line.qty_to_invoice)
                 elif line.qty_to_invoice < 0 and final:
                     line.invoice_line_create(invoices[group_key].id, line.qty_to_invoice)
+
+            if references.get(invoices.get(group_key)):
+                if order not in references[invoices[group_key]]:
+                    references[invoice] = references[invoice] | order
+
+        if not invoices:
+            raise UserError(_('There is no invoicable line.'))
+
 
         for invoice in invoices.values():
             if not invoice.invoice_line_ids:
@@ -372,7 +386,9 @@ class SaleOrder(models.Model):
             # Necessary to force computation of taxes. In account_invoice, they are triggered
             # by onchanges, which are not triggered when doing a create.
             invoice.compute_taxes()
-
+            invoice.message_post_with_view('mail.message_origin_link',
+                values={'self': invoice, 'origin': references[invoice]},
+                subtype_id=self.env.ref('mail.mt_note').id)
         return [inv.id for inv in invoices.values()]
 
     @api.multi
@@ -602,26 +618,28 @@ class SaleOrderLine(models.Model):
                         qty_invoiced -= self.env['product.uom']._compute_qty_obj(invoice_line.uom_id, invoice_line.quantity, line.product_uom)
             line.qty_invoiced = qty_invoiced
 
-    @api.depends('price_subtotal', 'product_uom_qty')
+    @api.depends('price_unit', 'discount')
     def _get_price_reduce(self):
         for line in self:
-            line.price_reduce = line.price_subtotal / line.product_uom_qty if line.product_uom_qty else 0.0
+            line.price_reduce = line.price_unit * (1.0 - line.discount / 100.0)
+
+    @api.depends('price_total', 'product_uom_qty')
+    def _get_price_reduce_tax(self):
+        for line in self:
+            line.price_reduce_taxinc = line.price_total / line.product_uom_qty if line.product_uom_qty else 0.0
+
+    @api.depends('price_subtotal', 'product_uom_qty')
+    def _get_price_reduce_notax(self):
+        for line in self:
+            line.price_reduce_taxexcl = line.price_subtotal / line.product_uom_qty if line.product_uom_qty else 0.0
 
     @api.multi
     def _compute_tax_id(self):
         for line in self:
             fpos = line.order_id.fiscal_position_id or line.order_id.partner_id.property_account_position_id
-            if fpos:
-                # The superuser is used by website_sale in order to create a sale order. We need to make
-                # sure we only select the taxes related to the company of the partner. This should only
-                # apply if the partner is linked to a company.
-                if self.env.uid == SUPERUSER_ID and line.order_id.company_id:
-                    taxes = fpos.map_tax(line.product_id.taxes_id).filtered(lambda r: r.company_id == line.order_id.company_id)
-                else:
-                    taxes = fpos.map_tax(line.product_id.taxes_id)
-                line.tax_id = taxes
-            else:
-                line.tax_id = line.product_id.taxes_id if line.product_id.taxes_id else False
+            # If company_id is set, always filter taxes by the company
+            taxes = line.product_id.taxes_id.filtered(lambda r: not line.company_id or r.company_id == line.company_id)
+            line.tax_id = fpos.map_tax(taxes) if fpos else taxes
 
     @api.multi
     def _prepare_order_line_procurement(self, group_id=False):
@@ -662,13 +680,12 @@ class SaleOrderLine(models.Model):
             vals = line._prepare_order_line_procurement(group_id=line.order_id.procurement_group_id.id)
             vals['product_qty'] = line.product_uom_qty - qty
             new_proc = self.env["procurement.order"].create(vals)
+            new_proc.message_post_with_view('mail.message_origin_link',
+                values={'self': new_proc, 'origin': line.order_id},
+                subtype_id=self.env.ref('mail.mt_note').id)
             new_procs += new_proc
         new_procs.run()
         return new_procs
-
-    @api.model
-    def _get_analytic_track_service(self):
-        return []
 
     @api.model
     def create(self, values):
@@ -681,9 +698,6 @@ class SaleOrderLine(models.Model):
                     values[field] = line._fields[field].convert_to_write(line[field], line)
         line = super(SaleOrderLine, self).create(values)
         if line.state == 'sale':
-            if (not line.order_id.project_id and
-                (line.product_id.track_service in self._get_analytic_track_service())):
-                line.order_id._create_analytic_account()
             line._action_procurement_create()
 
         return line
@@ -718,7 +732,9 @@ class SaleOrderLine(models.Model):
     price_total = fields.Monetary(compute='_compute_amount', string='Total', readonly=True, store=True)
 
     price_reduce = fields.Monetary(compute='_get_price_reduce', string='Price Reduce', readonly=True, store=True)
-    tax_id = fields.Many2many('account.tax', string='Taxes')
+    tax_id = fields.Many2many('account.tax', string='Taxes', domain=['|', ('active', '=', False), ('active', '=', True)])
+    price_reduce_taxinc = fields.Monetary(compute='_get_price_reduce_tax', string='Price Reduce Tax inc', readonly=True, store=True)
+    price_reduce_taxexcl = fields.Monetary(compute='_get_price_reduce_notax', string='Price Reduce Tax excl', readonly=True, store=True)
 
     discount = fields.Float(string='Discount (%)', digits=dp.get_precision('Discount'), default=0.0)
 
@@ -906,7 +922,33 @@ class AccountInvoice(models.Model):
     def _get_default_team(self):
         return self.env['crm.team']._get_default_team_id()
 
+    def _default_comment(self):
+        invoice_type = self.env.context.get('type', 'out_invoice')
+        if invoice_type == 'out_invoice':
+            return self.env.user.company_id.sale_note
+
     team_id = fields.Many2one('crm.team', string='Sales Team', default=_get_default_team, oldname='section_id')
+    comment = fields.Text(default=_default_comment)
+    partner_shipping_id = fields.Many2one(
+        'res.partner',
+        string='Delivery Address',
+        readonly=True,
+        states={'draft': [('readonly', False)]},
+        help="Delivery address for current invoice.")
+
+    @api.onchange('partner_shipping_id')
+    def _onchange_partner_shipping_id(self):
+        """
+        Trigger the change of fiscal position when the shipping address is modified.
+        """
+        fiscal_position = self.env['account.fiscal.position'].get_fiscal_position(self.partner_id.id, self.partner_shipping_id.id)
+        if fiscal_position:
+            self.fiscal_position_id = fiscal_position
+
+    @api.onchange('partner_id', 'company_id')
+    def _onchange_delivery_address(self):
+        addr = self.partner_id.address_get(['delivery'])
+        self.partner_shipping_id = addr and addr.get('delivery')
 
     @api.multi
     def confirm_paid(self):

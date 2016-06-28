@@ -270,7 +270,7 @@ class Product(models.Model):
             [('product_id', 'in', self.ids)],
             ['product_id', 'product_min_qty', 'product_max_qty'],
             ['product_id'])
-        res = dict.fromkeys(self.ids, dict())
+        res = {i: {} for i in self.ids}
         for data in read_group_res:
             res[data['product_id'][0]]['nbr_reordering_rules'] = int(data['product_id_count'])
             res[data['product_id'][0]]['reordering_min_qty'] = data['product_min_qty']
@@ -439,9 +439,9 @@ class ProductTemplate(models.Model):
             res[product_tmpl_id]['reordering_min_qty'] = data['product_min_qty']
             res[product_tmpl_id]['reordering_max_qty'] = data['product_max_qty']
         for template in self:
-            self.nbr_reordering_rules = res[template.id]['nbr_reordering_rules']
-            self.reordering_min_qty = res[template.id]['reordering_min_qty']
-            self.reordering_max_qty = res[template.id]['reordering_max_qty']
+            template.nbr_reordering_rules = res[template.id]['nbr_reordering_rules']
+            template.reordering_min_qty = res[template.id]['reordering_min_qty']
+            template.reordering_max_qty = res[template.id]['reordering_max_qty']
 
     @api.model
     def _get_product_template_type(self):

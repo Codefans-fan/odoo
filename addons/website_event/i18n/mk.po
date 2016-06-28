@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: Odoo 9.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2015-09-29 10:27+0000\n"
-"PO-Revision-Date: 2016-05-12 15:08+0000\n"
+"PO-Revision-Date: 2016-06-10 12:29+0000\n"
 "Last-Translator: Aleksandar Vangelovski <aleksandarv@hbee.eu>\n"
 "Language-Team: Macedonian (http://www.transifex.com/odoo/odoo-9/language/mk/)\n"
 "MIME-Version: 1.0\n"
@@ -90,7 +90,7 @@ msgstr "<strong>Име</strong>"
 #. module: website_event
 #: model:ir.ui.view,arch_db:website_event.event_description_full
 msgid "<strong>Participate on Twitter</strong>"
-msgstr ""
+msgstr "<strong>Учествувајте на Twitter</strong>"
 
 #. module: website_event
 #: model:ir.ui.view,arch_db:website_event.registration_attendee_details
@@ -231,7 +231,7 @@ msgstr "Влечи и пушти блок"
 #: code:addons/website_event/static/src/js/website.tour.event.js:60
 #, python-format
 msgid "Drag the 'Image-Text' block and drop it in your page."
-msgstr ""
+msgstr "Влечете го 'Image-Text' блокот и пуштете го на вашата страна."
 
 #. module: website_event
 #. openerp-web
@@ -489,7 +489,7 @@ msgstr "Регистрација"
 #. module: website_event
 #: model:ir.ui.view,arch_db:website_event.registration_template
 msgid "Register Now"
-msgstr ""
+msgstr "Регистрирај се сега"
 
 #. module: website_event
 #: model:ir.ui.view,arch_db:website_event.404
@@ -687,7 +687,7 @@ msgstr "или"
 #. module: website_event
 #: model:ir.ui.view,arch_db:website_event.index
 msgid "pull-right"
-msgstr ""
+msgstr "повлечи-десно"
 
 #. module: website_event
 #: model:ir.ui.view,arch_db:website_event.event_details

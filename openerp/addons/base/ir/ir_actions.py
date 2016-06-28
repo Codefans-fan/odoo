@@ -12,7 +12,7 @@ import odoo
 from odoo import api, fields, models, tools, workflow, _
 from odoo.exceptions import MissingError, UserError, ValidationError
 from odoo.report.report_sxw import report_sxw, report_rml
-from odoo.tools.safe_eval import safe_eval as eval
+from odoo.tools.safe_eval import safe_eval as eval, test_python_expr
 
 _logger = logging.getLogger(__name__)
 
@@ -289,7 +289,7 @@ class IrActionsActWindow(models.Model):
                             help="Model name of the object to open in the view window")
     src_model = fields.Char(string='Source Model',
                             help="Optional model name of the objects on which this action should be visible")
-    target = fields.Selection([('current', 'Current Window'), ('new', 'New Window'), ('inline', 'Inline Edit'), ('inlineview', 'Inline View'), ('fullscreen', 'Full Screen')], default="current", string='Target Window')
+    target = fields.Selection([('current', 'Current Window'), ('new', 'New Window'), ('inline', 'Inline Edit'), ('fullscreen', 'Full Screen'), ('main', 'Main action of Current Window')], default="current", string='Target Window')
     view_mode = fields.Char(required=True, default='tree,form',
                             help="Comma-separated list of allowed view modes, such as 'form', 'tree', 'calendar', etc. (Default: tree,form)")
     view_type = fields.Selection([('tree', 'Tree'), ('form', 'Form')], default="form", string='View Type', required=True,
@@ -302,7 +302,6 @@ class IrActionsActWindow(models.Model):
                                "when displaying the result of an action, federating view mode, views and " \
                                "reference view. The result is returned as an ordered list of pairs (view_id,view_mode).")
     limit = fields.Integer(default=80, help='Default limit for the list view')
-    auto_refresh = fields.Integer(default=0, help='Add an auto-refresh on the view')
     groups_id = fields.Many2many('res.groups', 'ir_act_window_group_rel',
                                  'act_id', 'gid', string='Groups')
     search_view_id = fields.Many2one('ir.ui.view', string='Search View Ref.')
@@ -512,7 +511,7 @@ class IrActionsServer(models.Model):
     # Workflow signal
     use_relational_model = fields.Selection([('base', 'Use the base model of the action'),
                                              ('relational', 'Use a relation field on the base model')],
-                                            string='Target Model', default='base', required=True)
+                                            string='Relational Target Model', default='base', required=True)
     wkf_transition_id = fields.Many2one('workflow.transition', string='Signal to Trigger',
                                         help="Select the workflow signal to trigger.")
     wkf_model_id = fields.Many2one('ir.model', string='Target Model',
@@ -529,7 +528,7 @@ class IrActionsServer(models.Model):
                                    ('copy_current', 'Copy the current record'),
                                    ('copy_other', 'Choose and copy a record in the database')],
                                   string="Creation Policy", default='new', required=True)
-    crud_model_id = fields.Many2one('ir.model', string='Target Model',
+    crud_model_id = fields.Many2one('ir.model', string='Create/Write Target Model',
                                     oldname='srcmodel_id', help="Model for record creation / update. Set this field only to specify a different model than the base model.")
     crud_model_name = fields.Char(string='Create/Write Target Model Name', related='crud_model_id.model', store=True, readonly=True)
     ref_object = fields.Reference(string='Reference record', selection='_select_objects', oldname='copy_object')
@@ -595,6 +594,13 @@ class IrActionsServer(models.Model):
             if ftype == 'many2one':
                 model_name = field.comodel_name
         return (True, model_name, None)
+
+    @api.constrains('code')
+    def _check_python_code(self):
+        for action in self.filtered('code'):
+            msg = test_python_expr(expr=action.code.strip(), mode="exec")
+            if msg:
+                raise ValidationError(msg)
 
     @api.constrains('write_expression', 'model_id')
     def _check_write_expression(self):
@@ -1127,6 +1133,7 @@ class IrActionsActClient(models.Model):
                       help="An arbitrary string, interpreted by the client"
                            " according to its own needs and wishes. There "
                            "is no central tag repository across clients.")
+    target = fields.Selection([('current', 'Current Window'), ('new', 'New Window'), ('fullscreen', 'Full Screen'), ('main', 'Main action of Current Window')], default="current", string='Target Window')
     res_model = fields.Char(string='Destination Model', help="Optional model, mostly used for needactions.")
     context = fields.Char(string='Context Value', default="{}", required=True, help="Context dictionary as Python expression, empty by default (Default: {})")
     params = fields.Binary(compute='_compute_params', inverse='_inverse_params', string='Supplementary arguments',

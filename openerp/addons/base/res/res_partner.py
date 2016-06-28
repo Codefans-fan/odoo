@@ -136,7 +136,7 @@ class Partner(models.Model, FormatAddress):
         return self.env['res.company']._company_default_get('res.partner')
 
     name = fields.Char(index=True)
-    display_name = fields.Char(compute='_compute_display_name', string='Name', store=True, index=True)
+    display_name = fields.Char(compute='_compute_display_name', store=True, index=True)
     date = fields.Date(index=True)
     title = fields.Many2one('res.partner.title')
     parent_id = fields.Many2one('res.partner', string='Related Company', index=True)
@@ -190,7 +190,6 @@ class Partner(models.Model, FormatAddress):
     phone = fields.Char()
     fax = fields.Char()
     mobile = fields.Char()
-    birthdate = fields.Char()
     is_company = fields.Boolean(string='Is a Company', default=False,
         help="Check if the contact is a company, otherwise it is a person")
     # company_type is only an interface field, do not use it in business logic
@@ -494,10 +493,10 @@ class Partner(models.Model, FormatAddress):
         # cannot be easily performed if default images are in the way
         if not vals.get('image'):
             vals['image'] = self._get_default_image(vals.get('type'), vals.get('is_company'), vals.get('parent_id'))
+        tools.image_resize_images(vals)
         partner = super(Partner, self).create(vals)
         partner._fields_sync(vals)
         partner._handle_first_contact_creation()
-        tools.image_resize_images(vals)
         return partner
 
     @api.multi
@@ -527,12 +526,11 @@ class Partner(models.Model, FormatAddress):
     @api.multi
     def name_get(self):
         res = []
-        types_dict = dict(self.fields_get()['type']['selection'])
         for partner in self:
             name = partner.name or ''
             if partner.parent_id and not partner.is_company:
                 if not name and partner.type in ['invoice', 'delivery', 'other']:
-                    name = types_dict[partner.type]
+                    name = dict(self.fields_get(['type'])['type']['selection'])[partner.type]
                 name = "%s, %s" % (partner.parent_name, name)
             if self._context.get('show_address_only'):
                 name = partner._display_address(without_company=True)
