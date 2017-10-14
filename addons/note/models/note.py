@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import api, fields, models
+from odoo import api, fields, models, _
 from odoo.tools import html2plaintext
 
 
@@ -22,7 +22,7 @@ class Tag(models.Model):
     _name = "note.tag"
     _description = "Note Tag"
 
-    name = fields.Char('Tag Name', required=True)
+    name = fields.Char('Tag Name', required=True, translate=True)
     color = fields.Integer('Color Index')
 
     _sql_constraints = [
@@ -33,7 +33,7 @@ class Tag(models.Model):
 class Note(models.Model):
 
     _name = 'note.note'
-    _inherit = ['mail.thread']
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _description = "Note"
     _order = 'sequence'
 
@@ -45,9 +45,10 @@ class Note(models.Model):
     memo = fields.Html('Note Content')
     sequence = fields.Integer('Sequence')
     stage_id = fields.Many2one('note.stage', compute='_compute_stage_id',
-        inverse='_inverse_stage_id', default=_get_default_stage_id, string='Stage')
-    stage_ids = fields.Many2many('note.stage', 'note_stage_rel', 'note_id', 'stage_id', string='Stages of Users')
-    open = fields.Boolean(string='Active', track_visibility='onchange', default=True)
+        inverse='_inverse_stage_id', string='Stage')
+    stage_ids = fields.Many2many('note.stage', 'note_stage_rel', 'note_id', 'stage_id',
+        string='Stages of Users',  default=_get_default_stage_id)
+    open = fields.Boolean(string='Active', default=True)
     date_done = fields.Date('Date done')
     color = fields.Integer(string='Color Index')
     tag_ids = fields.Many2many('note.tag', 'note_tags_rel', 'note_id', 'tag_id', string='Tags')
@@ -118,16 +119,6 @@ class Note(models.Model):
                     result = []
             return result
         return super(Note, self).read_group(domain, fields, groupby, offset=offset, limit=limit, orderby=orderby, lazy=lazy)
-
-    @api.multi
-    def _notification_get_recipient_groups(self, message, recipients):
-        res = super(Note, self)._notification_get_recipient_groups(message, recipients)
-        new_action_id = self.env['ir.model.data'].xmlid_to_res_id('note.action_note_note')
-        new_action = self._notification_link_helper('new', action_id=new_action_id)
-        res['user'] = {
-            'actions': [{'url': new_action, 'title': _('New Note')}]
-        }
-        return res
 
     @api.multi
     def action_close(self):

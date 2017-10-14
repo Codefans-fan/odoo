@@ -3,8 +3,8 @@
 import time
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from openerp import api, fields, models, _
-from openerp.exceptions import UserError
+from odoo import api, fields, models, _
+from odoo.exceptions import UserError
 
 
 class AccountAgedTrialBalance(models.TransientModel):
@@ -38,4 +38,4 @@ class AccountAgedTrialBalance(models.TransientModel):
             }
             start = stop - relativedelta(days=1)
         data['form'].update(res)
-        return self.env['report'].with_context(landscape=True).get_action(self, 'account.report_agedpartnerbalance', data=data)
+        return self.env.ref('account.action_report_aged_partner_balance').with_context(landscape=True).report_action(self, data=data)

@@ -3,16 +3,18 @@
 # * pos_restaurant
 # 
 # Translators:
-# krnkris, 2015
-# krnkris, 2016
+# krnkris <krnkris@freemail.hu>, 2017
+# Martin Trigaux <mat@odoo.com>, 2017
+# gezza <geza.nagy@oregional.hu>, 2017
+# Kovács Tibor <kovika@gmail.com>, 2017
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo 9.0\n"
+"Project-Id-Version: Odoo Server 10.saas~18\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2015-09-07 14:39+0000\n"
-"PO-Revision-Date: 2016-06-06 19:55+0000\n"
-"Last-Translator: krnkris\n"
-"Language-Team: Hungarian (http://www.transifex.com/odoo/odoo-9/language/hu/)\n"
+"POT-Creation-Date: 2017-09-20 09:52+0000\n"
+"PO-Revision-Date: 2017-09-20 09:52+0000\n"
+"Last-Translator: Kovács Tibor <kovika@gmail.com>, 2017\n"
+"Language-Team: Hungarian (https://www.transifex.com/odoo/teams/41243/hu/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
@@ -20,18 +22,37 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.view_restaurant_floor_kanban
+msgid "<strong>Floor Name: </strong>"
+msgstr ""
+
+#. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.view_restaurant_floor_kanban
+msgid "<strong>Point of Sale: </strong>"
+msgstr ""
+
+#. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_restaurant_floor_background_image
 msgid ""
 "A background image used to display a floor layout in the point of sale "
 "interface"
-msgstr "Egy háttér kép, amit az ülésrend elrendezésének kijelzésére használ az értékesítési hely kassza interfészén."
+msgstr ""
+"Egy háttér kép, amit az ülésrend elrendezésének kijelzésére használ az "
+"értékesítési hely kassza interfészén."
 
 #. module: pos_restaurant
 #: model:ir.actions.act_window,help:pos_restaurant.action_restaurant_floor_form
 msgid ""
 "A restaurant floor represents the place where customers are served, this is where you can\n"
 "                define and position the tables."
-msgstr "Egy étterem ülésrendje képviseli a vendégek felszolgálási helyeit, ahová asztalokat \n                határozhat meg és állíthat be."
+msgstr ""
+"Egy étterem ülésrendje képviseli a vendégek felszolgálási helyeit, ahová asztalokat \n"
+"                határozhat meg és állíthat be."
+
+#. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Accept customer tips or convert their change to a tip"
+msgstr ""
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_active
@@ -46,14 +67,24 @@ msgid "Add Note"
 msgstr "Értesítés hozzáadás"
 
 #. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Add notes to orderlines"
+msgstr ""
+
+#. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_pos_config_iface_orderline_notes
-msgid "Allow custom notes on Orderlines"
-msgstr "Engedélyezi az egyedi megjegyzéseket a Megrendelési tételsorokon"
+msgid "Allow custom notes on Orderlines."
+msgstr ""
+
+#. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Allow to print bill before payment"
+msgstr ""
 
 #. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_pos_config_iface_printbill
-msgid "Allows to print the Bill before payment"
-msgstr "Lehetővé teszi a nyugta kinyomtatását a fizetés előtt"
+msgid "Allows to print the Bill before payment."
+msgstr ""
 
 #. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_restaurant_table_name
@@ -77,7 +108,7 @@ msgstr "Megjelenítés"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/js/floors.js:535
+#: code:addons/pos_restaurant/static/src/js/floors.js:562
 #, python-format
 msgid "Are you sure ?"
 msgstr "Biztos benne ?"
@@ -99,11 +130,6 @@ msgstr "Háttér szín"
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_floor_background_image
 msgid "Background Image"
 msgstr "Háttér kép"
-
-#. module: pos_restaurant
-#: model:ir.ui.view,arch_db:pos_restaurant.view_pos_config_form
-msgid "Bar & Restaurant"
-msgstr "Bár & Étterem"
 
 #. module: pos_restaurant
 #. openerp-web
@@ -130,26 +156,19 @@ msgstr "Nyugta szétosztás"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/xml/multiprint.xml:30
+#: code:addons/pos_restaurant/static/src/xml/multiprint.xml:39
 #, python-format
 msgid "CANCELLED"
 msgstr "VISSZAVONT"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/js/floors.js:260
-#: code:addons/pos_restaurant/static/src/js/floors.js:396
+#: code:addons/pos_restaurant/static/src/js/floors.js:270
+#: code:addons/pos_restaurant/static/src/js/floors.js:309
+#: code:addons/pos_restaurant/static/src/js/floors.js:425
 #, python-format
 msgid "Changes could not be saved"
 msgstr "Változtatások nem menthetőek"
-
-#. module: pos_restaurant
-#. openerp-web
-#: code:addons/pos_restaurant/static/src/js/floors.js:261
-#: code:addons/pos_restaurant/static/src/js/floors.js:397
-#, python-format
-msgid "Check your internet connection and access rights"
-msgstr "Ellenőrizze internetkapcsolatát, és hozzáférési jogosultságait"
 
 #. module: pos_restaurant
 #: model:ir.actions.act_window,help:pos_restaurant.action_restaurant_floor_form
@@ -171,14 +190,14 @@ msgstr "Szín"
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_printer_create_uid
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_create_uid
 msgid "Created by"
-msgstr "Készítette"
+msgstr "Létrehozta"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_floor_create_date
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_printer_create_date
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_create_date
 msgid "Created on"
-msgstr "Létrehozás dátuma"
+msgstr "Létrehozva"
 
 #. module: pos_restaurant
 #. openerp-web
@@ -199,21 +218,25 @@ msgstr "Árengedmények"
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_printer_display_name
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_display_name
 msgid "Display Name"
-msgstr "Név megjelenítése"
+msgstr "Megjelenített név"
 
 #. module: pos_restaurant
 #: model:ir.actions.act_window,help:pos_restaurant.action_restaurant_printer_form
 msgid ""
 "Each Order Printer has an IP Address that defines the PosBox/Hardware\n"
 "                Proxy where the printer can be found, and a list of product categories.\n"
-"                An Order Printer will only print updates for prodcuts belonging to one of\n"
+"                An Order Printer will only print updates for products belonging to one of\n"
 "                its categories."
-msgstr " Mindegyik rendelés nyomtató saját IP elérési címmel rendelkezik,  melyik meghatározza\n                 a Pénztárgépet/Hardver Proxy ahol a nyomtató található, és egy termék kategória listát. \n                 Egy rendelés nyomtató csak akkor nyomtat frissítést, ha a termék az egyik \n                kategóriájába tartozik."
+msgstr ""
+" Mindegyik rendelés nyomtató saját IP elérési címmel rendelkezik,  melyik meghatározza\n"
+"                 a Pénztárgépet/Hardver Proxy ahol a nyomtató található, és egy termék kategória listát. \n"
+"                 Egy rendelés nyomtató csak akkor nyomtat frissítést, ha a termék az egyik \n"
+"                kategóriájába tartozik."
 
 #. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_pos_config_iface_splitbill
-msgid "Enables Bill Splitting in the Point of Sale"
-msgstr "Bekapcsolja a nyugta szétválasztást az értékesítési pont kasszájánál"
+msgid "Enables Bill Splitting in the Point of Sale."
+msgstr ""
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_floor_id
@@ -232,8 +255,13 @@ msgid "Floor Plans"
 msgstr "Ülésrend tervek"
 
 #. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Floors"
+msgstr ""
+
+#. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/xml/floors.xml:22
+#: code:addons/pos_restaurant/static/src/xml/floors.xml:28
 #: model:ir.model.fields,field_description:pos_restaurant.field_pos_order_customer_count
 #, python-format
 msgid "Guests"
@@ -241,10 +269,18 @@ msgstr "Vendégek"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/js/floors.js:883
+#: code:addons/pos_restaurant/static/src/js/floors.js:946
 #, python-format
 msgid "Guests ?"
 msgstr "Vendégek ?"
+
+#. module: pos_restaurant
+#. openerp-web
+#: code:addons/pos_restaurant/static/src/xml/floors.xml:10
+#: code:addons/pos_restaurant/static/src/xml/floors.xml:21
+#, python-format
+msgid "Guests:"
+msgstr "Vendégek:"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_height
@@ -261,28 +297,30 @@ msgstr "Vízszintes pozíció"
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_printer_id
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_id
 msgid "ID"
-msgstr "ID"
+msgstr "Azonosító"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_restaurant_table_active
 msgid ""
 "If false, the table is deactivated and will not be available in the point of"
 " sale"
-msgstr "Ha hamis, a táblázat hatástalanított és nem lesz elérhető az értékesítési pont kasszán"
+msgstr ""
+"Ha hamis, a táblázat hatástalanított és nem lesz elérhető az értékesítési "
+"pont kasszán"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_floor___last_update
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_printer___last_update
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table___last_update
 msgid "Last Modified on"
-msgstr "Utolsó frissítés dátuma"
+msgstr "Utoljára módosítva"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_floor_write_uid
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_printer_write_uid
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_write_uid
 msgid "Last Updated by"
-msgstr "Utoljára frissítve, által"
+msgstr "Utoljára frissítette"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_floor_write_date
@@ -292,16 +330,21 @@ msgid "Last Updated on"
 msgstr "Utoljára frissítve "
 
 #. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Manage table orders"
+msgstr ""
+
+#. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/xml/multiprint.xml:52
+#: code:addons/pos_restaurant/static/src/xml/multiprint.xml:62
 #, python-format
 msgid "NEW"
 msgstr "ÚJ"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/xml/multiprint.xml:40
-#: code:addons/pos_restaurant/static/src/xml/multiprint.xml:62
+#: code:addons/pos_restaurant/static/src/xml/multiprint.xml:50
+#: code:addons/pos_restaurant/static/src/xml/multiprint.xml:73
 #, python-format
 msgid "NOTE"
 msgstr "ÉRTESÍTÉS"
@@ -311,11 +354,11 @@ msgstr "ÉRTESÍTÉS"
 #: code:addons/pos_restaurant/static/src/xml/notes.xml:16
 #, python-format
 msgid "Note"
-msgstr "Megjegyzés"
+msgstr "Jegyzet"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/js/floors.js:468
+#: code:addons/pos_restaurant/static/src/js/floors.js:495
 #, python-format
 msgid "Number of Seats ?"
 msgstr "Székek száma ?"
@@ -325,17 +368,18 @@ msgstr "Székek száma ?"
 #: code:addons/pos_restaurant/static/src/xml/printbill.xml:13
 #, python-format
 msgid "Ok"
-msgstr "Rendben"
+msgstr "Ok"
 
 #. module: pos_restaurant
 #. openerp-web
 #: code:addons/pos_restaurant/static/src/xml/multiprint.xml:6
 #, python-format
 msgid "Order"
-msgstr "Átutalási megbízás"
+msgstr "Rendelés"
 
 #. module: pos_restaurant
 #: model:ir.actions.act_window,name:pos_restaurant.action_restaurant_printer_form
+#: model:ir.model.fields,field_description:pos_restaurant.field_pos_config_is_order_printer
 #: model:ir.model.fields,field_description:pos_restaurant.field_pos_config_printer_ids
 #: model:ir.ui.menu,name:pos_restaurant.menu_restaurant_printer_all
 msgid "Order Printers"
@@ -346,7 +390,9 @@ msgstr "Rendelés nyomtatók"
 msgid ""
 "Order Printers are used by restaurants and bars to print the\n"
 "                order updates in the kitchen/bar when the waiter updates the order."
-msgstr "Megrendelés nyomtatót a bárokban és éttermekben használnak a megrendelések\n                frissítéseinek nyomtatására a konyhában/bárban, amint a felszolgáló frissíti a megrendelést."
+msgstr ""
+"Megrendelés nyomtatót a bárokban és éttermekben használnak a megrendelések\n"
+"                frissítéseinek nyomtatására a konyhában/bárban, amint a felszolgáló frissíti a megrendelést."
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_pos_config_iface_orderline_notes
@@ -366,15 +412,14 @@ msgid "Payment"
 msgstr "Kifizetés"
 
 #. module: pos_restaurant
-#: model:ir.model,name:pos_restaurant.model_pos_order
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_floor_pos_config_id
 msgid "Point of Sale"
 msgstr "Értékesítési pont"
 
 #. module: pos_restaurant
-#: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_pos_order_ids
-msgid "Pos Orders"
-msgstr "Értékesítési ponti kassza rendelései"
+#: model:ir.model,name:pos_restaurant.model_pos_order
+msgid "Point of Sale Orders"
+msgstr "Értékesítési pont rendelések"
 
 #. module: pos_restaurant
 #. openerp-web
@@ -382,6 +427,11 @@ msgstr "Értékesítési ponti kassza rendelései"
 #, python-format
 msgid "Print"
 msgstr "Nyomtatás"
+
+#. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Print orders at the kitchen, at the bar, etc."
+msgstr ""
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_printer_product_categories_ids
@@ -394,13 +444,18 @@ msgid "Printer Name"
 msgstr "Nyomtatónév"
 
 #. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Printers"
+msgstr "Nyomtatók"
+
+#. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_printer_proxy_ip
 msgid "Proxy IP Address"
 msgstr "Proxy IP cím"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/js/floors.js:536
+#: code:addons/pos_restaurant/static/src/js/floors.js:563
 #, python-format
 msgid "Removing a table cannot be undone"
 msgstr "Visszaállíthatatlan asztal eltávolítása"
@@ -461,6 +516,11 @@ msgid "Split"
 msgstr "Felosztás"
 
 #. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Split total or order lines"
+msgstr ""
+
+#. module: pos_restaurant
 #: selection:restaurant.table,shape:0
 msgid "Square"
 msgstr "Négyzetes"
@@ -470,7 +530,7 @@ msgstr "Négyzetes"
 #: code:addons/pos_restaurant/static/src/xml/printbill.xml:118
 #, python-format
 msgid "Subtotal"
-msgstr "Nettó érték"
+msgstr "Részösszeg"
 
 #. module: pos_restaurant
 #. openerp-web
@@ -485,13 +545,18 @@ msgid "Table"
 msgstr "Táblázat"
 
 #. module: pos_restaurant
+#: model:ir.model.fields,field_description:pos_restaurant.field_pos_config_is_table_management
+msgid "Table Management"
+msgstr ""
+
+#. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_name
 msgid "Table Name"
 msgstr "Asztal neve"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/js/floors.js:456
+#: code:addons/pos_restaurant/static/src/js/floors.js:483
 #, python-format
 msgid "Table Name ?"
 msgstr "Asztal neve ?"
@@ -524,7 +589,9 @@ msgstr "Erre a megrendelésre felszolgált vendégek száma."
 msgid ""
 "The background color of the floor layout, (must be specified in a html-"
 "compatible format)"
-msgstr "A háttér szín az ülésrend kiosztáshoz, (html - kompatibilis formátumban kell meghatározni)"
+msgstr ""
+"A háttér szín az ülésrend kiosztáshoz, (html - kompatibilis formátumban kell"
+" meghatározni)"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_restaurant_table_seats
@@ -537,14 +604,9 @@ msgid "The list of tables in this floor"
 msgstr "Asztalok listája ebben az ülésrendben"
 
 #. module: pos_restaurant
-#: model:ir.model.fields,help:pos_restaurant.field_restaurant_table_pos_order_ids
-msgid "The orders served at this table"
-msgstr "Ezen az asztalon felszolgált megrendelések"
-
-#. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_pos_config_floor_ids
-msgid "The restaurant floors served by this point of sale"
-msgstr "Ezen az értékesítési pont kasszán felszolgált éttermi ülésrendek"
+msgid "The restaurant floors served by this point of sale."
+msgstr ""
 
 #. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_pos_order_table_id
@@ -567,13 +629,15 @@ msgstr "Asztal magassága pixelekben"
 msgid ""
 "The table's horizontal position from the left side to the table's center, in"
 " pixels"
-msgstr "Asztal vízszintes pozíciója a bal oldaltól az asztal közepéig, pixelekben"
+msgstr ""
+"Asztal vízszintes pozíciója a bal oldaltól az asztal közepéig, pixelekben"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_restaurant_table_position_v
 msgid ""
 "The table's vertical position from the top to the table's center, in pixels"
-msgstr "Asztal függőleges pozíciója a felső széltől az asztal közepéig, pixelekben"
+msgstr ""
+"Asztal függőleges pozíciója a felső széltől az asztal közepéig, pixelekben"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,help:pos_restaurant.field_restaurant_table_width
@@ -582,22 +646,37 @@ msgstr "Asztal szélessége pixelekben"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/xml/floors.xml:90
+#: code:addons/pos_restaurant/static/src/xml/floors.xml:106
 #, python-format
 msgid "This floor has no tables yet, use the"
 msgstr "Ennek az ülésrendnek még nincsenek asztalai, használja a"
 
 #. module: pos_restaurant
-#: model:ir.model.fields,help:pos_restaurant.field_restaurant_floor_sequence
-msgid "Used to sort Floors"
-msgstr "Ülésrendek csoportosításához használt"
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "This product is used as reference on customer receipts."
+msgstr ""
+
+#. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Tip Product"
+msgstr "Termék borravalóként"
+
+#. module: pos_restaurant
+#: model:ir.ui.view,arch_db:pos_restaurant.pos_config_view_form_inherit_restaurant
+msgid "Tips"
+msgstr "Tippek"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/xml/printbill.xml:57
+#: code:addons/pos_restaurant/static/src/xml/floors.xml:37
 #, python-format
-msgid "VAT:"
-msgstr "ÁFA:"
+msgid "Transfer"
+msgstr "Átvitel"
+
+#. module: pos_restaurant
+#: model:ir.model.fields,help:pos_restaurant.field_restaurant_floor_sequence
+msgid "Used to sort Floors"
+msgstr "Ülésrendek csoportosításához használt"
 
 #. module: pos_restaurant
 #: model:ir.model.fields,field_description:pos_restaurant.field_restaurant_table_position_v
@@ -618,6 +697,15 @@ msgstr "Ezzel"
 
 #. module: pos_restaurant
 #. openerp-web
+#: code:addons/pos_restaurant/static/src/js/floors.js:271
+#: code:addons/pos_restaurant/static/src/js/floors.js:310
+#: code:addons/pos_restaurant/static/src/js/floors.js:426
+#, python-format
+msgid "You must be connected to the internet to save your changes."
+msgstr "Internethez csatlakozva tudja csak mentani a változtatásait."
+
+#. module: pos_restaurant
+#. openerp-web
 #: code:addons/pos_restaurant/static/src/xml/splitbill.xml:36
 #, python-format
 msgid "at"
@@ -626,14 +714,14 @@ msgstr "ekkor"
 #. module: pos_restaurant
 #. openerp-web
 #: code:addons/pos_restaurant/static/src/xml/floors.xml:6
-#: code:addons/pos_restaurant/static/src/xml/floors.xml:14
+#: code:addons/pos_restaurant/static/src/xml/floors.xml:17
 #, python-format
 msgid "at table"
 msgstr "asztalnál"
 
 #. module: pos_restaurant
 #. openerp-web
-#: code:addons/pos_restaurant/static/src/xml/floors.xml:91
+#: code:addons/pos_restaurant/static/src/xml/floors.xml:107
 #, python-format
 msgid "button in the editing toolbar to create new tables."
 msgstr "a gombot a szerkesztési  eszköztárban az új asztalok létrehozásához."

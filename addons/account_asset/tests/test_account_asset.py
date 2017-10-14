@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
+# Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from openerp import tools
-from openerp.tests import common
-from openerp.modules.module import get_module_resource
+from odoo import tools
+from odoo.tests import common
+from odoo.modules.module import get_resource_path
 
 
 class TestAccountAsset(common.TransactionCase):
 
     def _load(self, module, *args):
         tools.convert_file(self.cr, 'account_asset',
-                           get_module_resource(module, *args),
+                           get_resource_path(module, *args),
                            {}, 'init', False, 'test', self.registry._assertion_report)
 
     def test_00_account_asset_asset(self):
@@ -54,7 +55,7 @@ class TestAccountAsset(common.TransactionCase):
         asset_modify_number_0.with_context({'active_id': account_asset_asset_office0.id}).modify()
 
         # I check the proper depreciation lines created.
-        self.assertEqual(account_asset_asset_office0.method_number, len(account_asset_asset_office0.depreciation_line_ids) - 1)
+        self.assertEqual(account_asset_asset_office0.method_number, len(account_asset_asset_office0.depreciation_line_ids))
         # I compute a asset on period.
         context = {
             "active_ids": [self.ref("account_asset.menu_asset_depreciation_confirmation_wizard")],

@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models, _
-import odoo.addons.decimal_precision as dp
+from odoo.addons import decimal_precision as dp
 from odoo.exceptions import UserError
 
 
@@ -29,11 +29,18 @@ class PurchaseRequisitionType(models.Model):
 class PurchaseRequisition(models.Model):
     _name = "purchase.requisition"
     _description = "Purchase Requisition"
-    _inherit = ['mail.thread', 'ir.needaction_mixin']
+    _inherit = ['mail.thread']
     _order = "id desc"
 
     def _get_picking_in(self):
-        return self.env.ref('stock.picking_type_in')
+        pick_in = self.env.ref('stock.picking_type_in')
+        if not pick_in:
+            company = self.env['res.company']._company_default_get('purchase.requisition')
+            pick_in = self.env['stock.picking.type'].search(
+                [('warehouse_id.company_id', '=', company.id), ('code', '=', 'incoming')],
+                limit=1,
+            )
+        return pick_in
 
     def _get_type_id(self):
         return self.env['purchase.requisition.type'].search([], limit=1)
@@ -51,7 +58,6 @@ class PurchaseRequisition(models.Model):
     company_id = fields.Many2one('res.company', string='Company', required=True, default=lambda self: self.env['res.company']._company_default_get('purchase.requisition'))
     purchase_ids = fields.One2many('purchase.order', 'requisition_id', string='Purchase Orders', states={'done': [('readonly', True)]})
     line_ids = fields.One2many('purchase.requisition.line', 'requisition_id', string='Products to Purchase', states={'done': [('readonly', True)]}, copy=True)
-    procurement_id = fields.Many2one('procurement.order', string='Procurement', ondelete='set null', copy=False)
     warehouse_id = fields.Many2one('stock.warehouse', string='Warehouse')
     state = fields.Selection([('draft', 'Draft'), ('in_progress', 'Confirmed'),
                                ('open', 'Bid Selection'), ('done', 'Done'),
@@ -59,7 +65,7 @@ class PurchaseRequisition(models.Model):
                               'Status', track_visibility='onchange', required=True,
                               copy=False, default='draft')
     account_analytic_id = fields.Many2one('account.analytic.account', 'Analytic Account')
-    picking_type_id = fields.Many2one('stock.picking.type', 'Picking Type', required=True, default=_get_picking_in)
+    picking_type_id = fields.Many2one('stock.picking.type', 'Operation Type', required=True, default=_get_picking_in)
 
     @api.multi
     @api.depends('purchase_ids')
@@ -99,6 +105,20 @@ class PurchaseRequisition(models.Model):
             raise UserError(_('You have to cancel or validate every RfQ before closing the purchase requisition.'))
         self.write({'state': 'done'})
 
+    def _prepare_tender_values(self, product_id, product_qty, product_uom, location_id, name, origin, values):
+        return{
+            'origin': origin,
+            'date_end': values['date_planned'],
+            'warehouse_id': values.get('warehouse_id') and values['warehouse_id'].id or False,
+            'company_id': values['company_id'].id,
+            'line_ids': [(0, 0, {
+                'product_id': product_id.id,
+                'product_uom_id': product_uom.id,
+                'product_qty': product_qty,
+                'move_dest_id': values.get('move_dest_ids') and values['move_dest_ids'][0].id or False,
+            })],
+        }
+
 
 class PurchaseRequisitionLine(models.Model):
     _name = "purchase.requisition.line"
@@ -107,24 +127,24 @@ class PurchaseRequisitionLine(models.Model):
 
     product_id = fields.Many2one('product.product', string='Product', domain=[('purchase_ok', '=', True)], required=True)
     product_uom_id = fields.Many2one('product.uom', string='Product Unit of Measure')
-    product_qty = fields.Float(string='Quantity', digits_compute=dp.get_precision('Product Unit of Measure'))
-    price_unit = fields.Float(string='Unit Price', digits_compute=dp.get_precision('Product Price'))
+    product_qty = fields.Float(string='Quantity', digits=dp.get_precision('Product Unit of Measure'))
+    price_unit = fields.Float(string='Unit Price', digits=dp.get_precision('Product Price'))
     qty_ordered = fields.Float(compute='_compute_ordered_qty', string='Ordered Quantities')
     requisition_id = fields.Many2one('purchase.requisition', string='Purchase Agreement', ondelete='cascade')
     company_id = fields.Many2one('res.company', related='requisition_id.company_id', string='Company', store=True, readonly=True, default= lambda self: self.env['res.company']._company_default_get('purchase.requisition.line'))
     account_analytic_id = fields.Many2one('account.analytic.account', string='Analytic Account')
     schedule_date = fields.Date(string='Scheduled Date')
+    move_dest_id = fields.Many2one('stock.move', 'Downstream Move')
 
     @api.multi
     @api.depends('requisition_id.purchase_ids.state')
     def _compute_ordered_qty(self):
-        ProductUOM = self.env['product.uom']
         for line in self:
             total = 0.0
             for po in line.requisition_id.purchase_ids.filtered(lambda purchase_order: purchase_order.state in ['purchase', 'done']):
                 for po_line in po.order_line.filtered(lambda order_line: order_line.product_id == line.product_id):
                     if po_line.product_uom != line.product_uom_id:
-                        total += ProductUOM._compute_qty_obj(po_line.product_uom, po_line.product_qty, line.product_uom_id)
+                        total += po_line.product_uom._compute_quantity(po_line.product_qty, line.product_uom_id)
                     else:
                         total += po_line.product_qty
             line.qty_ordered = total
@@ -138,6 +158,22 @@ class PurchaseRequisitionLine(models.Model):
             self.account_analytic_id = self.requisition_id.account_analytic_id
         if not self.schedule_date:
             self.schedule_date = self.requisition_id.schedule_date
+
+    @api.multi
+    def _prepare_purchase_order_line(self, name, product_qty=0.0, price_unit=0.0, taxes_ids=False):
+        self.ensure_one()
+        requisition = self.requisition_id
+        return {
+            'name': name,
+            'product_id': self.product_id.id,
+            'product_uom': self.product_id.uom_po_id.id,
+            'product_qty': product_qty,
+            'price_unit': price_unit,
+            'taxes_id': [(6, 0, taxes_ids)],
+            'date_planned': requisition.schedule_date or fields.Date.today(),
+            'account_analytic_id': self.account_analytic_id.id,
+            'move_dest_ids': self.move_dest_id and [(4, self.move_dest_id.id)] or []
+        }
 
 
 class PurchaseOrder(models.Model):
@@ -190,46 +226,38 @@ class PurchaseOrder(models.Model):
 
             # Compute taxes
             if fpos:
-                taxes_ids = fpos.map_tax(line.product_id.supplier_taxes_id.filtered(lambda tax: tax.company_id == requisition.company_id))
+                taxes_ids = fpos.map_tax(line.product_id.supplier_taxes_id.filtered(lambda tax: tax.company_id == requisition.company_id)).ids
             else:
                 taxes_ids = line.product_id.supplier_taxes_id.filtered(lambda tax: tax.company_id == requisition.company_id).ids
 
             # Compute quantity and price_unit
-            if requisition.type_id.quantity_copy != 'copy':
-                product_qty = 0
-                price_unit = line.price_unit
-            elif line.product_uom_id != line.product_id.uom_po_id:
-                ProductUOM = self.env['product.uom']
-                product_qty = ProductUOM._compute_qty_obj(
-                    line.product_uom_id, line.product_qty, line.product_id.uom_po_id)
-                price_unit = ProductUOM._compute_price(
-                    line.product_uom_id.id, line.price_unit, to_uom_id=line.product_id.uom_po_id.id)
+            if line.product_uom_id != line.product_id.uom_po_id:
+                product_qty = line.product_uom_id._compute_quantity(line.product_qty, line.product_id.uom_po_id)
+                price_unit = line.product_uom_id._compute_price(line.price_unit, line.product_id.uom_po_id)
             else:
                 product_qty = line.product_qty
                 price_unit = line.price_unit
+
+            if requisition.type_id.quantity_copy != 'copy':
+                product_qty = 0
 
             # Compute price_unit in appropriate currency
             if requisition.company_id.currency_id != currency:
                 price_unit = requisition.company_id.currency_id.compute(price_unit, currency)
 
             # Create PO line
-            order_lines.append((0, 0, {
-                'name': name,
-                'product_id': line.product_id.id,
-                'product_uom': line.product_id.uom_po_id.id,
-                'product_qty': product_qty,
-                'price_unit': price_unit,
-                'taxes_id': [(6, 0, taxes_ids)],
-                'date_planned': requisition.schedule_date or fields.Date.today(),
-                'procurement_ids': [(6, 0, [requisition.procurement_id.id])] if requisition.procurement_id else False,
-                'account_analytic_id': line.account_analytic_id.id,
-            }))
+            order_line_values = line._prepare_purchase_order_line(
+                name=name, product_qty=product_qty, price_unit=price_unit,
+                taxes_ids=taxes_ids)
+            order_lines.append((0, 0, order_line_values))
         self.order_line = order_lines
 
     @api.multi
     def button_confirm(self):
         res = super(PurchaseOrder, self).button_confirm()
         for po in self:
+            if not po.requisition_id:
+                continue
             if po.requisition_id.type_id.exclusive == 'exclusive':
                 others_po = po.requisition_id.mapped('purchase_ids').filtered(lambda r: r.id != po.id)
                 others_po.button_cancel()
@@ -255,6 +283,24 @@ class PurchaseOrder(models.Model):
         return result
 
 
+class PurchaseOrderLine(models.Model):
+    _inherit = "purchase.order.line"
+
+    @api.onchange('product_qty', 'product_uom')
+    def _onchange_quantity(self):
+        res = super(PurchaseOrderLine, self)._onchange_quantity()
+        if self.order_id.requisition_id:
+            for line in self.order_id.requisition_id.line_ids:
+                if line.product_id == self.product_id:
+                    if line.product_uom_id != self.product_uom:
+                        self.price_unit = line.product_uom_id._compute_price(
+                            line.price_unit, self.product_uom)
+                    else:
+                        self.price_unit = line.price_unit
+                    break
+        return res
+
+
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
@@ -264,41 +310,14 @@ class ProductTemplate(models.Model):
         string='Procurement', default='rfq')
 
 
-class ProcurementOrder(models.Model):
-    _inherit = 'procurement.order'
-
-    requisition_id = fields.Many2one('purchase.requisition', string='Latest Requisition')
+class ProcurementRule(models.Model):
+    _inherit = 'procurement.rule'
 
     @api.multi
-    def make_po(self):
-        Requisition = self.env['purchase.requisition']
-        procurements = self.env['procurement.order']
-        Warehouse = self.env['stock.warehouse']
-        res = []
-        for procurement in self:
-            if procurement.product_id.purchase_requisition == 'tenders':
-                warehouse_id = Warehouse.search([('company_id', '=', procurement.company_id.id)], limit=1).id
-                requisition_id = Requisition.create({
-                    'origin': procurement.origin,
-                    'date_end': procurement.date_planned,
-                    'warehouse_id': warehouse_id,
-                    'company_id': procurement.company_id.id,
-                    'procurement_id': procurement.id,
-                    'picking_type_id': procurement.rule_id.picking_type_id.id,
-                    'line_ids': [(0, 0, {
-                        'product_id': procurement.product_id.id,
-                        'product_uom_id': procurement.product_uom.id,
-                        'product_qty': procurement.product_qty
-                    })],
-                })
-                procurement.message_post(body=_("Purchase Requisition created"))
-                requisition_id.message_post_with_view('mail.message_origin_link',
-                    values={'self': requisition_id, 'origin': procurement},
-                    subtype_id=self.env['ir.model.data'].xmlid_to_res_id('mail.mt_note'))
-                procurement.requisition_id = requisition_id
-                procurements += procurement
-                res += [procurement.id]
-        set_others = self - procurements
-        if set_others:
-            res += super(ProcurementOrder, set_others).make_po()
-        return res
+    def _run_buy(self, product_id, product_qty, product_uom, location_id, name, origin, values):
+        if product_id.purchase_requisition != 'tenders':
+            return super(ProcurementRule, self)._run_buy(product_id, product_qty, product_uom, location_id, name, origin, values)
+        values = self.env['purchase.requisition']._prepare_tender_values(product_id, product_qty, product_uom, location_id, name, origin, values)
+        values['picking_type_id'] = self.picking_type_id.id
+        self.env['purchase.requisition'].create(values)
+        return True

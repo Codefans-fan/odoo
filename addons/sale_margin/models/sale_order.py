@@ -2,7 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from odoo import api, fields, models
-import odoo.addons.decimal_precision as dp
+from odoo.addons import decimal_precision as dp
 
 
 class SaleOrderLine(models.Model):
@@ -16,11 +16,23 @@ class SaleOrderLine(models.Model):
         to_cur = order_id.pricelist_id.currency_id
         purchase_price = product_id.standard_price
         if product_uom_id != product_id.uom_id:
-            purchase_price = self.env['product.uom']._compute_price(product_id.uom_id.id, purchase_price, to_uom_id=product_uom_id.id)
+            purchase_price = product_id.uom_id._compute_price(purchase_price, product_uom_id)
         ctx = self.env.context.copy()
         ctx['date'] = order_id.date_order
         price = frm_cur.with_context(ctx).compute(purchase_price, to_cur, round=False)
         return price
+
+    @api.model
+    def _get_purchase_price(self, pricelist, product, product_uom, date):
+        frm_cur = self.env.user.company_id.currency_id
+        to_cur = pricelist.currency_id
+        purchase_price = product.standard_price
+        if product_uom != product.uom_id:
+            purchase_price = product.uom_id._compute_price(purchase_price, product_uom)
+        ctx = self.env.context.copy()
+        ctx['date'] = date
+        price = frm_cur.with_context(ctx).compute(purchase_price, to_cur, round=False)
+        return {'purchase_price': price}
 
     @api.onchange('product_id', 'product_uom')
     def product_id_change_margin(self):
@@ -30,6 +42,8 @@ class SaleOrderLine(models.Model):
 
     @api.model
     def create(self, vals):
+        vals.update(self._prepare_add_missing_fields(vals))
+
         # Calculation of the margin for programmatic creation of a SO line. It is therefore not
         # necessary to call product_id_change_margin manually
         if 'purchase_price' not in vals:
@@ -41,11 +55,16 @@ class SaleOrderLine(models.Model):
 
         return super(SaleOrderLine, self).create(vals)
 
-    @api.depends('product_id', 'purchase_price', 'product_uom_qty', 'price_unit')
+    @api.depends('product_id', 'purchase_price', 'product_uom_qty', 'price_unit', 'price_subtotal')
     def _product_margin(self):
         for line in self:
             currency = line.order_id.pricelist_id.currency_id
-            line.margin = currency.round(line.price_subtotal - ((line.purchase_price or line.product_id.standard_price) * line.product_uom_qty))
+            price = line.purchase_price
+            if not price:
+                from_cur = line.env.user.company_id.currency_id.with_context(date=line.order_id.date_order)
+                price = from_cur.compute(line.product_id.standard_price, currency, round=False)
+ 
+            line.margin = currency.round(line.price_subtotal - (price * line.product_uom_qty))
 
 
 class SaleOrder(models.Model):

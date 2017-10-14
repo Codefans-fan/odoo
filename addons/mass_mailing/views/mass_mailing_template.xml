@@ -7,4 +7,10 @@
             <script type="text/javascript" src="/mass_mailing/static/src/js/mass_mailing.js"></script>
         </xpath>
     </template>
+
+    <template id="assets_editor" inherit_id="web_editor.assets_editor">
+        <xpath expr="//link[last()]" position="after">
+            <link type="text/less" rel="stylesheet" href="/mass_mailing/static/src/less/mass_mailing.ui.less"/>
+        </xpath>
+    </template>
 </odoo>

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from odoo.tests import common
+from odoo.addons.account.tests.account_test_classes import AccountingTestCase
 
-class TestStockLandedCostsCommon(common.TransactionCase):
+class TestStockLandedCostsCommon(AccountingTestCase):
 
     def setUp(self):
         super(TestStockLandedCostsCommon, self).setUp()
@@ -39,7 +39,7 @@ class TestStockLandedCostsCommon(common.TransactionCase):
         self.product_refrigerator = self.Product.create({
             'name': 'Refrigerator',
             'type': 'product',
-            'cost_method': 'real',
+            'cost_method': 'fifo',
             'valuation': 'real_time',
             'standard_price': 1.0,
             'weight': 10,
@@ -48,7 +48,7 @@ class TestStockLandedCostsCommon(common.TransactionCase):
         self.product_oven = self.Product.create({
             'name': 'Microwave Oven',
             'type': 'product',
-            'cost_method': 'real',
+            'cost_method': 'fifo',
             'valuation': 'real_time',
             'standard_price': 1.0,
             'weight': 20,
@@ -59,6 +59,9 @@ class TestStockLandedCostsCommon(common.TransactionCase):
         self.brokerage_quantity = self._create_services('Brokerage Cost')
         self.transportation_weight = self._create_services('Transportation Cost')
         self.packaging_volume = self._create_services('Packaging Cost')
+        # Ensure the account properties exists.
+        self.ensure_account_property('property_stock_account_input')
+        self.ensure_account_property('property_stock_account_output')
 
     def _create_services(self, name):
         return self.Product.create({

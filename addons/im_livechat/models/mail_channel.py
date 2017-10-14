@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from openerp import api, fields, models
+# Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+from odoo import api, fields, models, _
 
 class ChannelPartner(models.Model):
     _inherit = 'mail.channel.partner'
@@ -65,12 +66,17 @@ class MailChannel(models.Model):
             partner_name = self.env['res.partner'].browse(self.env.context.get('im_livechat_operator_partner_id')).name_get()[0]
             for channel_info in channel_infos:
                 channel_info['operator_pid'] = partner_name
-        # add the anonymous name
         channel_infos_dict = dict((c['id'], c) for c in channel_infos)
         for channel in self:
+            # add the anonymous name
             if channel.anonymous_name:
                 channel_infos_dict[channel.id]['anonymous_name'] = channel.anonymous_name
-        return channel_infos_dict.values()
+            # add the last message date
+            if channel.channel_type == 'livechat':
+                last_msg = self.env['mail.message'].search([("channel_ids", "in", [channel.id])], limit=1)
+                if last_msg:
+                    channel_infos_dict[channel.id]['last_message_date'] = last_msg.date
+        return list(channel_infos_dict.values())
 
     @api.model
     def channel_fetch_slot(self):
@@ -100,3 +106,36 @@ class MailChannel(models.Model):
         if help:
             return '<p">%s</p>' % (help)
         return super(MailChannel, self).get_empty_list_help(help)
+
+    def _define_command_history(self):
+        return {
+            'channel_types': ['livechat'],
+            'help': _('See 15 last visited pages')
+        }
+
+    def _execute_command_history(self, **kwargs):
+        notification = []
+        notification_values = {
+            '_type': 'history_command',
+        }
+        notification.append([self.uuid, dict(notification_values)])
+        return self.env['bus.bus'].sendmany(notification)
+
+    def _send_history_message(self, pid, page_history):
+        message_body = _('No history found')
+        if page_history:
+            html_links = ['<li><a href="%s" target="_blank">%s</a></li>' % (page, page) for page in page_history]
+            message_body = '<span class="o_mail_notification"><ul>%s</ul></span>' % (''.join(html_links))
+        self.env['bus.bus'].sendone((self._cr.dbname, 'res.partner', pid), {
+            'body': message_body,
+            'channel_ids': self.ids,
+            'info': 'transient_message',
+        })
+
+    # Rating Mixin
+
+    def rating_get_parent_model_name(self, values):
+        return 'im_livechat.channel'
+
+    def rating_get_parent_id(self):
+        return self.livechat_channel_id.id

@@ -77,7 +77,7 @@ class Employee(models.Model):
     current_leave_id = fields.Many2one('hr.holidays.status', compute='_compute_leave_status', string="Current Leave Type")
     leave_date_from = fields.Date('From Date', compute='_compute_leave_status')
     leave_date_to = fields.Date('To Date', compute='_compute_leave_status')
-    leaves_count = fields.Integer('Number of Leaves', compute='_compute_leaves_count')
+    leaves_count = fields.Float('Number of Leaves', compute='_compute_leaves_count')
     show_leaves = fields.Boolean('Able to see Remaining Leaves', compute='_compute_show_leaves')
     is_absent_totay = fields.Boolean('Absent Today', compute='_compute_absent_employee', search='_search_absent_employee')
 
@@ -133,8 +133,9 @@ class Employee(models.Model):
                     'holiday_type': 'employee',
                     'number_of_days_temp': difference
                 })
-                for signal in ('confirm', 'validate', 'second_validate'):
-                    leave.signal_workflow(signal)
+                leave.action_approve()
+                if leave.double_validation:
+                    leave.action_validate()
             elif difference < 0:
                 raise UserError(_('You cannot reduce validated allocation requests'))
 
@@ -175,7 +176,7 @@ class Employee(models.Model):
 
     @api.multi
     def _compute_show_leaves(self):
-        show_leaves = self.env['res.users'].has_group('base.group_hr_user')
+        show_leaves = self.env['res.users'].has_group('hr_holidays.group_hr_holidays_user')
         for employee in self:
             if show_leaves or employee.user_id == self.env.user:
                 employee.show_leaves = True
@@ -206,11 +207,11 @@ class Employee(models.Model):
         today_date = datetime.datetime.utcnow().date()
         today_start = fields.Datetime.to_string(today_date)  # get the midnight of the current utc day
         today_end = fields.Datetime.to_string(today_date + relativedelta(hours=23, minutes=59, seconds=59))
-        holidays = self.env['hr.holidays'].search([
+        holidays = self.env['hr.holidays'].sudo().search([
             ('employee_id', '!=', False),
             ('state', 'not in', ['cancel', 'refuse']),
             ('date_from', '<=', today_end),
             ('date_to', '>=', today_start),
             ('type', '=', 'remove')
-        ], ['employee_id'])
+        ])
         return [('id', 'in', holidays.mapped('employee_id').ids)]

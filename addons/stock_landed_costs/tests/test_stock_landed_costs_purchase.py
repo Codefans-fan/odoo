@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-
-import odoo
+import unittest
 from odoo.addons.stock_landed_costs.tests.common import TestStockLandedCostsCommon
 
-@odoo.tests.common.at_install(False)
-@odoo.tests.common.post_install(True)
 class TestLandedCosts(TestStockLandedCostsCommon):
 
     def setUp(self):
@@ -48,6 +45,10 @@ class TestLandedCosts(TestStockLandedCostsCommon):
             'location_dest_id': self.customer_location_id})
 
     def test_00_landed_costs_on_incoming_shipment(self):
+        chart_of_accounts = self.env.user.company_id.chart_template_id
+        generic_coa = self.env.ref('l10n_generic_coa.configurable_chart_template')
+        if chart_of_accounts != generic_coa:
+            raise unittest.SkipTest('Skip this test as it works only with %s (%s loaded)' % (generic_coa.name, chart_of_accounts.name))
         """ Test landed cost on incoming shipment """
         #
         # (A) Purchase product
@@ -97,6 +98,11 @@ class TestLandedCosts(TestStockLandedCostsCommon):
         self.assertEqual(account_entry['debit'], 430.0, 'Wrong Account Entry')
 
     def test_01_negative_landed_costs_on_incoming_shipment(self):
+        chart_of_accounts = self.env.user.company_id.chart_template_id
+        generic_coa = self.env.ref('l10n_generic_coa.configurable_chart_template')
+        if chart_of_accounts != generic_coa:
+            raise unittest.SkipTest('Skip this test as it works only with %s (%s loaded)' % (generic_coa.name, chart_of_accounts.name))
+
         """ Test negative landed cost on incoming shipment """
         #
         # (A) Purchase Product
@@ -177,14 +183,53 @@ class TestLandedCosts(TestStockLandedCostsCommon):
         account_entry = self.env['account.move.line'].read_group(
             [('move_id', '=', stock_negative_landed_cost.account_move_id.id)], ['debit', 'credit', 'move_id'], ['move_id'])[0]
         self.assertEqual(account_entry['debit'], account_entry['credit'], 'Debit and credit are not equal')
-        self.assertEqual(account_entry['debit'], 134.336, 'Wrong Account Entry')
+        move_lines = [
+            ('split by volume - Microwave Oven', 3.75, 0.0),
+            ('split by volume - Microwave Oven', 0.0, 3.75),
+            ('split by weight - Microwave Oven', 40.0, 0.0),
+            ('split by weight - Microwave Oven', 0.0, 40.0),
+            ('split by quantity - Microwave Oven', 33.33, 0.0),
+            ('split by quantity - Microwave Oven', 0.0, 33.33),
+            ('equal split - Microwave Oven', 2.5, 0.0),
+            ('equal split - Microwave Oven', 0.0, 2.5),
+            ('split by volume - Refrigerator: 2.0 already out', 0.5, 0.0),
+            ('split by volume - Refrigerator: 2.0 already out', 0.0, 0.5),
+            ('split by volume - Refrigerator', 1.25, 0.0),
+            ('split by volume - Refrigerator', 0.0, 1.25),
+            ('split by weight - Refrigerator: 2.0 already out', 4.0, 0.0),
+            ('split by weight - Refrigerator: 2.0 already out', 0.0, 4.0),
+            ('split by weight - Refrigerator', 10.0, 0.0),
+            ('split by weight - Refrigerator', 0.0, 10.0),
+            ('split by quantity - Refrigerator: 2.0 already out', 6.67, 0.0),
+            ('split by quantity - Refrigerator: 2.0 already out', 0.0, 6.67),
+            ('split by quantity - Refrigerator', 16.67, 0.0),
+            ('split by quantity - Refrigerator', 0.0, 16.67),
+            ('equal split - Refrigerator: 2.0 already out', 1.0, 0.0),
+            ('equal split - Refrigerator: 2.0 already out', 0.0, 1.0),
+            ('equal split - Refrigerator', 2.5, 0.0),
+            ('equal split - Refrigerator', 0.0, 2.5)
+        ]
+        if stock_negative_landed_cost.account_move_id.company_id.anglo_saxon_accounting:
+            move_lines += [
+                ('split by volume - Refrigerator: 2.0 already out', 0.5, 0.0),
+                ('split by volume - Refrigerator: 2.0 already out', 0.0, 0.5),
+                ('split by weight - Refrigerator: 2.0 already out', 4.0, 0.0),
+                ('split by weight - Refrigerator: 2.0 already out', 0.0, 4.0),
+                ('split by quantity - Refrigerator: 2.0 already out', 6.67, 0.0),
+                ('split by quantity - Refrigerator: 2.0 already out', 0.0, 6.67),
+                ('equal split - Refrigerator: 2.0 already out', 1.0, 0.0),
+                ('equal split - Refrigerator: 2.0 already out', 0.0, 1.0),
+            ]
+        self.check_complete_move(stock_negative_landed_cost.account_move_id, move_lines)
 
     def _process_incoming_shipment(self):
         """ Two product incoming shipment. """
         # Confirm incoming shipment.
         self.picking_in.action_confirm()
         # Transfer incoming shipment
-        self.picking_in.do_transfer()
+        res_dict = self.picking_in.button_validate()
+        wizard = self.env[(res_dict.get('res_model'))].browse(res_dict.get('res_id'))
+        wizard.process()
         return self.picking_in
 
     def _process_outgoing_shipment(self):
@@ -194,7 +239,10 @@ class TestLandedCosts(TestStockLandedCostsCommon):
         # Product assign to outgoing shipments
         self.picking_out.action_assign()
         # Transfer picking.
-        self.picking_out.do_transfer()
+
+        res_dict = self.picking_out.button_validate()
+        wizard = self.env[(res_dict.get('res_model'))].browse(res_dict.get('res_id'))
+        wizard.process()
 
     def _create_landed_costs(self, value, picking_in):
         return self.LandedCost.create(dict(

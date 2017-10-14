@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import hr_attendance
-import ir_http
+from . import res_config_settings
+from . import hr_attendance
+from . import hr_employee

@@ -410,6 +410,10 @@ var PosDB = core.Class.extend({
             }
         }
 
+        // Only necessary when we store a new, validated order. Orders
+        // that where already stored should already have been removed.
+        this.remove_unpaid_order(order);
+
         orders.push({id: order_id, data: order});
         this.save('orders',orders);
         return order_id;
@@ -473,6 +477,13 @@ var PosDB = core.Class.extend({
         }
         return orders;
     },
+    set_cashier: function(cashier) {
+        // Always update if the user is the same as before
+        this.save('cashier', cashier || null);
+    },
+    get_cashier: function() {
+        return this.load('cashier');
+    }
 });
 
 return PosDB;

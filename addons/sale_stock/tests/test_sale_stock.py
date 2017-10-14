@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
-from openerp.addons.sale.tests.test_sale_common import TestSale
-from openerp.exceptions import UserError
+
+from odoo.addons.sale.tests.test_sale_common import TestSale
+from odoo.exceptions import UserError
 
 
 class TestSaleStock(TestSale):
@@ -15,7 +16,7 @@ class TestSaleStock(TestSale):
             'partner_id': self.partner.id,
             'partner_invoice_id': self.partner.id,
             'partner_shipping_id': self.partner.id,
-            'order_line': [(0, 0, {'name': p.name, 'product_id': p.id, 'product_uom_qty': 2, 'product_uom': p.uom_id.id, 'price_unit': p.list_price}) for (_, p) in self.products.iteritems()],
+            'order_line': [(0, 0, {'name': p.name, 'product_id': p.id, 'product_uom_qty': 2, 'product_uom': p.uom_id.id, 'price_unit': p.list_price}) for p in self.products.values()],
             'pricelist_id': self.env.ref('product.list0').id,
             'picking_policy': 'direct',
         })
@@ -30,8 +31,8 @@ class TestSaleStock(TestSale):
         self.assertEqual(self.so.invoice_status, 'no', 'Sale Stock: so invoice_status should be "nothing to invoice" after invoicing')
         pick = self.so.picking_ids
         pick.force_assign()
-        pick.pack_operation_product_ids.write({'qty_done': 1})
-        wiz_act = pick.do_new_transfer()
+        pick.move_lines.write({'quantity_done': 1})
+        wiz_act = pick.button_validate()
         wiz = self.env[wiz_act['res_model']].browse(wiz_act['res_id'])
         wiz.process()
         self.assertEqual(self.so.invoice_status, 'to invoice', 'Sale Stock: so invoice_status should be "to invoice" after partial delivery')
@@ -50,8 +51,8 @@ class TestSaleStock(TestSale):
         self.assertEqual(len(self.so.picking_ids), 2, 'Sale Stock: number of pickings should be 2')
         pick_2 = self.so.picking_ids[0]
         pick_2.force_assign()
-        pick_2.pack_operation_product_ids.write({'qty_done': 1})
-        self.assertIsNone(pick_2.do_new_transfer(), 'Sale Stock: second picking should be final without need for a backorder')
+        pick_2.move_lines.write({'quantity_done': 1})
+        self.assertIsNone(pick_2.button_validate(), 'Sale Stock: second picking should be final without need for a backorder')
         self.assertEqual(self.so.invoice_status, 'to invoice', 'Sale Stock: so invoice_status should be "to invoice" after complete delivery')
         del_qties = [sol.qty_delivered for sol in self.so.order_line]
         del_qties_truth = [2.0 if sol.product_id.type in ['product', 'consu'] else 0.0 for sol in self.so.order_line]
@@ -72,7 +73,7 @@ class TestSaleStock(TestSale):
             'partner_id': self.partner.id,
             'partner_invoice_id': self.partner.id,
             'partner_shipping_id': self.partner.id,
-            'order_line': [(0, 0, {'name': p.name, 'product_id': p.id, 'product_uom_qty': 2, 'product_uom': p.uom_id.id, 'price_unit': p.list_price}) for (_, p) in self.products.iteritems()],
+            'order_line': [(0, 0, {'name': p.name, 'product_id': p.id, 'product_uom_qty': 2, 'product_uom': p.uom_id.id, 'price_unit': p.list_price}) for p in self.products.values()],
             'pricelist_id': self.env.ref('product.list0').id,
             'picking_policy': 'direct',
         })
@@ -98,8 +99,8 @@ class TestSaleStock(TestSale):
         # deliver, check the delivered quantities
         pick = self.so.picking_ids
         pick.force_assign()
-        pick.pack_operation_product_ids.write({'qty_done': 2})
-        self.assertIsNone(pick.do_new_transfer(), 'Sale Stock: complete delivery should not need a backorder')
+        pick.move_lines.write({'quantity_done': 2})
+        self.assertIsNone(pick.button_validate(), 'Sale Stock: complete delivery should not need a backorder')
         del_qties = [sol.qty_delivered for sol in self.so.order_line]
         del_qties_truth = [2.0 if sol.product_id.type in ['product', 'consu'] else 0.0 for sol in self.so.order_line]
         self.assertEqual(del_qties, del_qties_truth, 'Sale Stock: delivered quantities are wrong after partial delivery')
@@ -139,8 +140,8 @@ class TestSaleStock(TestSale):
         # deliver completely
         pick = self.so.picking_ids
         pick.force_assign()
-        pick.pack_operation_product_ids.write({'qty_done': 5})
-        pick.do_new_transfer()
+        pick.move_lines.write({'quantity_done': 5})
+        pick.button_validate()
 
         # Check quantity delivered
         del_qty = sum(sol.qty_delivered for sol in self.so.order_line)
@@ -153,21 +154,21 @@ class TestSaleStock(TestSale):
         self.assertEqual(len(inv_1_id), 1, 'Sale Stock: only one invoice instead of "%s" should be created' % len(inv_1_id))
         self.inv_1 = self.env['account.invoice'].browse(inv_1_id)
         self.assertEqual(self.inv_1.amount_untaxed, self.inv_1.amount_untaxed, 'Sale Stock: amount in SO and invoice should be the same')
-        self.inv_1.signal_workflow('invoice_open')
+        self.inv_1.action_invoice_open()
 
         # Create return picking
         StockReturnPicking = self.env['stock.return.picking']
         default_data = StockReturnPicking.with_context(active_ids=pick.ids, active_id=pick.ids[0]).default_get(['move_dest_exists', 'original_location_id', 'product_return_moves', 'parent_location_id', 'location_id'])
         return_wiz = StockReturnPicking.with_context(active_ids=pick.ids, active_id=pick.ids[0]).create(default_data)
         return_wiz.product_return_moves.quantity = 2.0 # Return only 2
-        return_wiz.product_return_moves.to_refund_so = True # Refund these 2
+        return_wiz.product_return_moves.to_refund = True # Refund these 2
         res = return_wiz.create_returns()
         return_pick = self.env['stock.picking'].browse(res['res_id'])
 
         # Validate picking
         return_pick.force_assign()
-        return_pick.pack_operation_product_ids.write({'qty_done': 2})
-        return_pick.do_new_transfer()
+        return_pick.move_lines.write({'quantity_done': 2})
+        return_pick.button_validate()
 
         # Check invoice
         self.assertEqual(self.so.invoice_status, 'to invoice', 'Sale Stock: so invoice_status should be "to invoice" instead of "%s" after picking return' % self.so.invoice_status)
@@ -213,10 +214,10 @@ class TestSaleStock(TestSale):
         # deliver partially
         pick = self.so.picking_ids
         pick.force_assign()
-        pick.pack_operation_product_ids.write({'qty_done': 4})
-        backorder_wiz_id = pick.do_new_transfer()['res_id']
-        backorder_wiz = self.env['stock.backorder.confirmation'].browse([backorder_wiz_id])
-        backorder_wiz.process_cancel_backorder()
+        pick.move_lines.write({'quantity_done': 4})
+        res_dict = pick.button_validate()
+        wizard = self.env[(res_dict.get('res_model'))].browse(res_dict.get('res_id'))
+        wizard.process_cancel_backorder()
 
         # Check quantity delivered
         del_qty = sum(sol.qty_delivered for sol in self.so.order_line)
@@ -232,3 +233,39 @@ class TestSaleStock(TestSale):
 
         self.so.action_done()
         self.assertEqual(self.so.invoice_status, 'invoiced', 'Sale Stock: so invoice_status should be "invoiced" when set to done')
+
+    def test_04_create_picking_update_saleorderline(self):
+        """
+        Test that updating multiple sale order lines after a succesful delivery creates a single picking containing
+        the new move lines.
+        """
+        # sell two products
+        item1 = self.products['prod_order']
+        item2 = self.products['prod_del']
+
+        self.so = self.env['sale.order'].create({
+            'partner_id': self.partner.id,
+            'order_line': [
+                (0, 0, {'name': item1.name, 'product_id': item1.id, 'product_uom_qty': 1, 'product_uom': item1.uom_id.id, 'price_unit': item1.list_price}),
+                (0, 0, {'name': item2.name, 'product_id': item2.id, 'product_uom_qty': 1, 'product_uom': item2.uom_id.id, 'price_unit': item2.list_price}),
+            ],
+        })
+        self.so.action_confirm()
+
+        # deliver them
+        self.assertEquals(len(self.so.picking_ids), 1)
+        self.so.picking_ids[0].force_assign()
+        res_dict = self.so.picking_ids[0].button_validate()
+        wizard = self.env[(res_dict.get('res_model'))].browse(res_dict.get('res_id'))
+        wizard.process()
+        self.assertEquals(self.so.picking_ids[0].state, "done")
+
+        # update the two original sale order lines
+        self.so.write({
+            'order_line': [
+                (1, self.so.order_line[0].id, {'product_uom_qty': 2}),
+                (1, self.so.order_line[1].id, {'product_uom_qty': 2}),
+            ]
+        })
+        # a single picking should be created for the new delivery
+        self.assertEquals(len(self.so.picking_ids), 2)

@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-from openerp.addons.web.http import request
-from openerp.osv import orm
+# Part of Odoo. See LICENSE file for full copyright and licensing details.
+
 import ast
 
+from odoo import models
+from odoo.http import request
 
-class QWeb(orm.AbstractModel):
-    """ QWeb object for rendering stuff in the website context
-    """
+
+class QWeb(models.AbstractModel):
+    """ QWeb object for rendering stuff in the website context """
 
     _inherit = 'ir.qweb'
 
@@ -20,6 +22,12 @@ class QWeb(orm.AbstractModel):
         'script':  'src',
         'img':     'src',
     }
+
+    def _get_asset(self, xmlid, options, css=True, js=True, debug=False, async=False, values=None):
+        website = getattr(request, 'website', None) if request else None
+        if website and website.cdn_activated:
+            values = dict(values, url_for=website.get_cdn_url)
+        return super(QWeb, self)._get_asset(xmlid, options, css, js, debug, async, values)
 
     def _website_build_attribute(self, tagName, name, value, options, values):
         """ Compute the value of an attribute while rendering the template. """
@@ -36,6 +44,7 @@ class QWeb(orm.AbstractModel):
 
         url_att = self.URL_ATTRS.get(el.tag)
         cdn_att = self.CDN_TRIGGERS.get(el.tag)
+
         def process(item):
             if isinstance(item, tuple) and (item[0] in (url_att, cdn_att)):
                 return (item[0], ast.Call(
@@ -56,7 +65,7 @@ class QWeb(orm.AbstractModel):
             else:
                 return item
 
-        return map(process, items)
+        return [process(it) for it in items]
 
     def _compile_static_attributes(self, el, options):
         items = super(QWeb, self)._compile_static_attributes(el, options)
@@ -72,7 +81,7 @@ class QWeb(orm.AbstractModel):
         atts = super(QWeb, self)._get_dynamic_att(tagName, atts, options, values)
         if options.get('rendering_bundle'):
             return atts
-        for name, value in atts.iteritems():
+        for name, value in atts.items():
             atts[name] = self._website_build_attribute(tagName, name, value, options, values)
         return atts
 

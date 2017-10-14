@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-import cgi
-import re
+# Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from openerp import api, fields, models
+from odoo import fields, models
 
 
 class MailShortcode(models.Model):
@@ -16,30 +15,9 @@ class MailShortcode(models.Model):
     _description = 'Canned Response / Shortcode'
 
     source = fields.Char('Shortcut', required=True, index=True, help="The shortcut which must be replaced in the Chat Messages")
+    unicode_source = fields.Char(string='Unicode Character', help="The source is replaced by this unicode character in the Chat Messages")
     substitution = fields.Text('Substitution', required=True, index=True, help="The escaped html code replacing the shortcut")
     description = fields.Char('Description')
     shortcode_type = fields.Selection([('image', 'Smiley'), ('text', 'Canned Response')], required=True, default='text',
         help="* Smiley are only used for HTML code to display an image "\
              "* Text (default value) is used to substitute text with another text")
-
-    @api.model
-    def create(self, values):
-        if values.get('substitution'):
-            values['substitution'] = self._sanitize_shorcode(values['substitution'])
-        return super(MailShortcode, self).create(values)
-
-    @api.multi
-    def write(self, values):
-        if values.get('substitution'):
-            values['substitution'] = self._sanitize_shorcode(values['substitution'])
-        return super(MailShortcode, self).write(values)
-
-    def _sanitize_shorcode(self, substitution):
-        """ Sanitize the shortcode substitution :
-                - HTML substitution : only allow the img tag (emoji)
-                - escape other substitutions to avoid XSS
-        """
-        is_img_tag = re.match(r'''^<img\s+src=('|")([^'"]*)\1\s*/?>$''', substitution, re.M | re.I)
-        if is_img_tag:
-            return substitution
-        return cgi.escape(substitution)

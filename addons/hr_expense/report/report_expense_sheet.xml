@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <template id="report_expense_sheet">
-        <t t-call="report.html_container">
+        <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
-                <t t-call="report.external_layout">
+                <t t-call="web.external_layout">
                     <div class="page">
                         <h2>Expenses Report</h2>
 
@@ -57,14 +57,21 @@
                                         <span t-field="line.unit_amount"/>
                                     </td>
                                     <td>
-                                        <span t-field="line.tax_ids"/>
+                                        <t t-foreach="line.tax_ids" t-as="tax">
+                                          <t t-if="tax.description">
+                                            <span t-field="tax.description"/>
+                                          </t>
+                                          <t t-if="not tax.description">
+                                            <span t-field="tax.name"/>
+                                          </t>
+                                        </t>
                                     </td>
                                     <td class="text-center">
                                         <span t-field="line.quantity"/>
                                     </td>
                                     <td class="text-right">
                                         <span t-field="line.total_amount"
-                                            t-field-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                            t-options='{"widget": "monetary", "display_currency": line.currency_id}'/>
                                     </td>
                                 </tr>
                             </tbody>
@@ -77,13 +84,12 @@
                                         <td><strong>Total</strong></td>
                                         <td class="text-right">
                                             <span t-field="o.total_amount"
-                                                t-field-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                                t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                                         </td>
                                     </tr>
                                 </table>
                             </div>
                         </div>
-
                         <p>Certified honest and conform,<br/>(Date and signature).<br/><br/></p>
                     </div>
                 </t>
@@ -98,6 +104,7 @@
         report_type="qweb-pdf"
         name="hr_expense.report_expense_sheet"
         file="hr_expense.report_expense_sheet"
+        print_report_name="'Expenses - %s - %s' % (object.employee_id.name, (object.name).replace('/', ''))"
     />
 
 </odoo>

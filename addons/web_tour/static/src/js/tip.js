@@ -4,14 +4,15 @@ odoo.define('web_tour.Tip', function(require) {
 var core = require('web.core');
 var Widget = require('web.Widget');
 
-return Widget.extend({
+var Tip = Widget.extend({
     template: "Tip",
     events: {
         mouseenter: "_to_info_mode",
         mouseleave: "_to_bubble_mode",
     },
     /**
-     * @param {info} [Object] description of the tip, containing the following keys:
+     * @param {Widget} parent
+     * @param {Object} [info] description of the tip, containing the following keys:
      *  - content [String] the html content of the tip
      *  - event_handlers [Object] description of optional event handlers to bind to the tip:
      *    - event [String] the event name
@@ -40,7 +41,7 @@ return Widget.extend({
         };
     },
     /**
-     * @param {$anchor} [JQuery] the node on which the tip should be placed
+     * @param {jQuery} $anchor the node on which the tip should be placed
      */
     attach_to: function ($anchor) {
         this.$anchor = $anchor;
@@ -58,7 +59,7 @@ return Widget.extend({
         this.$tooltip_content = this.$(".o_tooltip_content");
         this.init_width = this.$el.innerWidth();
         this.init_height = this.$el.innerHeight();
-        this.border_width = (this.$el.outerWidth() - this.init_width)/2;
+        this.double_border_width = this.$el.outerWidth() - this.init_width;
         this.content_width = this.$tooltip_content.outerWidth(true);
         this.content_height = this.$tooltip_content.outerHeight(true);
         this.$window = $(window);
@@ -75,12 +76,12 @@ return Widget.extend({
 
         this._reposition();
         this.$el.css("opacity", 1);
-        core.bus.on("resize", this, function () {
+        core.bus.on("resize", this, _.debounce(function () {
             if (this.tip_opened) {
                 this._to_bubble_mode(true);
             }
             this._reposition();
-        });
+        }, 500));
 
         this.$el.on("transitionend oTransitionEnd webkitTransitionEnd", (function () {
             if (!this.tip_opened && this.$el.parent()[0] === document.body) {
@@ -118,11 +119,17 @@ return Widget.extend({
     },
     _get_ideal_location: function () {
         var $location = this.$anchor;
+        if ($location.is("html,body")) {
+            return $(document.body);
+        }
+
         var o;
+        var p;
         do {
             $location = $location.parent();
             o = $location.css("overflow");
-        } while ((o === "visible" || o === "hidden") && $location[0] !== document.body);
+            p = $location.css("position");
+        } while ((o === "visible" || o === "hidden") && p !== "fixed" && $location[0] !== document.body);
 
         return $location;
     },
@@ -140,8 +147,8 @@ return Widget.extend({
         var offset = this.$el.offset();
         this.$tooltip_overlay.css({
             top: -Math.min((this.info.position === "bottom" ? this.info.space : this.info.overlay.y), offset.top),
-            right: -Math.min((this.info.position === "left" ? this.info.space : this.info.overlay.x), this.$window.width() - (offset.left + this.init_width)),
-            bottom: -Math.min((this.info.position === "top" ? this.info.space : this.info.overlay.y), this.$window.height() - (offset.top + this.init_height)),
+            right: -Math.min((this.info.position === "left" ? this.info.space : this.info.overlay.x), this.$window.width() - (offset.left + this.init_width + this.double_border_width)),
+            bottom: -Math.min((this.info.position === "top" ? this.info.space : this.info.overlay.y), this.$window.height() - (offset.top + this.init_height + this.double_border_width)),
             left: -Math.min((this.info.position === "right" ? this.info.space : this.info.overlay.x), offset.left),
         });
 
@@ -150,14 +157,8 @@ return Widget.extend({
         this.$el.addClass("o_animated");
     },
     _bind_anchor_events: function () {
-        var consume_event = "mousedown";
-        if (this.$anchor.is("textarea") || this.$anchor.filter("input").is(function () {
-            return !!$(this).attr("type").match(/^(email|number|password|search|tel|text|url)$/);
-        })) {
-            consume_event = "input";
-        }
-
-        this.$anchor.on(consume_event + ".anchor", (function (e) {
+        this.consume_event = Tip.getConsumeEventType(this.$anchor);
+        this.$anchor.on(this.consume_event + ".anchor", (function (e) {
             if (e.type !== "mousedown" || e.which === 1) { // only left click
                 this.trigger("tip_consumed");
                 this._unbind_anchor_events();
@@ -210,9 +211,9 @@ return Widget.extend({
         var overflow = false;
         var posVertical = (this.info.position === "top" || this.info.position === "bottom");
         if (posVertical) {
-            overflow = (offset.left + this.content_width + 2 * this.border_width + this.info.overlay.x > this.$window.width());
+            overflow = (offset.left + this.content_width + this.double_border_width + this.info.overlay.x > this.$window.width());
         } else {
-            overflow = (offset.top + this.content_height + 2 * this.border_width + this.info.overlay.y > this.$window.height());
+            overflow = (offset.top + this.content_height + this.double_border_width + this.info.overlay.y > this.$window.height());
         }
         if (posVertical && overflow || this.info.position === "left") {
             mbLeft -= (this.content_width - this.init_width);
@@ -260,5 +261,17 @@ return Widget.extend({
         });
     },
 });
+
+Tip.getConsumeEventType = function ($element) {
+    if ($element.is("textarea") || $element.filter("input").is(function () {
+        var type = $(this).attr("type");
+        return !type || !!type.match(/^(email|number|password|search|tel|text|url)$/);
+    })) {
+        return "input";
+    }
+    return "mousedown";
+};
+
+return Tip;
 
 });

@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 from odoo import api, fields, models, tools, _
+from odoo.addons import decimal_precision as dp
+
+from odoo.tools import pycompat
+from odoo.tools.translate import html_translate
 
 
 class ProductStyle(models.Model):
@@ -13,7 +17,37 @@ class ProductStyle(models.Model):
 class ProductPricelist(models.Model):
     _inherit = "product.pricelist"
 
-    code = fields.Char(string='E-commerce Promotional Code')
+    def _default_website(self):
+        return self.env['website'].search([], limit=1)
+
+    website_id = fields.Many2one('website', string="website", default=_default_website)
+    code = fields.Char(string='E-commerce Promotional Code', groups="base.group_user")
+    selectable = fields.Boolean(help="Allow the end user to choose this price list")
+
+    def clear_cache(self):
+        # website._get_pl() is cached to avoid to recompute at each request the
+        # list of available pricelists. So, we need to invalidate the cache when
+        # we change the config of website price list to force to recompute.
+        website = self.env['website']
+        website._get_pl_partner_order.clear_cache(website)
+
+    @api.model
+    def create(self, data):
+        res = super(ProductPricelist, self).create(data)
+        self.clear_cache()
+        return res
+
+    @api.multi
+    def write(self, data):
+        res = super(ProductPricelist, self).write(data)
+        self.clear_cache()
+        return res
+
+    @api.multi
+    def unlink(self):
+        res = super(ProductPricelist, self).unlink()
+        self.clear_cache()
+        return res
 
 
 class ProductPublicCategory(models.Model):
@@ -75,32 +109,40 @@ class ProductTemplate(models.Model):
     _name = 'product.template'
     _mail_post_access = 'read'
 
-    website_message_ids = fields.One2many(
-        'mail.message', 'res_id',
-        domain=lambda self: ['&', ('model', '=', self._name), ('message_type', '=', 'comment')],
-        string='Website Comments',
-    )
-    website_description = fields.Html('Description for the website', sanitize=False, translate=True)
+    website_description = fields.Html('Description for the website', sanitize_attributes=False, translate=html_translate)
     alternative_product_ids = fields.Many2many('product.template', 'product_alternative_rel', 'src_id', 'dest_id',
-                                               string='Suggested Products', help='Appear on the product page')
+                                               string='Alternative Products', help='Suggest more expensive alternatives to '
+                                               'your customers (upsell strategy). Those products show up on the product page.')
     accessory_product_ids = fields.Many2many('product.product', 'product_accessory_rel', 'src_id', 'dest_id',
-                                             string='Accessory Products', help='Appear on the shopping cart')
+                                             string='Accessory Products', help='Accessories show up when the customer reviews the '
+                                             'cart before paying (cross-sell strategy, e.g. for computers: mouse, keyboard, etc.). '
+                                             'An algorithm figures out a list of accessories based on all the products added to cart.')
     website_size_x = fields.Integer('Size X', default=1)
     website_size_y = fields.Integer('Size Y', default=1)
     website_style_ids = fields.Many2many('product.style', string='Styles')
     website_sequence = fields.Integer('Website Sequence', help="Determine the display order in the Website E-commerce",
                                       default=lambda self: self._default_website_sequence())
     public_categ_ids = fields.Many2many('product.public.category', string='Website Product Category',
-                                        help="Those categories are used to group similar products for e-commerce.")
-    availability = fields.Selection([
-        ('empty', 'Display Nothing'),
-        ('in_stock', 'In Stock'),
-        ('warning', 'Warning'),
-    ], "Availability", default='empty', help="This field is used to display a availability banner with a message on the ecommerce")
-    availability_warning = fields.Text("Availability Warning", translate=True)
+                                        help="Categories can be published on the Shop page (online catalog grid) to help "
+                                        "customers find all the items within a category. To publish them, go to the Shop page, "
+                                        "hit Customize and turn *Product Categories* on. A product can belong to several categories.")
+    product_image_ids = fields.One2many('product.image', 'product_tmpl_id', string='Images')
+
+    website_price = fields.Float('Website price', compute='_website_price', digits=dp.get_precision('Product Price'))
+    website_public_price = fields.Float('Website public price', compute='_website_price', digits=dp.get_precision('Product Price'))
+
+    def _website_price(self):
+        # First filter out the ones that have no variant:
+        # This makes sure that every template below has a corresponding product in the zipped result.
+        self = self.filtered('product_variant_id')
+        # use mapped who returns a recordset with only itself to prefetch (and don't prefetch every product_variant_ids)
+        for template, product in pycompat.izip(self, self.mapped('product_variant_id')):
+            template.website_price = product.website_price
+            template.website_public_price = product.website_public_price
 
     def _default_website_sequence(self):
-        min_sequence = self.sudo().search([], order='website_sequence', limit=1).website_sequence
+        self._cr.execute("SELECT MIN(website_sequence) FROM %s" % self._table)
+        min_sequence = self._cr.fetchone()[0]
         return min_sequence and min_sequence - 1 or 10
 
     def set_sequence_top(self):
@@ -126,44 +168,45 @@ class ProductTemplate(models.Model):
             return self.set_sequence_bottom()
 
     @api.multi
-    def _website_url(self, field_name, arg):
-        res = super(ProductTemplate, self)._website_url(field_name, arg)
+    def _compute_website_url(self):
+        super(ProductTemplate, self)._compute_website_url()
         for product in self:
-            res[product.id] = "/shop/product/%s" % (product.id,)
-        return res
-
-    @api.multi
-    def display_price(self, pricelist, qty=1, public=False, **kw):
-        self.ensure_one()
-        return self.product_variant_ids and self.product_variant_ids[0].display_price(pricelist, qty=qty, public=public) or 0
+            product.website_url = "/shop/product/%s" % (product.id,)
 
 
 class Product(models.Model):
     _inherit = "product.product"
+
+    website_price = fields.Float('Website price', compute='_website_price', digits=dp.get_precision('Product Price'))
+    website_public_price = fields.Float('Website public price', compute='_website_price', digits=dp.get_precision('Product Price'))
+
+    def _website_price(self):
+        qty = self._context.get('quantity', 1.0)
+        partner = self.env.user.partner_id
+        current_website = self.env['website'].get_current_website()
+        pricelist = current_website.get_current_pricelist()
+        company_id = current_website.company_id
+
+        context = dict(self._context, pricelist=pricelist.id, partner=partner)
+        self2 = self.with_context(context) if self._context != context else self
+
+        ret = self.env.user.has_group('sale.group_show_price_subtotal') and 'total_excluded' or 'total_included'
+
+        for p, p2 in pycompat.izip(self, self2):
+            taxes = partner.property_account_position_id.map_tax(p.taxes_id.filtered(lambda x: x.company_id == company_id))
+            p.website_price = taxes.compute_all(p2.price, pricelist.currency_id, quantity=qty, product=p2, partner=partner)[ret]
+            p.website_public_price = taxes.compute_all(p2.lst_price, quantity=qty, product=p2, partner=partner)[ret]
 
     @api.multi
     def website_publish_button(self):
         self.ensure_one()
         return self.product_tmpl_id.website_publish_button()
 
-    @api.multi
-    def display_price(self, pricelist, qty=1, public=False, **kw):
-        self.ensure_one()
-        partner = self.env.user.partner_id
-        context = {
-            'pricelist': pricelist.id,
-            'quantity': qty,
-            'partner': partner
-        }
-        ret = self.env.user.has_group('sale.group_show_price_subtotal') and 'total_excluded' or 'total_included'
-        taxes = partner.property_account_position_id.map_tax(self.taxes_id)
-        return taxes.compute_all(public and self.lst_price or self.with_context(context).price, pricelist.currency_id, qty, product=self, partner=partner)[ret]
-
 
 class ProductAttribute(models.Model):
     _inherit = "product.attribute"
 
-    type = fields.Selection([('radio', 'Radio'), ('select', 'Select'), ('color', 'Color'), ('hidden', 'Hidden')], default='radio')
+    type = fields.Selection([('radio', 'Radio'), ('select', 'Select'), ('color', 'Color')], default='radio')
 
 
 class ProductAttributeValue(models.Model):
@@ -172,3 +215,11 @@ class ProductAttributeValue(models.Model):
     html_color = fields.Char(string='HTML Color Index', oldname='color', help="Here you can set a "
                              "specific HTML color index (e.g. #ff0000) to display the color on the website if the "
                              "attibute type is 'Color'.")
+
+
+class ProductImage(models.Model):
+    _name = 'product.image'
+
+    name = fields.Char('Name')
+    image = fields.Binary('Image', attachment=True)
+    product_tmpl_id = fields.Many2one('product.template', 'Related Product', copy=True)

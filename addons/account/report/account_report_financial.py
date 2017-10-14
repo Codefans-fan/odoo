@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import time
-from openerp import api, models
+from odoo import api, models, _
+from odoo.exceptions import UserError
 
 
 class ReportFinancial(models.AbstractModel):
@@ -18,7 +19,7 @@ class ReportFinancial(models.AbstractModel):
 
         res = {}
         for account in accounts:
-            res[account.id] = dict((fn, 0.0) for fn in mapping.keys())
+            res[account.id] = dict.fromkeys(mapping, 0.0)
         if accounts:
             tables, where_clause, where_params = self.env['account.move.line']._query_get()
             tables = tables.replace('"', '') if tables else "account_move_line"
@@ -142,12 +143,15 @@ class ReportFinancial(models.AbstractModel):
                 lines += sorted(sub_lines, key=lambda sub_line: sub_line['name'])
         return lines
 
-    @api.multi
-    def render_html(self, data):
+    @api.model
+    def get_report_values(self, docids, data=None):
+        if not data.get('form') or not self.env.context.get('active_model') or not self.env.context.get('active_id'):
+            raise UserError(_("Form content is missing, this report cannot be printed."))
+
         self.model = self.env.context.get('active_model')
         docs = self.env[self.model].browse(self.env.context.get('active_id'))
         report_lines = self.get_account_lines(data.get('form'))
-        docargs = {
+        return {
             'doc_ids': self.ids,
             'doc_model': self.model,
             'data': data['form'],
@@ -155,4 +159,3 @@ class ReportFinancial(models.AbstractModel):
             'time': time,
             'get_account_lines': report_lines,
         }
-        return self.env['report'].render('account.report_financial', docargs)

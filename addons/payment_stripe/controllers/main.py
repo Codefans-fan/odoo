@@ -15,7 +15,7 @@ class StripeController(http.Controller):
     def stripe_s2s_create_json(self, **kwargs):
         acquirer_id = int(kwargs.get('acquirer_id'))
         acquirer = request.env['payment.acquirer'].browse(acquirer_id)
-        return acquirer.s2s_process(kwargs)
+        return acquirer.s2s_process(kwargs).id
 
     @http.route(['/payment/stripe/s2s/create'], type='http', auth='public')
     def stripe_s2s_create(self, **post):
@@ -24,30 +24,39 @@ class StripeController(http.Controller):
         acquirer.s2s_process(post)
         return werkzeug.utils.redirect(post.get('return_url', '/'))
 
+    @http.route(['/payment/stripe/s2s/create_json_3ds'], type='json', auth='public', csrf=False)
+    def stripe_s2s_create_json_3ds(self, verify_validity=False, **kwargs):
+        token = request.env['payment.acquirer'].browse(int(kwargs.get('acquirer_id'))).s2s_process(kwargs)
+
+        if not token:
+            res = {
+                'result': False,
+            }
+            return res
+
+        res = {
+            'result': True,
+            'id': token.id,
+            'short_name': token.short_name,
+            '3d_secure': False,
+            'verified': False,
+        }
+
+        if verify_validity != False:
+            token.validate()
+            res['verified'] = token.verified
+
+        return res
+
     @http.route(['/payment/stripe/create_charge'], type='json', auth='public')
     def stripe_create_charge(self, **post):
         """ Create a payment transaction
 
         Expects the result from the user input from checkout.js popup"""
-        acquirer = request.env['payment.acquirer'].browse(int(post.get('acquirer_id')))
-
-        sale_order_id = int(request.session.get('sale_order_id') or post.get('sale_order_id'))
-
-        order = request.env['sale.order'].sudo().browse(sale_order_id)
-        tx = request.env['payment.transaction'].sudo().create({
-            'acquirer_id': acquirer.id,
-            'reference': 'STRIPE-%s' % order.id,
-            'amount': float(post.get('amount')),
-            'currency_id': request.env['res.currency'].search([('name', '=', post.get('currency'))], limit=1).id,
-            'partner_id': request.env.user.partner_id.id,
-            'sale_order_id': order.id
-        })
-        order.write({
-            'payment_acquirer_id': acquirer.id,
-            'payment_tx_id': tx.id
-        })
-        request.session['sale_transaction_id'] = tx.id
-        response = tx._create_stripe_charge(tokenid=post['tokenid'])
+        tx = request.env['payment.transaction'].sudo().browse(
+            int(request.session.get('sale_transaction_id') or request.session.get('website_payment_tx_id', False))
+        )
+        response = tx._create_stripe_charge(tokenid=post['tokenid'], email=post['email'])
         _logger.info('Stripe: entering form_feedback with post data %s', pprint.pformat(response))
         if response:
             request.env['payment.transaction'].sudo().form_feedback(response, 'stripe')

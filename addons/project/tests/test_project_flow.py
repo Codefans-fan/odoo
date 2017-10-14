@@ -2,8 +2,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from .test_project_base import TestProjectBase
-from openerp.exceptions import AccessError
-from openerp.tools import mute_logger
+from odoo.tools import mute_logger
 
 
 EMAIL_TPL = """Return-Path: <whatever-2a840@postmaster.twitter.com>
@@ -11,7 +10,7 @@ X-Original-To: {to}
 Delivered-To: {to}
 To: {to}
 cc: {cc}
-Received: by mail1.openerp.com (Postfix, from userid 10002)
+Received: by mail1.odoo.com (Postfix, from userid 10002)
     id 5DF9ABFB2A; Fri, 10 Aug 2012 16:16:39 +0200 (CEST)
 Message-ID: {msg_id}
 Date: Tue, 29 Nov 2011 12:43:21 +0530
@@ -39,7 +38,7 @@ class TestProjectFlow(TestProjectBase):
         dogs = pigs.copy()
         self.assertEqual(len(dogs.tasks), 2, 'project: duplicating a project must duplicate its tasks')
 
-    @mute_logger('openerp.addons.mail.mail_thread')
+    @mute_logger('odoo.addons.mail.mail_thread')
     def test_task_process_without_stage(self):
         # Do: incoming mail from an unknown partner on an alias creates a new task 'Frogs'
         task = self.format_and_process(
@@ -55,8 +54,6 @@ class TestProjectFlow(TestProjectBase):
         # Test: messages
         self.assertEqual(len(task.message_ids), 2,
                          'project: message_process: newly created task should have 2 messages: creation and email')
-        self.assertEqual(task.message_ids[1].subtype_id.name, 'Task Opened',
-                         'project: message_process: first message of new task should have Task Created subtype')
         self.assertEqual(task.message_ids[0].author_id, self.user_projectuser.partner_id,
                          'project: message_process: second message should be the one from Agrolait (partner failed)')
         self.assertEqual(task.message_ids[0].subject, 'Frogs',
@@ -66,7 +63,7 @@ class TestProjectFlow(TestProjectBase):
         self.assertEqual(task.project_id.id, self.project_pigs.id, 'project_task: incorrect project')
         self.assertEqual(task.stage_id.sequence, False, "project_task: shouldn't have a stage, i.e. sequence=False")
 
-    @mute_logger('openerp.addons.mail.mail_thread')
+    @mute_logger('odoo.addons.mail.mail_thread')
     def test_task_process_with_stages(self):
         # Do: incoming mail from an unknown partner on an alias creates a new task 'Cats'
         task = self.format_and_process(

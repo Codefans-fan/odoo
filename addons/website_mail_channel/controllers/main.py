@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import werkzeug
+
 from datetime import datetime
 from dateutil import relativedelta
 
-from odoo import http, fields
+from odoo import http, fields, tools, _
 from odoo.http import request
-from odoo.addons.website.models.website import slug
+from odoo.addons.http_routing.models.ir_http import slug
 
 
 class MailGroup(http.Controller):
@@ -16,7 +18,8 @@ class MailGroup(http.Controller):
     def _get_archives(self, group_id):
         MailMessage = request.env['mail.message']
         groups = MailMessage._read_group_raw(
-            [('model', '=', 'mail.channel'), ('res_id', '=', group_id)], ['subject', 'date'],
+            [('model', '=', 'mail.channel'), ('res_id', '=', group_id), ('message_type', '!=', 'notification')],
+            ['subject', 'date'],
             groupby=["date"], orderby="date desc")
         for group in groups:
             (r, label) = group['date']
@@ -30,7 +33,7 @@ class MailGroup(http.Controller):
         """ date is (of course) a datetime so start and end are datetime
         strings, but we just want date strings
         """
-        return (datetime.datetime
+        return (datetime
             .strptime(dt, tools.DEFAULT_SERVER_DATETIME_FORMAT)
             .date() # may be unnecessary?
             .strftime(tools.DEFAULT_SERVER_DATE_FORMAT))
@@ -42,12 +45,12 @@ class MailGroup(http.Controller):
         # compute statistics
         month_date = datetime.today() - relativedelta.relativedelta(months=1)
         messages = request.env['mail.message'].read_group(
-            [('model', '=', 'mail.channel'), ('date', '>=', fields.Datetime.to_string(month_date))],
+            [('model', '=', 'mail.channel'), ('date', '>=', fields.Datetime.to_string(month_date)), ('message_type', '!=', 'notification')],
             [], ['res_id'])
         message_data = dict((message['res_id'], message['res_id_count']) for message in messages)
 
         group_data = dict((group.id, {'monthly_message_nbr': message_data.get(group.id, 0)}) for group in groups)
-        return request.website.render('website_mail_channel.mail_channels', {'groups': groups, 'group_data': group_data})
+        return request.render('website_mail_channel.mail_channels', {'groups': groups, 'group_data': group_data})
 
     @http.route(["/groups/is_member"], type='json', auth="public", website=True)
     def is_member(self, channel_id=0, **kw):
@@ -83,35 +86,44 @@ class MailGroup(http.Controller):
             :param channel_id : the channel id to join/quit
             :param subscription : 'on' to unsubscribe the user, 'off' to subscribe
         """
-        subscribe = subscription == 'on'
+        unsubscribe = subscription == 'on'
         channel = request.env['mail.channel'].browse(int(channel_id))
         partner_ids = []
 
         # search partner_id
         if request.env.user != request.website.user_id:
+            # connected users are directly (un)subscribed
             partner_ids = request.env.user.partner_id.ids
-        else:  # mail_thread method
+
+            # add or remove channel members
+            if unsubscribe:
+                channel.check_access_rule('read')
+                channel.sudo().write({'channel_partner_ids': [(3, partner_id) for partner_id in partner_ids]})
+                return "off"
+            else:  # add partner to the channel
+                request.session['partner_id'] = partner_ids[0]
+                channel.check_access_rule('read')
+                channel.sudo().write({'channel_partner_ids': [(4, partner_id) for partner_id in partner_ids]})
+            return "on"
+
+        else:
+            # public users will recieve confirmation email
             partner_ids = channel.sudo()._find_partner_from_emails([email], check_followers=True)
             if not partner_ids or not partner_ids[0]:
                 name = email.split('@')[0]
-                partner_ids = request.env['res.partner'].sudo().create({'name': name, 'email': email}).ids
+                partner_ids = [request.env['res.partner'].sudo().create({'name': name, 'email': email}).id]
 
-        # add or remove channel members
-        if subscribe:
-            channel.check_access_rule('read')
-            channel.sudo().write({'channel_partner_ids': [(3, partner_id) for partner_id in partner_ids]})
-            return False
-        else:  # add partner to the channel
-            request.session['partner_id'] = partner_ids[0]
-            channel.check_access_rule('read')
-            channel.sudo().write({'channel_partner_ids': [(4, partner_id) for partner_id in partner_ids]})
-        return True
+            channel.sudo()._send_confirmation_email(partner_ids, unsubscribe)
+            return "email"
 
     @http.route([
-        "/groups/<model('mail.channel'):group>",
-        "/groups/<model('mail.channel'):group>/page/<int:page>"
+        '''/groups/<model('mail.channel', "[('channel_type', '=', 'channel')]"):group>''',
+        '''/groups/<model('mail.channel'):group>/page/<int:page>'''
     ], type='http', auth="public", website=True)
     def thread_headers(self, group, page=1, mode='thread', date_begin=None, date_end=None, **post):
+        if group.channel_type != 'channel':
+            raise werkzeug.exceptions.NotFound()
+
         Message = request.env['mail.message']
 
         domain = [('model', '=', 'mail.channel'), ('res_id', '=', group.id), ('message_type', '!=', 'notification')]
@@ -138,12 +150,15 @@ class MailGroup(http.Controller):
             'date_end': date_end,
             'replies_per_page': self._replies_per_page,
         }
-        return request.website.render('website_mail_channel.group_messages', values)
+        return request.render('website_mail_channel.group_messages', values)
 
     @http.route([
-        '''/groups/<model('mail.channel'):group>/<model('mail.message', "[('model','=','mail.channel'), ('res_id','=',group[0])]"):message>''',
+        '''/groups/<model('mail.channel', "[('channel_type', '=', 'channel')]"):group>/<model('mail.message', "[('model','=','mail.channel'), ('res_id','=',group[0])]"):message>''',
     ], type='http', auth="public", website=True)
     def thread_discussion(self, group, message, mode='thread', date_begin=None, date_end=None, **post):
+        if group.channel_type != 'channel':
+            raise werkzeug.exceptions.NotFound()
+
         Message = request.env['mail.message']
         if mode == 'thread':
             base_domain = [('model', '=', 'mail.channel'), ('res_id', '=', group.id), ('parent_id', '=', message.parent_id and message.parent_id.id or False)]
@@ -162,12 +177,15 @@ class MailGroup(http.Controller):
             'next_message': next_message,
             'prev_message': prev_message,
         }
-        return request.website.render('website_mail_channel.group_message', values)
+        return request.render('website_mail_channel.group_message', values)
 
     @http.route(
-        '''/groups/<model('mail.channel'):group>/<model('mail.message', "[('model','=','mail.channel'), ('res_id','=',group[0])]"):message>/get_replies''',
+        '''/groups/<model('mail.channel', "[('channel_type', '=', 'channel')]"):group>/<model('mail.message', "[('model','=','mail.channel'), ('res_id','=',group[0])]"):message>/get_replies''',
         type='json', auth="public", methods=['POST'], website=True)
     def render_messages(self, group, message, **post):
+        if group.channel_type != 'channel':
+            return False
+
         last_displayed_id = post.get('last_displayed_id')
         if not last_displayed_id:
             return False
@@ -189,3 +207,43 @@ class MailGroup(http.Controller):
         return {
             'alias_name': group.alias_id and group.alias_id.alias_name and group.alias_id.alias_domain and '%s@%s' % (group.alias_id.alias_name, group.alias_id.alias_domain) or False
         }
+
+    @http.route("/groups/subscribe/<model('mail.channel'):channel>/<int:partner_id>/<string:token>", type='http', auth='public', website=True)
+    def confirm_subscribe(self, channel, partner_id, token, **kw):
+        subscriber = request.env['mail.channel.partner'].search([('channel_id', '=', channel.id), ('partner_id', '=', partner_id)])
+        if subscriber:
+            # already registered, maybe clicked twice
+            return request.render('website_mail_channel.invalid_token_subscription')
+
+        subscriber_token = channel._generate_action_token(partner_id, action='subscribe')
+        if token != subscriber_token:
+            return request.render('website_mail_channel.invalid_token_subscription')
+
+        # add partner
+        channel.sudo().write({'channel_partner_ids': [(4, partner_id)]})
+
+        return request.render("website_mail_channel.confirmation_subscription", {'subscribing': True})
+
+    @http.route("/groups/unsubscribe/<model('mail.channel'):channel>/<int:partner_id>/<string:token>", type='http', auth='public', website=True)
+    def confirm_unsubscribe(self, channel, partner_id, token, **kw):
+        subscriber = request.env['mail.channel.partner'].search([('channel_id', '=', channel.id), ('partner_id', '=', partner_id)])
+        if not subscriber:
+            # FIXME: remove try/except in master
+            try:
+                return request.render(
+                    'website_mail_channel.not_subscribed', {
+                    'partner_id': partner_id
+                })
+            except ValueError:
+                return _("The address %s is already unsubscribed or was never subscribed to any mailing list") % (
+                    partner_id.email
+                )
+
+        subscriber_token = channel._generate_action_token(partner_id, action='unsubscribe')
+        if token != subscriber_token:
+            return request.render('website_mail_channel.invalid_token_subscription')
+
+        # remove partner
+        channel.sudo().write({'channel_partner_ids': [(3, partner_id)]})
+
+        return request.render("website_mail_channel.confirmation_subscription", {'subscribing': False})

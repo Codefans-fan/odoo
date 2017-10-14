@@ -2,8 +2,9 @@
 
 from datetime import datetime
 import time
-from openerp import api, models
-from openerp.tools import DEFAULT_SERVER_DATE_FORMAT
+from odoo import api, models, _
+from odoo.exceptions import UserError
+from odoo.tools import DEFAULT_SERVER_DATE_FORMAT
 
 
 class ReportPartnerLedger(models.AbstractModel):
@@ -11,6 +12,7 @@ class ReportPartnerLedger(models.AbstractModel):
 
     def _lines(self, data, partner):
         full_account = []
+        currency = self.env['res.currency']
         query_get_data = self.env['account.move.line'].with_context(data['form'].get('used_context', {}))._query_get()
         reconcile_clause = "" if data['form']['reconciled'] else ' AND "account_move_line".reconciled = false '
         params = [partner.id, tuple(data['computed']['move_state']), tuple(data['computed']['account_ids'])] + query_get_data[2]
@@ -31,7 +33,7 @@ class ReportPartnerLedger(models.AbstractModel):
         lang_code = self.env.context.get('lang') or 'en_US'
         lang = self.env['res.lang']
         lang_id = lang._lang_get(lang_code)
-        date_format = lang.browse(lang_id).date_format
+        date_format = lang_id.date_format
         for r in res:
             r['date'] = datetime.strptime(r['date'], DEFAULT_SERVER_DATE_FORMAT).strftime(date_format)
             r['displayed_name'] = '-'.join(
@@ -40,6 +42,7 @@ class ReportPartnerLedger(models.AbstractModel):
             )
             sum += r['debit'] - r['credit']
             r['progress'] = sum
+            r['currency_id'] = currency.browse(r.get('currency_id'))
             full_account.append(r)
         return full_account
 
@@ -65,8 +68,11 @@ class ReportPartnerLedger(models.AbstractModel):
             result = contemp[0] or 0.0
         return result
 
-    @api.multi
-    def render_html(self, data):
+    @api.model
+    def get_report_values(self, docids, data=None):
+        if not data.get('form'):
+            raise UserError(_("Form content is missing, this report cannot be printed."))
+
         data['computed'] = {}
 
         obj_partner = self.env['res.partner']
@@ -103,9 +109,9 @@ class ReportPartnerLedger(models.AbstractModel):
         self.env.cr.execute(query, tuple(params))
         partner_ids = [res['partner_id'] for res in self.env.cr.dictfetchall()]
         partners = obj_partner.browse(partner_ids)
-        partners = sorted(partners, key=lambda x: (x.ref, x.name))
+        partners = sorted(partners, key=lambda x: (x.ref or '', x.name or ''))
 
-        docargs = {
+        return {
             'doc_ids': partner_ids,
             'doc_model': self.env['res.partner'],
             'data': data,
@@ -114,4 +120,3 @@ class ReportPartnerLedger(models.AbstractModel):
             'lines': self._lines,
             'sum_partner': self._sum_partner,
         }
-        return self.env['report'].render('account.report_partnerledger', docargs)

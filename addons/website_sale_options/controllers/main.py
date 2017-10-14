@@ -5,12 +5,13 @@ from odoo import http
 from odoo.http import request
 from odoo.addons.website_sale.controllers.main import WebsiteSale
 
+
 class WebsiteSaleOptions(WebsiteSale):
 
     @http.route(['/shop/product/<model("product.template"):product>'], type='http', auth="public", website=True)
     def product(self, product, category='', search='', **kwargs):
         r = super(WebsiteSaleOptions, self).product(product, category, search, **kwargs)
-        r.qcontext['optional_product_ids'] = map(lambda p: p.with_context({'active_id': p.id}), product.optional_product_ids)
+        r.qcontext['optional_product_ids'] = [p.with_context({'active_id': p.id}) for p in product.optional_product_ids]
         return r
 
     @http.route(['/shop/cart/update_option'], type='http', auth="public", methods=['POST'], website=True, multilang=False)
@@ -27,17 +28,26 @@ class WebsiteSaleOptions(WebsiteSale):
             if "optional-product-" in k and int(kw.get(k.replace("product", "add"))) and int(v) in option_ids:
                 optional_product_ids.append(int(v))
 
+        attributes = self._filter_attributes(**kw)
+
         value = {}
         if add_qty or set_qty:
-            value = order._cart_update(product_id=int(product_id),
-                add_qty=int(add_qty), set_qty=int(set_qty),
-                optional_product_ids=optional_product_ids)
+            value = order._cart_update(
+                product_id=int(product_id),
+                add_qty=int(add_qty),
+                set_qty=int(set_qty),
+                attributes=attributes,
+                optional_product_ids=optional_product_ids
+            )
 
         # options have all time the same quantity
         for option_id in optional_product_ids:
-            order._cart_update(product_id=option_id,
+            order._cart_update(
+                product_id=option_id,
                 set_qty=value.get('quantity'),
-                linked_line_id=value.get('line_id'))
+                attributes=attributes,
+                linked_line_id=value.get('line_id')
+            )
 
         return str(order.cart_quantity)
 
@@ -45,8 +55,9 @@ class WebsiteSaleOptions(WebsiteSale):
     def modal(self, product_id, **kw):
         pricelist = request.website.get_current_pricelist()
         product_context = dict(request.context)
+        quantity = kw['kwargs']['context']['quantity']
         if not product_context.get('pricelist'):
-            product_context['pricelist'] = int(pricelist)
+            product_context['pricelist'] = pricelist.id
         # fetch quantity from custom context
         product_context.update(kw.get('kwargs', {}).get('context', {}))
 
@@ -54,8 +65,18 @@ class WebsiteSaleOptions(WebsiteSale):
         to_currency = pricelist.currency_id
         compute_currency = lambda price: request.env['res.currency']._compute(from_currency, to_currency, price)
         product = request.env['product.product'].with_context(product_context).browse(int(product_id))
-        return request.website._render("website_sale_options.modal", {
+
+        main_product_attr_ids = self.get_attribute_value_ids(product)
+        for variant in main_product_attr_ids:
+            if variant[0] == product.id:
+                # We indeed need a list of lists (even with only 1 element)
+                main_product_attr_ids = [variant]
+                break
+
+        return request.env['ir.ui.view'].render_template("website_sale_options.modal", {
             'product': product,
+            'quantity': quantity,
             'compute_currency': compute_currency,
             'get_attribute_value_ids': self.get_attribute_value_ids,
+            'main_product_attr_ids': main_product_attr_ids,
         })

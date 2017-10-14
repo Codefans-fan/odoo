@@ -6,7 +6,7 @@ from odoo import api, fields, models, _
 
 
 class SaleOrder(models.Model):
-    """Add several date fields to Sale Orders, computed or user-entered"""
+    """Add several date fields to Sales Orders, computed or user-entered"""
     _inherit = 'sale.order'
 
     commitment_date = fields.Datetime(compute='_compute_commitment_date', string='Commitment Date', store=True,
@@ -37,7 +37,8 @@ class SaleOrder(models.Model):
                 dt = order_datetime + timedelta(days=line.customer_lead or 0.0)
                 dates_list.append(dt)
             if dates_list:
-                order.commitment_date = fields.Datetime.to_string(min(dates_list))
+                commit_date = min(dates_list) if order.picking_policy == 'direct' else max(dates_list)
+                order.commitment_date = fields.Datetime.to_string(commit_date)
 
     def _compute_picking_ids(self):
         super(SaleOrder, self)._compute_picking_ids()
@@ -46,7 +47,7 @@ class SaleOrder(models.Model):
             for pick in order.picking_ids:
                 dates_list.append(fields.Datetime.from_string(pick.date))
             if dates_list:
-                order.write({'effective_date': fields.Datetime.to_string(min(dates_list))})
+                order.effective_date = fields.Datetime.to_string(min(dates_list))
 
     @api.onchange('requested_date')
     def onchange_requested_date(self):
@@ -65,8 +66,8 @@ class SaleOrderLine(models.Model):
     _inherit = 'sale.order.line'
 
     @api.multi
-    def _prepare_order_line_procurement(self, group_id):
-        vals = super(SaleOrderLine, self)._prepare_order_line_procurement(group_id=group_id)
+    def _prepare_procurement_values(self, group_id):
+        vals = super(SaleOrderLine, self)._prepare_procurement_values(group_id=group_id)
         for line in self.filtered("order_id.requested_date"):
             date_planned = fields.Datetime.from_string(line.order_id.requested_date) - timedelta(days=line.order_id.company_id.security_lead)
             vals.update({

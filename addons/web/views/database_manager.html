@@ -32,7 +32,9 @@
           var modal  = $(this).parentsUntil('body', '.modal');
           if (modal.hasClass('o_database_backup')) {
             $(modal).modal('hide');
-            $('.list-group').before("<div class='alert alert-info'>The backup may take some time before being ready</div>");
+            if (!$('.alert-backup-long').length) {
+              $('.list-group').before("<div class='alert alert-info alert-backup-long'>The backup may take some time before being ready</div>");              
+            }
           }
       });
   });
@@ -52,14 +54,13 @@
 
 {% macro create_form() -%}
   <p>Odoo is up and running! <br />
-  Create a new database by filling out the form,
-  you'll be able to install your first app in a minute.</p>
+  Fill out this form to create a new database. You will install your first app afterwards.</p>
   {{ master_input() }}
   <div class="form-group">
     <div class="row">
       <div class="col-md-12">
         <label for="name" class="control-label">Database Name</label>
-        <input id="name" type="text" name="name" class="form-control" required="required" autocomplete="off"/>
+        <input id="name" type="text" name="name" class="form-control" required="required" autocomplete="off" pattern="{{ pattern }}" title="Only alphanumerical characters, underscore, hyphen and dot are allowed"/>
       </div>
     </div>
   </div>
@@ -67,7 +68,7 @@
     <div class="row">
       <div class="col-md-12">
         <label for="login" class="control-label">Email</label>
-        <input id="login" type="text" name="login" class="form-control" autocomplete="off"/>
+        <input id="login" type="text" name="login" class="form-control" required="required" autocomplete="off"/>
       </div>
     </div>
   </div>
@@ -115,7 +116,11 @@
       <div class="text-center">
         <img src="/web/static/src/img/logo2.png" class="img-responsive center-block"/>
       </div>
-      {% if insecure and databases %}
+      {% if not list_db %}
+      <div class="alert alert-danger text-center">
+      The database manager has been disabled by the administrator
+      </div>
+      {% elif insecure and databases %}
       <div class="alert alert-warning">
       Warning, your Odoo database manager is not protected.
       Please <a href="#" data-toggle="modal" data-target=".o_database_master">set a master password</a>
@@ -125,10 +130,13 @@
       {% if error %}
       <div class="alert alert-danger">{{ error }}</div>
       {% endif %}
-      {% if databases %}
+      {% if list_db and databases %}
         <div class="list-group">
           {% for db in databases %}
-          <a href="/web?db={{ db }}" class="list-group-item">
+          <a href="/web?db={{ db }}" class="list-group-item" >
+            {% if db in incompatible_databases %}
+              <i class="icon fa fa-warning pull-right text-warning" title="This database may not be compatible"></i>
+            {% endif %}
             {{ db }}
             {% if manage %}
             <div class="text-right pull-right">
@@ -157,7 +165,7 @@
           <a href="/web/database/manager">Manage databases</a>
         </div>
         {% endif %}
-      {% else %}
+      {% elif list_db %}
         <form role="form" action="/web/database/create" method="post">
           {{ create_form() }}
           <input type="submit" value="Create database" class="btn btn-primary pull-left"/>
@@ -206,7 +214,7 @@
             </div>
             <div class="form-group">
               <label for="name" class="control-label">Database Name</label>
-              <input id="name" type="text" name="name" class="form-control" required="required"/>
+              <input id="name" type="text" name="name" class="form-control" required="required" pattern="{{ pattern }}" title="Only alphanumerical characters, underscore, hyphen and dot are allowed"/>
             </div>
             <div class="form-group">
                 <label for="copy">This database might have been moved or copied.</label>
@@ -279,7 +287,7 @@
             </div>
             <div class="form-group">
               <label for="new_name" class="control-label">New Name</label>
-              <input id="new_name" type="text" name="new_name" class="form-control" required="required"/>
+              <input id="new_name" type="text" name="new_name" class="form-control" required="required" pattern="{{ pattern }}" title="Only alphanumerical characters, underscore, hyphen and dot are allowed"/>
             </div>
           </div>
           <div class="modal-footer">
